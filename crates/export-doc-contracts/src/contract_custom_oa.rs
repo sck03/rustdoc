@@ -1,5 +1,25 @@
 //! Reviewed pre-production break: scoped settings writes and versioned custom forms.
 use serde_json::{Value, json};
+// Reviewed addition: freight and factory payments use the same reimbursement workflow.
+pub(super) fn expense_categories(baseline: &mut Value) {
+    for name in ["OaExpenseLine", "OaMaterialOaExpenseLine"] {
+        let categories =
+            &mut baseline["components"]["schemas"][name]["properties"]["category"]["enum"];
+        assert_eq!(
+            *categories,
+            json!(["Travel", "Transport", "Meals", "Office", "Other"])
+        );
+        *categories = json!([
+            "Travel",
+            "Transport",
+            "Meals",
+            "Office",
+            "Freight",
+            "FactoryPayment",
+            "Other"
+        ]);
+    }
+}
 pub(super) fn apply(baseline: &mut Value) {
     let schemas = &mut baseline["components"]["schemas"];
     schemas

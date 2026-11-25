@@ -54,7 +54,16 @@ pub fn expense_total(lines: &Value, currency: &str, today: NaiveDate) -> Result<
         .ok_or("费用明细须为 1–100 行。")?;
     let mut total = Decimal::ZERO;
     for line in lines {
-        if !["Travel", "Transport", "Meals", "Office", "Other"].contains(&string(line, "category"))
+        if ![
+            "Travel",
+            "Transport",
+            "Meals",
+            "Office",
+            "Freight",
+            "FactoryPayment",
+            "Other",
+        ]
+        .contains(&string(line, "category"))
         {
             return Err("费用类别无效。".into());
         }

@@ -23840,6 +23840,8 @@
               "Transport",
               "Meals",
               "Office",
+              "Freight",
+              "FactoryPayment",
               "Other"
             ]
           },
@@ -24284,6 +24286,8 @@
               "Transport",
               "Meals",
               "Office",
+              "Freight",
+              "FactoryPayment",
               "Other"
             ]
           },

@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "87150534835f56daa136f20b89143c8b63c6c65c0ed348f7e25133f8e3da1ed1",
+  "digest": "493bfd89cb2ee7a032616298fdf0a66910357a603bc0961a2012bbbdf05a2a11",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -115539,6 +115539,8 @@
             "Transport",
             "Meals",
             "Office",
+            "Freight",
+            "FactoryPayment",
             "Other"
           ]
         },
@@ -115983,6 +115985,8 @@
             "Transport",
             "Meals",
             "Office",
+            "Freight",
+            "FactoryPayment",
             "Other"
           ]
         },

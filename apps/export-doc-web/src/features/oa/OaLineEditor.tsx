@@ -3,7 +3,7 @@ import type { OaExpenseLine, OaRequestSave } from "../../api/index.ts";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
 import { OfficeField } from "../office/OfficeUi.tsx";
 
-export const expenseCategories = { Travel: "差旅", Transport: "交通", Meals: "餐饮", Office: "办公", Other: "其他" } as const;
+export const expenseCategories = { Travel: "差旅", Transport: "交通", Meals: "餐饮", Office: "办公", Freight: "运费", FactoryPayment: "工厂付款", Other: "其他" } as const;
 export function OaLineEditor({ draft, setDraft, purchase, businessDate }: {
   draft: OaRequestSave; setDraft: Dispatch<SetStateAction<OaRequestSave>>; purchase: boolean; businessDate: string;
 }) {

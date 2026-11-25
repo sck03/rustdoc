@@ -35,6 +35,11 @@ fn prior_policy(id: &str) -> &'static Value {
         ))
         .unwrap();
         policies.extend(additions.as_object().unwrap().clone());
+        // Reviewed self-service endpoint authorizes the authenticated account without a resource grant.
+        policies.insert(
+            CHANGE_OWN_PASSWORD.id.into(),
+            serde_json::json!({"permissionBypass":true}),
+        );
         // Never-submitted draft deletion uses the existing edit right; ordering is directory management.
         for (operation, resource, action) in [
             (

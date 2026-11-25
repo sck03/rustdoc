@@ -13,7 +13,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("startPeriod",s().enumeration(Enumeration::Values(vec![serde_json::json!("AM"),serde_json::json!("PM")]))),("endPeriod",s().enumeration(Enumeration::Values(vec![serde_json::json!("AM"),serde_json::json!("PM")])))
     ]).required(vec!["category","startsOn","endsOn","startPeriod","endPeriod"])),
     ("OaExpenseLine",o(vec![
-        ("category",s().enumeration(Enumeration::Values(vec![serde_json::json!("Travel"),serde_json::json!("Transport"),serde_json::json!("Meals"),serde_json::json!("Office"),serde_json::json!("Other")]))),("spentOn",s().format("date")),("description",s()),
+        ("category",s().enumeration(Enumeration::Values(vec![serde_json::json!("Travel"),serde_json::json!("Transport"),serde_json::json!("Meals"),serde_json::json!("Office"),serde_json::json!("Freight"),serde_json::json!("FactoryPayment"),serde_json::json!("Other")]))),("spentOn",s().format("date")),("description",s()),
         ("amount",s().pattern("^[0-9]+(\\.[0-9]{1,2})?$"))
     ]).required(vec!["category","spentOn","description","amount"])),
     ("OaPurchaseLine",o(vec![
@@ -407,7 +407,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ("OaMaterialOaTravel",o(vec![("destination",s()),("startsOn",s().format("date")),("endsOn",s().format("date"))]).required(vec![])),
     ("OaMaterialOaOvertime",o(vec![("startsAt",s().format("date-time")),("endsAt",s().format("date-time")),("location",s())]).required(vec![])),
     ("OaMaterialOaExpenseLine",o(vec![
-        ("category",s().enumeration(Enumeration::Values(vec![serde_json::json!("Travel"),serde_json::json!("Transport"),serde_json::json!("Meals"),serde_json::json!("Office"),serde_json::json!("Other")]))),("spentOn",s().format("date")),("description",s()),
+        ("category",s().enumeration(Enumeration::Values(vec![serde_json::json!("Travel"),serde_json::json!("Transport"),serde_json::json!("Meals"),serde_json::json!("Office"),serde_json::json!("Freight"),serde_json::json!("FactoryPayment"),serde_json::json!("Other")]))),("spentOn",s().format("date")),("description",s()),
         ("amount",s().pattern("^[0-9]+(\\.[0-9]{1,2})?$"))
     ]).required(vec![])),
     ("OaMaterialOaPurchaseLine",o(vec![

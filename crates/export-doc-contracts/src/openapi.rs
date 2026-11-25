@@ -270,6 +270,7 @@ mod tests {
         contract_import_preview::apply(&mut baseline);
         browser_downloads::apply(&mut baseline);
         account_security::apply(&mut baseline);
+        custom_oa::expense_categories(&mut baseline);
         if let Some(change) = difference("contract", &document(), &baseline) {
             panic!("undeclared contract change: {change}");
         }

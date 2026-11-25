@@ -50,10 +50,28 @@ await withOfficeUi('finance-receipt-ui', async ({ output, url, invoke, openPage,
   await publishDefinitions(invoke, admin, settings, ['expense'], { expense:[sample] });
   const account = (await invoke('ListUsers', undefined, {}, admin)).users.find(user => user.id === users[2].id);
   await invoke('updateUserAccount', { ...account, expectedVersion:account.versionNumber, resetPassword:'' }, { id:account.id }, admin);
-  const applicant = (await invoke('Login', { username:'finance-applicant', password:'Finance-Receipt-2026' })).accessToken;
+  const applicantLogin = await invoke('Login', { username:'finance-applicant', password:'Finance-Receipt-2026' });
+  const applicant = applicantLogin.accessToken;
   const requestTitle = '业务部本月海外客户拜访交通与办公用品费用报销-' + 'ExpenseReference'.repeat(3);
-  const request = await invoke('CreateExpenseRequest', { requestKey:randomUUID(), title:requestTitle, reason:'其他员工费用报销', currency:'CNY', lines:[{ category:'Other', spentOn:'2026-11-24', description:'交通费', amount:'12.35' }] }, {}, applicant);
-  const proof = new FormData(); proof.set('file', new Blob(['%PDF-1.7\n%%EOF'], { type:'application/pdf' }), 'proof.pdf'); proof.set('expectedVersion', String(request.versionNumber));
+  const request = await invoke('CreateExpenseRequest', { requestKey:randomUUID(), title:requestTitle, reason:'其他员工费用报销', currency:'CNY', lines:[{ category:'Other', spentOn:applicantLogin.user.businessDate, description:'交通费', amount:'12.35' }] }, {}, applicant);
+  const applicantPage = await openPage('finance-applicant', 'Finance-Receipt-2026');
+  await applicantPage.goto(`${url}/#/office/requests/expense?requestId=${request.id}`);
+  await applicantPage.getByRole('button', { name:'编辑草稿', exact:true }).click();
+  const editor = applicantPage.getByRole('dialog');
+  assert.deepEqual(await editor.getByLabel('费用类别').locator('option').allTextContents(), ['差旅','交通','餐饮','办公','运费','工厂付款','其他']);
+  await editor.getByLabel('费用类别').selectOption({ label:'运费' });
+  await editor.getByLabel('费用说明').fill('出口货物运费');
+  await editor.getByLabel('金额', { exact:true }).fill('4.35');
+  await editor.getByRole('button', { name:'添加明细', exact:true }).click();
+  await editor.getByLabel('费用类别').nth(1).selectOption({ label:'工厂付款' });
+  await editor.getByLabel('费用说明').nth(1).fill('工厂货款');
+  await editor.getByLabel('金额', { exact:true }).nth(1).fill('8.00');
+  await editor.getByRole('button', { name:'保存草稿', exact:true }).click();
+  await editor.waitFor({ state:'hidden' });
+  const saved = await invoke('GetExpenseRequest', undefined, { id:request.id }, applicant);
+  assert.deepEqual(saved.lines.map(line => line.category), ['Freight','FactoryPayment']);
+  assert.equal(saved.totalAmount, '12.35');
+  const proof = new FormData(); proof.set('file', new Blob(['%PDF-1.7\n%%EOF'], { type:'application/pdf' }), 'proof.pdf'); proof.set('expectedVersion', String(saved.versionNumber));
   const uploaded = await fetch(`${url}/api/office/expense-requests/${request.id}/attachments`, { method:'POST', headers:{ authorization:`Bearer ${applicant}` }, body:proof });
   assert(uploaded.ok, await uploaded.text());
   const latest = await invoke('GetExpenseRequest', undefined, { id:request.id }, applicant);
@@ -91,6 +109,9 @@ await withOfficeUi('finance-receipt-ui', async ({ output, url, invoke, openPage,
   await page.setViewportSize({width:1440,height:1000});
   await page.goto(`${url}/#/office/requests/expense?view=finance&requestId=${request.id}`);
   await page.getByText(requestTitle, { exact:true }).first().waitFor();
+  await page.locator('ol.oa-lines').getByText(/^运费 ·/u).waitFor();
+  await page.locator('ol.oa-lines').getByText(/^工厂付款 ·/u).waitFor();
+  await page.screenshot({ path:path.join(output, 'expense-category-details.png'), fullPage:true });
   const liveFinance = (await invoke('Login', { username:'finance-receiver', password:'Finance-Receipt-2026' })).accessToken;
   const row = await invoke('GetExpenseRequest', undefined, { id:request.id }, liveFinance);
   const financeNotifications = await invoke('ListNotifications', undefined, {}, liveFinance);
@@ -113,5 +134,6 @@ await withOfficeUi('finance-receipt-ui', async ({ output, url, invoke, openPage,
   await page.screenshot({ path:path.join(output, 'finance-receipt.png'), fullPage:true });
   fs.writeFileSync(path.join(output, 'summary.json'), JSON.stringify({ defaultFinanceScope:true, noDefaultApproval:true, administratorExcluded:true, publication:true, crossEmployeeReceiptVisible:true,
     combinedDepartmentApproval:true, financeNotifications:true, unreadCount:true, readAll:true, receiptOnlyAfterApproval:true, currentReceiptState:true,
+    expenseCategoryOptions:true, freightAndFactoryPaymentSave:true, expenseCategoryDetails:true, exactExpenseTotal:true,
     longChineseAndUnbrokenEnglishTitle:true }, null, 2));
 });

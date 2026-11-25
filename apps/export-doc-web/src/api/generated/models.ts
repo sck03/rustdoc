@@ -5102,7 +5102,7 @@ export interface OaExclusiveBranch {
 
 export interface OaExpenseLine {
   amount: string;
-  category: "Travel" | "Transport" | "Meals" | "Office" | "Other";
+  category: "Travel" | "Transport" | "Meals" | "Office" | "Freight" | "FactoryPayment" | "Other";
   description: string;
   spentOn: string;
 }
@@ -5192,7 +5192,7 @@ export interface OaMaterialAccess {
 
 export interface OaMaterialOaExpenseLine {
   amount?: string;
-  category?: "Travel" | "Transport" | "Meals" | "Office" | "Other";
+  category?: "Travel" | "Transport" | "Meals" | "Office" | "Freight" | "FactoryPayment" | "Other";
   description?: string;
   spentOn?: string;
 }
