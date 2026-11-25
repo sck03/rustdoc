@@ -239,8 +239,8 @@ function factoryPayment() {
         [9, [goodsField("goods-2"), goodsField("quantity-2"), cell("receipt-label", "收汇日期", 1, { style: center })]],
         [9, [goodsField("goods-3"), goodsField("quantity-3"), binding("receipt", "Payment.ReceiptDate", 1, { rowSpan: 2, style: center })]],
         [9, [goodsField("goods-4"), goodsField("quantity-4")]],
-        [14, [binding("payee", "Payment.PayeeName", 4, { label: "货源单位名称：", labelPosition: "Prefix", style: { bold: true } }), cell("bank", "", 2)]],
-        [10, [cell("amount-label", "金额（价税合计）", 1, { style: { ...center, fontSizePt: 7, marginLeftMm: 0.3, marginRightMm: 0.3 } }), binding("amount-upper", "cny_amount_upper", 4, { style: { bold: true } }), binding("amount", "Payment.CNYAmount", 2, { label: "小写：￥", labelPosition: "Prefix", style: { bold: true } })]],
+        [14, [binding("payee", "Payment.PayeeName", 3, { label: "货源单位名称：", labelPosition: "Prefix", style: { bold: true } }), cell("bank", "", 3)]],
+        [10, [cell("amount-label", "金额（价税合计）", 1, { style: { ...center, fontSizePt: 7, marginLeftMm: 0.3, marginRightMm: 0.3 } }), binding("amount-upper", "cny_amount_upper", 3, { style: { bold: true } }), binding("amount", "Payment.CNYAmount", 3, { label: "小写：￥", labelPosition: "Prefix", style: { bold: true } })]],
       ], 8, serif),
       grid(`${id}-signatures`, 12, 117 + offset, 180, [34,32,34], [[8, [cell("department-signature", "部门经理签字："), cell("review-signature", "复核："), cell("manager-signature", "总经理签字：")]]], 9, serif, false),
       text(`${id}-stub`, stub, 193, 53 + offset, 7, 40, 10, "Center", false, serif),
@@ -271,7 +271,7 @@ function factoryPayment() {
         [12, [checks("tax-middle", "Payment.TaxRebateRate", ["9%", "6%"], 1, 1, noBorder)]],
         [12, [checks("tax-bottom", "Payment.TaxRebateRate", ["0%", "其他"], 1, 1, noBorder)]],
       ], 8, serif, false),
-      grid(`${id}-bank-details`, left(5), 88 + offset, width(5) + width(6), [36,64], [
+      grid(`${id}-bank-details`, left(4), 88 + offset, width(4) + width(5) + width(6), [28,72], [
         [7, [cell("bank-label", "开户银行帐号：", 1, { rowSpan: 2, style: { fontSizePt: 7.5 } }), binding("bank-name", "Payment.BankName", 1, { style: { bold: true } })]],
         [7, [binding("bank-account", "Payment.AccountNo", 1, { style: { bold: true } })]],
       ], 8, serif, false),

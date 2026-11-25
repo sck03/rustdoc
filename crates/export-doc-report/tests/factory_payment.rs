@@ -116,3 +116,39 @@ fn existing_single_goods_remain_available_to_editable_template_fields() {
     assert_eq!(data.text("Payment.Goods1.QuantityText"), "12.5箱");
     assert!(data.text("Payment.Goods2.GoodsName").is_empty());
 }
+
+#[test]
+fn expanded_bank_area_keeps_long_names_and_accounts_on_their_own_lines() {
+    let bank_name = "中国工商银行股份有限公司宁波市海曙支行";
+    let account_no = "1234567890123456789012";
+    let mut payment = ApiPaymentDto {
+        bank_name: bank_name.into(),
+        account_no: account_no.into(),
+        cny_amount: "232151.04".parse().unwrap(),
+        ..Default::default()
+    };
+    let data = ReportData::payment(&payment, json!({})).unwrap();
+    let document = render_builtin(Builtin::FactoryPayment, &data, &AtomicBool::new(false)).unwrap();
+    let svg = &document.pages[0].svg;
+    assert_eq!(
+        positions(svg, bank_name).len(),
+        2,
+        "the entire bank name must occupy one line in each copy"
+    );
+    assert_eq!(positions(svg, account_no).len(), 2);
+    let label = positions(svg, "开户银行帐号：");
+    let amount = positions(svg, "小写：￥232151.04");
+    for copy in 0..2 {
+        assert!((label[copy].0 - amount[copy].0).abs() < 0.1);
+        assert!(
+            label[copy].0 < 115.,
+            "bank and amount must start at the expanded boundary"
+        );
+    }
+    payment.bank_name = "中".repeat(20);
+    let data = ReportData::payment(&payment, json!({})).unwrap();
+    assert!(
+        render_builtin(Builtin::FactoryPayment, &data, &AtomicBool::new(false)).is_err(),
+        "overlong names must fail clearly instead of being cut off or overwriting the account"
+    );
+}
