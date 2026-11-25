@@ -9,7 +9,7 @@ import { getRolePresentation } from "../../app/userRoles.ts";
 import { useRouteQuery } from "../../ui/useRouteQuery.ts";
 import { readRouteId } from "../../ui/routeQueryState.ts";
 import { useScopedMutation } from "../../ui/useScopedMutation.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 
 type UserCommand = { kind: "save"; body: ApiUserSaveRequest } | { kind: "delete" } | { kind: "refresh" } | { kind: "new" } | { kind: "select"; user: ApiUserAccountDto };
 

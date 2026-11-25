@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { BusinessAttachmentCategoryRecord, BusinessAttachmentDelete, BusinessAttachmentDetails as AttachmentDetails, BusinessAttachmentMetadataUpdate, BusinessAttachmentRevisionRecord, BusinessAttachmentUpdate } from "../../api/index.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { attachmentVersionLabel, canPreviewAttachment, fileSizeLabel } from "./attachmentModel.ts";
 import { BusinessAttachmentMetadataForm } from "./BusinessAttachmentMetadataForm.tsx";

@@ -1,23 +1,18 @@
-import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ConfirmationDialog } from "./ConfirmationDialog.tsx";
-
-export type ConfirmationRequest = {
-  title: string;
-  description: string;
-  details?: string[];
-  confirmLabel?: string;
-  tone?: "danger" | "warning";
-};
+import { ConfirmationContext, type ConfirmationRequest } from "./confirmationContext.ts";
 
 type PendingConfirmation = ConfirmationRequest & {
   resolve: (confirmed: boolean) => void;
 };
 
-const ConfirmationContext = createContext<((request: ConfirmationRequest) => Promise<boolean>) | null>(null);
-
 export function ConfirmationProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<PendingConfirmation | null>(null);
   const pendingRef = useRef<PendingConfirmation | null>(null);
+  useEffect(() => () => {
+    pendingRef.current?.resolve(false);
+    pendingRef.current = null;
+  }, []);
 
   const confirm = useCallback((request: ConfirmationRequest) => {
     pendingRef.current?.resolve(false);
@@ -51,12 +46,4 @@ export function ConfirmationProvider({ children }: { children: ReactNode }) {
       ) : null}
     </ConfirmationContext.Provider>
   );
-}
-
-export function useConfirmation() {
-  const confirm = useContext(ConfirmationContext);
-  if (!confirm) {
-    throw new Error("useConfirmation must be used inside ConfirmationProvider.");
-  }
-  return confirm;
 }

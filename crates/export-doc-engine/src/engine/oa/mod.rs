@@ -369,7 +369,6 @@ pub(super) fn handle(
                 | "withdraw"
                 | "cancel"
                 | "void"
-                | "complete"
                 | "approval-reassign"
                 | "resource-submit"
                 | "workflow-command"
@@ -422,7 +421,7 @@ pub(super) fn handle(
             return decisions::list(tx, &actor, &row, query);
         }
         store::check_version(&row, store::expected(body))?;
-        if matches!(action.as_str(), "fulfillment" | "complete") {
+        if action == "fulfillment" {
             return fulfillment::execute(tx, &actor, meta, row, body, today);
         }
         if matches!(action.as_str(), "personnel-execute" | "personnel-cancel") {
@@ -511,7 +510,7 @@ pub(super) fn handle(
         if note.chars().count() > 500
             || (matches!(
                 action.as_str(),
-                "reject" | "return" | "cancel" | "withdraw" | "void" | "complete" | "remind"
+                "reject" | "return" | "cancel" | "withdraw" | "void" | "remind"
             ) && note.is_empty())
         {
             return Err(invalid(

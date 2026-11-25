@@ -23,7 +23,7 @@ export function ApprovalDelegationsEditor({ value, accounts, timeZone, onChange 
         <OfficeField label="代理人"><select value={item.delegateUserId} onChange={event => change(index, { delegateUserId: Number(event.target.value) })}>{accountOptions}</select></OfficeField>
         {(["startsAt", "endsAt"] as const).map(key => <OfficeField key={key} label={key === "startsAt" ? "代理开始时间" : "代理结束时间"}>
           <input type="datetime-local" required value={toBusinessDateTimeLocalInput(item[key], timeZone)} onChange={event => {
-            try { change(index, { [key]: businessDateTimeLocalInputToIso(event.target.value, timeZone) ?? "" }); }
+            try { change(index, { [key]: businessDateTimeLocalInputToIso(event.target.value, timeZone, item[key]) ?? "" }); }
             catch (error) { event.target.setCustomValidity(readApiError(error)); event.target.reportValidity(); }
           }} onInput={event => event.currentTarget.setCustomValidity("")} />
         </OfficeField>)}

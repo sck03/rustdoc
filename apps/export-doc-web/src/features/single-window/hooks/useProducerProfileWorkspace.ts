@@ -4,7 +4,7 @@ import type { ApiCustomsCooProducerProfileDto, ApiCustomsCooProducerProfileInput
 import { queryKeys } from "../../../api/queryKeys.ts";
 import { readApiError } from "../../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../../ui/unsavedChangesGuard.tsx";
-import { useConfirmation } from "../../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../../ui/confirmationContext.ts";
 import { useServerPageNumber } from "../../../ui/useServerPageNumber.ts";
 import { useScopedMutation } from "../../../ui/useScopedMutation.ts";
 import { toDraft, normalizeProfileInput, producerProfileDraftEquals, hasProducerIdentity, buildProfileDisplayName, type ProducerProfileDraft } from "../producerProfileModel.ts";

@@ -3,7 +3,7 @@ import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { isDesktopBridgeAvailable, selectReportTemplatePackageFile, selectSaveReportTemplatePackagePath } from "../../desktop/desktopBridge.ts";
 import { readDesktopError } from "../../ui/DesktopPathActions.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
-import type { ConfirmationRequest } from "../../ui/ConfirmationProvider.tsx";
+import type { ConfirmationRequest } from "../../ui/confirmationContext.ts";
 import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { useReportTemplatePackageMutations } from "./useReportTemplatePackageMutations.ts";
 import { buildTemplatePackageFileName, fileNameFromPath, type ReportTypeOption, type TemplateImportStrategyOption } from "./reportTemplateDesignerModel.ts";

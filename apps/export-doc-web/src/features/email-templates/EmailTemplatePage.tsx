@@ -24,7 +24,7 @@ import {
 } from "./emailTemplateModel.ts";
 import { useEmailTemplateWorkspace } from "./useEmailTemplateWorkspace.ts";
 import { usePermission } from "../../app/PermissionAccessContext.tsx";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { EmailHtmlPreview, EmailRichTextEditor } from "../../ui/EmailRichTextEditor.tsx";
 import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 import { Pagination } from "../../ui/primitives/Pagination.tsx";

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ApiInvoiceListItemDto, ApiReportTemplateDto, BackgroundJobSnapshot, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { downloadCompletedJobResult, downloadJobResultWhenReady } from "../../ui/downloadJobResult.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useScopedMutation } from "../../ui/useScopedMutation.ts";

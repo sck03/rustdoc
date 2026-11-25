@@ -125,8 +125,8 @@ function RequestEditor({
             registration: { ...body.personnelChange.registration, requestKey: body.requestKey },
           };
         if (draft.overtime) {
-          const startsAt = businessDateTimeLocalInputToIso(draft.overtime.startsAt, user.businessTimeZone);
-          const endsAt = businessDateTimeLocalInputToIso(draft.overtime.endsAt, user.businessTimeZone);
+          const startsAt = businessDateTimeLocalInputToIso(draft.overtime.startsAt, user.businessTimeZone, record?.overtime?.startsAt);
+          const endsAt = businessDateTimeLocalInputToIso(draft.overtime.endsAt, user.businessTimeZone, record?.overtime?.endsAt);
           if (!startsAt || !endsAt) throw new Error("请填写完整加班时段。");
           body.overtime = { ...draft.overtime, startsAt, endsAt };
         }

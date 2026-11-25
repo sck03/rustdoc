@@ -1,6 +1,6 @@
 import { useLayoutEffect, useState } from "react";
 import type { ApiSingleWindowLockedFieldDto } from "../../api/index.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import type { SingleWindowDocumentWorkspace } from "./useSingleWindowDocumentWorkspace.ts";
 
 type Options<T extends object> = {

@@ -24,7 +24,7 @@ import { readApiError } from "../../ui/formUtils.ts";
 import { isComposingKey } from "../../ui/keyboardEvent.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { ServerDraftUpdateNotice, useServerDraftSync } from "../../ui/serverDraftSync.tsx";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
 import { getClipboardPasteInstruction, readClipboardText } from "../../ui/clipboard.ts";

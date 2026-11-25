@@ -8022,36 +8022,6 @@ export interface CompleteCrmFollowUpRequest {
   body: ApiCrmLifecycleRequest;
 }
 
-export interface CompleteExpenseRequestRequest {
-  id: number;
-  body: OaCommandAction;
-}
-
-export interface CompleteGeneralRequestRequest {
-  id: number;
-  body: OaCommandAction;
-}
-
-export interface CompleteLeaveRequestRequest {
-  id: number;
-  body: OaCommandAction;
-}
-
-export interface CompleteOvertimeRequestRequest {
-  id: number;
-  body: OaCommandAction;
-}
-
-export interface CompletePurchaseRequestRequest {
-  id: number;
-  body: OaCommandAction;
-}
-
-export interface CompleteTravelRequestRequest {
-  id: number;
-  body: OaCommandAction;
-}
-
 export interface ConfirmAnnouncementReadRequest {
   id: number;
   body: AnnouncementRead;

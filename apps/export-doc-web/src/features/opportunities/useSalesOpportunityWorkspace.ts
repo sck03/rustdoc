@@ -5,7 +5,7 @@ import type { ApiSalesOpportunityDto, ExportDocManagerApiClient } from "../../ap
 import { queryKeys } from "../../api/queryKeys.ts";
 import { usePermission } from "../../app/PermissionAccessContext.tsx";
 import { permissionActions, permissionResources } from "../../app/permissionCatalog.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
 import { useDirectoryLocation } from "../../ui/useDirectoryLocation.ts";
 import { usePagedDirectoryQuery } from "../../ui/usePagedDirectoryQuery.ts";

@@ -10,7 +10,7 @@ import {
   selectDisasterRecoveryPackageFile,
   type RuntimeStorageContext,
 } from "../../desktop/desktopBridge.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { waitForJobCompletion } from "../../ui/downloadJobResult.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { isStrongRecoveryPassword, readDesktopError, updateBackupQuery } from "./backupManagementModel.ts";

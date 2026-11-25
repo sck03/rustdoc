@@ -279,6 +279,26 @@ mod tests {
         custom_oa::expense_categories(&mut baseline);
         payment_goods::apply(&mut baseline);
         oa_payment_labels::apply(&mut baseline);
+        // The fulfillment command is the sole handling entry; no deployed
+        // clients require the six duplicate completion routes.
+        for kind in [
+            "leave", "overtime", "expense", "travel", "purchase", "general",
+        ] {
+            let path = format!("/api/office/{kind}-requests/{{id}}/complete");
+            assert!(
+                baseline["paths"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove(&path)
+                    .is_some()
+            );
+            assert!(document()["paths"].get(&path).is_none());
+            assert!(
+                document()["paths"]
+                    .get(format!("/api/office/{kind}-requests/{{id}}/fulfillment"))
+                    .is_some()
+            );
+        }
         if let Some(change) = difference("contract", &document(), &baseline) {
             panic!("undeclared contract change: {change}");
         }

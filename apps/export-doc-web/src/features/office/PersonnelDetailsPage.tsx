@@ -18,7 +18,7 @@ import { PersonnelFormDialog } from "./PersonnelFormDialog.tsx";
 import { PersonnelAccountDialog } from "./PersonnelAccountDialog.tsx";
 import { PersonnelUnlinkAccountDialog } from "./PersonnelUnlinkAccountDialog.tsx";
 import { PersonnelImagesPanel } from "./PersonnelImagesPanel.tsx";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { RecordDeleteDialog } from "./RecordDeleteDialog.tsx";
 import { PersonnelOrganizationFacts } from "./PersonnelOrganizationEditor.tsx";
 

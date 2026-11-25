@@ -8,7 +8,7 @@ pub(crate) use frames::FramedProcess;
 
 use crate::{api::ApiError, operation};
 use std::{
-    io::{Read, Write},
+    io::Read,
     process::{Child, Command, ExitStatus, Stdio},
     sync::mpsc,
     thread,
@@ -120,6 +120,22 @@ pub fn run(
     output_limit: usize,
     timeout: Duration,
 ) -> Result<Output, ApiError> {
+    run_reader(
+        command,
+        std::io::Cursor::new(input.as_ref()),
+        output_limit,
+        timeout,
+    )
+}
+
+/// Stream a bounded, local input without creating a second in-memory frame.
+/// Killing the process closes the pipe before scoped writers are joined.
+pub fn run_reader(
+    command: &mut Command,
+    mut input: impl Read + Send,
+    output_limit: usize,
+    timeout: Duration,
+) -> Result<Output, ApiError> {
     let mut process = Process::spawn(command, true)?;
     let mut stdin = process
         .child
@@ -136,11 +152,10 @@ pub fn run(
         .stderr
         .take()
         .ok_or_else(|| failure("工具缺少诊断管道。"))?;
-    let input = input.as_ref();
     thread::scope(move |threads| {
         // The process guard is dropped before scoped pipe threads are joined on unwind.
         let mut process = process;
-        let writer = threads.spawn(move || stdin.write_all(input));
+        let writer = threads.spawn(move || std::io::copy(&mut input, &mut stdin));
         let (sender, receiver) = mpsc::channel();
         let reader = threads.spawn(move || {
             let _ = sender.send(read(stdout, output_limit, true));

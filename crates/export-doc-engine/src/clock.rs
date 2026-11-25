@@ -55,11 +55,20 @@ impl BusinessClock {
         }
         let next = day.succ_opt().ok_or("日期超出范围。")?;
         Ok((
-            self.parse_local_input(&format!("{day} 00:00"))?
-                .to_rfc3339(),
-            self.parse_local_input(&format!("{next} 00:00"))?
-                .to_rfc3339(),
+            self.day_start(day)?.to_rfc3339(),
+            self.day_start(next)?.to_rfc3339(),
         ))
+    }
+    // Calendar boundaries use the first real instant, while appointments remain
+    // strict. A wholly skipped date has an empty range at the next valid date.
+    fn day_start(&self, day: NaiveDate) -> Result<DateTime<Utc>, String> {
+        let midnight = day.and_hms_opt(0, 0, 0).ok_or("业务日期无效。")?;
+        self.zone
+            .from_local_datetime(&midnight)
+            .earliest()
+            .or_else(|| chrono_tz::GapInfo::new(&midnight, &self.zone).and_then(|gap| gap.end))
+            .map(|instant| instant.with_timezone(&Utc))
+            .ok_or_else(|| "业务日期超出时区支持范围。".into())
     }
     pub fn new(zone: &str) -> Result<Self, String> {
         zone.parse()
@@ -72,13 +81,7 @@ impl BusinessClock {
     pub fn at(&self, now: DateTime<Utc>) -> Result<BusinessTime, String> {
         let today = now.with_timezone(&self.zone).date_naive();
         let tomorrow = today.succ_opt().ok_or("业务日期超出范围。")?;
-        let midnight = tomorrow.and_hms_opt(0, 0, 0).ok_or("业务日期无效。")?;
-        let valid_until = self
-            .zone
-            .from_local_datetime(&midnight)
-            .earliest()
-            .ok_or("业务时区的次日零点不存在。")?
-            .with_timezone(&Utc);
+        let valid_until = self.day_start(tomorrow)?;
         Ok(BusinessTime {
             today,
             utc_now: now,
@@ -91,6 +94,41 @@ impl BusinessClock {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn calendar_boundaries_handle_skipped_midnights_dates_and_repeated_midnights() {
+        let zone = BusinessClock::new("America/Santiago").unwrap();
+        let time = zone.at("2026-09-05T16:00:00Z".parse().unwrap()).unwrap();
+        assert_eq!(time.valid_until.to_rfc3339(), "2026-09-06T04:00:00+00:00");
+        let (from, to) = zone.day_range("2026-09-06").unwrap();
+        assert_eq!(from, time.valid_until.to_rfc3339());
+        assert_eq!(
+            (DateTime::parse_from_rfc3339(&to).unwrap()
+                - DateTime::parse_from_rfc3339(&from).unwrap())
+            .num_hours(),
+            23
+        );
+        assert!(zone.parse_local_input("2026-09-06 00:00").is_err());
+
+        let zone = BusinessClock::new("Pacific/Apia").unwrap();
+        let time = zone.at("2011-12-29T20:00:00Z".parse().unwrap()).unwrap();
+        let (from, to) = zone.day_range("2011-12-30").unwrap();
+        assert_eq!(from, to);
+        assert_eq!(from, time.valid_until.to_rfc3339());
+        assert_eq!(
+            zone.at(time.valid_until).unwrap().today.to_string(),
+            "2011-12-31"
+        );
+
+        let zone = BusinessClock::new("America/Havana").unwrap();
+        let (from, to) = zone.day_range("2026-11-01").unwrap();
+        assert_eq!(
+            (DateTime::parse_from_rfc3339(&to).unwrap()
+                - DateTime::parse_from_rfc3339(&from).unwrap())
+            .num_hours(),
+            25
+        );
+        assert!(zone.parse_local_input("2026-11-01 00:30").is_err());
+    }
     #[test]
     fn local_appointments_roundtrip_without_using_the_host_time_zone() {
         let zone = BusinessClock::new("America/New_York").unwrap();

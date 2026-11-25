@@ -63,6 +63,27 @@ fn output_limit_stops_the_process_and_releases_all_pipes() {
 }
 
 #[test]
+fn streamed_input_is_read_in_bounded_chunks_and_transferred_exactly() {
+    struct Chunked(std::io::Take<std::io::Repeat>);
+    impl Read for Chunked {
+        fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+            assert!(buffer.len() <= 64 * 1024);
+            self.0.read(buffer)
+        }
+    }
+    let size = 4 * 1024 * 1024;
+    let output = controlled_process::run_reader(
+        &mut child("echo"),
+        Chunked(std::io::repeat(0xab).take(size)),
+        size as usize + 1024,
+        Duration::from_secs(10),
+    )
+    .unwrap();
+    assert!(output.status.success());
+    assert!(output.stdout.ends_with(&vec![0xab; size as usize]));
+}
+
+#[test]
 fn cancellation_and_timeout_release_a_blocked_input_writer() {
     let input = vec![0; 1024 * 1024];
     let scope = OperationScope::new(Duration::from_secs(10));
@@ -75,9 +96,9 @@ fn cancellation_and_timeout_release_a_blocked_input_writer() {
         });
         let error = scope
             .run(|| {
-                controlled_process::run(
+                controlled_process::run_reader(
                     &mut child("idle"),
-                    input.as_slice(),
+                    std::io::Cursor::new(input.as_slice()),
                     32768,
                     Duration::from_secs(10),
                 )

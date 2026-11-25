@@ -1,5 +1,5 @@
 import { ApiError, type ApiHsCodeDto, type ExportDocManagerApiClient } from "../../api/index.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { mergeHsCodeReference, normalizeHsCodeDtoForSave } from "./masterDataModel.ts";
 

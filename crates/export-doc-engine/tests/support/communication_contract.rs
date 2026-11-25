@@ -477,7 +477,12 @@ pub fn exercise(service: &NativeService, admin: &str) -> i64 {
         Some(409)
     );
     assert_eq!(count(service, &reader), 2);
-    action(service, manager, COMPLETE_GENERAL_REQUEST, &request);
+    action(
+        service,
+        manager,
+        EXECUTE_GENERAL_REQUEST_FULFILLMENT,
+        &request,
+    );
     assert_eq!(count(service, &reader), 3);
     let inbox = call(
         service,

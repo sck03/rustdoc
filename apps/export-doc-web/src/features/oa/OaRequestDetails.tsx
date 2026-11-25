@@ -40,7 +40,7 @@ export function OaRequestDetails({ client, user, row, onEdit, onDeleted }: { cli
   const editable = !row.materialAccess?.isPartial && ["Draft", "Returned"].includes(row.status) && oaAccess(user, row.kind, "edit", row);
   const api = oaApi(client, row.kind);
   const actions = oaActions(row, user);
-  const primaryAction = actions.find(action => ["submit", "approve", "complete"].includes(action));
+  const primaryAction = actions.find(action => ["submit", "approve"].includes(action));
   return <article className="oa-detail">
     <header className="oa-detail-summary">
     <div className="office-card-heading"><h2>{row.title ?? `申请 #${row.id}`}</h2><span className="office-badge" data-state={row.status}>{oaStatus[row.status]}</span></div>
@@ -97,7 +97,6 @@ function OaActionDialog({ client, row, action, onClose }: { client: ExportDocMan
   const label = typeof action === "number" ? "移除附件" : oaActionLabel(action, row.kind);
   return <OfficeDialog title={label} onClose={onClose} {...operation} protectChanges>
     <p>{row.title} · {requestPersonLabel(row.employeeName, row)}</p>
-    {action === "complete" && <p className="office-muted">{row.kind === "expense" ? "请核对已批准的明细和凭证，填写接收说明或财务软件接收编号。系统保留办理人和时间；付款在独立财务软件中完成。" : "请如实记录办理结果；采购请注明验收情况，通用申请请注明交付内容。"}</p>}
     <form onSubmit={(event) => { event.preventDefault(); const api = oaApi(client, row.kind); const body = { expectedVersion: row.versionNumber, note, taskKey, verificationValues, confirmedReviewPoints };
       void operation.run((signal) => typeof action === "number" ? api.remove(row.id, action, body, { signal }) : api.action(action, row.id, body, { signal }), onClose);
     }}>

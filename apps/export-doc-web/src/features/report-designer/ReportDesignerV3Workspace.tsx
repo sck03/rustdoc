@@ -59,7 +59,7 @@ import { ComponentPalette, FieldPanel, type PaletteActions } from "./ReportDesig
 import { focusDesignerNode } from "./ReportDesignerV3InspectorControls.tsx";
 import { insertProductField } from "./reportDesignerProductFields.ts";
 import { getV3InsertionIssue } from "./reportDesignerV3Insertion.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { ReportDesignerPendingInputContext } from "./ReportDesignerPendingInputContext.tsx";
 
 type V3SidebarTab = "components" | "fields" | "layers";

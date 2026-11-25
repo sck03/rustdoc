@@ -12,7 +12,7 @@ import type { SettingPatch, SettingsRecord } from "./settingsTypes.ts";
 import { isDesktopBridgeAvailable, selectDirectory } from "../../desktop/desktopBridge.ts";
 import { filterSettingsCategories, settingsCategories, allSettingsCategories, type SettingsCategoryKey } from "./settingsCategoryCatalog.ts";
 import { readSettingsCategoryFromSearch } from "./settingsNavigationModel.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { useRouteQuery } from "../../ui/useRouteQuery.ts";
 import { useSettingsMaintenanceActions } from "./useSettingsMaintenanceActions.ts";

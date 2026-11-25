@@ -3,6 +3,7 @@ mod merge;
 pub(crate) use credit::extract_text;
 mod native;
 use crate::{api::ApiError, engine::error::unavailable, paths::ensure_safe_absolute};
+pub(crate) use merge::write_input as write_merge_input;
 pub use merge::{MAX_MERGE_INPUT, merge};
 use std::{
     io::{Read, Write},

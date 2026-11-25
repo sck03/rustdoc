@@ -2,7 +2,7 @@ import { FileInput } from "../../ui/FileInput.tsx";
 import { useState } from "react";
 import type { ExportDocManagerApiClient, PersonnelImageKind, PersonnelImageRecord, PersonnelRecord } from "../../api/index.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { OfficeDialog } from "./OfficeUi.tsx";
 import type { useOfficeOperation } from "./useOfficeData.ts";
 import { usePersonnelImage } from "./usePersonnelImage.ts";

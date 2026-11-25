@@ -99,7 +99,7 @@ await withOfficeUi('approval-permissions-ui', async ({ output, url, invoke, open
     const approved = await invoke(`Get${op}Request`, undefined, { id: row.id }, login.accessToken);
     assert.equal(approved.status, kind === 'personnel' ? 'Completed' : 'Approved');
     assert.equal(approved.approvalPlan.steps[0].actedByUserId, account.id);
-    if (kind === 'general') await assert.rejects(() => invoke('CompleteGeneralRequest', { expectedVersion: approved.versionNumber, note: '审批不授予办结' }, { id: row.id }, login.accessToken), /403/u);
+    if (kind === 'general') await assert.rejects(() => invoke('ExecuteGeneralRequestFulfillment', { expectedVersion: approved.versionNumber, note: '审批不授予办结' }, { id: row.id }, login.accessToken), /403/u);
   }
   assert.equal((await invoke('GetPersonnel', undefined, { id: employee.employee.id }, adminToken)).employee.status, 'Active');
   await gm.screenshot({ path: path.join(output, 'manager-personnel-approved.png'), fullPage: true });

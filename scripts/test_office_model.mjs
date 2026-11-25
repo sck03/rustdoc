@@ -98,7 +98,10 @@ for (const scope of ["own", "department", "company", "all"]) {
   assert(!oa.oaAccess({ ...oaManager, capabilities: { permissions: [{ resourceKey: "office.leave", action: "view", dataScope: scope }] } }, "leave", "view", { ...cross, kind: "leave" }));
 }
 assert(office.officeAccess({ ...user, capabilities: { permissions: [...grants("own"), ...grants("company")] } }, "rooms").allows("cancel", row), "permission alternatives remain a union");
-assert.equal(oa.oaActionLabel("complete","expense"), "财务接收", "expense completion records handoff without implying payment");
+assert.equal(oa.oaHandlingLabels.expense, "财务接收", "fulfillment records handoff without implying payment");
+assert.deepEqual(oa.oaActions({ ...row, kind: "expense", status: "Approved", workflowTasks: [] }, {
+  ...user, capabilities: { permissions: [{ resourceKey: "office.expenses", action: "complete", dataScope: "company" }] },
+}), [], "handling is exclusively exposed by the workflow fulfillment panel");
 assert.equal(office.officeStatus({ ...row, status: "InUse" }, user.businessDate, Date.parse(row.endsAt)), "超时未归还");
 assert.equal(office.officeStatus({ ...row, status: "InUse", requiresKey:false }, user.businessDate, Date.parse(row.endsAt)), "超时未结束");
 assert(isRouteAccessAllowed({ pathname:"/office/approvals", user, canManageSystem:false, isDesktopRuntime:false }), "resource-only users can reach the shared request hub");
@@ -110,6 +113,11 @@ for (const [day, hours] of [["2026-03-08", 23], ["2026-11-01", 25]]) {
   assert.equal((Date.parse(range.to) - Date.parse(range.from)) / 3600000, hours, "calendar days must honor daylight saving time");
 }
 assert.equal(office.officeDayRange("2026-02-30", "Asia/Shanghai"), null);
+assert.deepEqual(office.officeDayRange("2026-09-06", "America/Santiago"), { from: "2026-09-06T04:00:00.000Z", to: "2026-09-07T03:00:00.000Z" });
+const skipped = office.officeDayRange("2011-12-30", "Pacific/Apia");
+assert.equal(skipped.from, skipped.to);
+const repeated = office.officeDayRange("2026-11-01", "America/Havana");
+assert.equal((Date.parse(repeated.to) - Date.parse(repeated.from)) / 3600000, 25);
 assert.equal(office.shiftOfficeBookingEnd("2026-03-08T02:30", "America/New_York"), "");
 assert.equal(office.shiftOfficeBookingEnd("2026-09-07T10:30", "Asia/Shanghai"), "2026-09-07T11:30");
 assert.equal(getDefaultWorkspaceRoute(user.capabilities), "/office/approvals", "Full employees enter their authorized application workspace");

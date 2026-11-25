@@ -8,7 +8,7 @@ import { isComposingKey } from "../../ui/keyboardEvent.ts";
 import { isConcurrencyConflict, normalizeText, readApiError, readRouteSuccessMessage } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { useServerDraftSync } from "../../ui/serverDraftSync.tsx";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { useScopedConfirmation } from "../../ui/useScopedConfirmation.ts";
 import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";

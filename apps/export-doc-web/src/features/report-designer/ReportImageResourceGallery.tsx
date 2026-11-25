@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiReportTemplateImageResourceResponse, ExportDocManagerApiClient } from "../../api/index.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useAbortableOperation, isAbortError } from "../../ui/useAbortableOperation.ts";
 import { ReportResourceImage } from "./ReportResourceImage.tsx";

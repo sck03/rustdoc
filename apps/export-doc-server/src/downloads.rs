@@ -111,11 +111,17 @@ impl Tickets {
             nonce().map_err(ApiError::local)?
         );
         let binding = if binding.is_empty() {
-            format!(
-                "{}{}",
-                nonce().map_err(ApiError::local)?,
-                nonce().map_err(ApiError::local)?
-            )
+            // Parallel initial requests have not received Set-Cookie yet.
+            // Reuse this session's live binding under the bounded ticket lock.
+            if let Some(ticket) = entries.values().find(|ticket| ticket.session == session) {
+                ticket.binding.clone()
+            } else {
+                format!(
+                    "{}{}",
+                    nonce().map_err(ApiError::local)?,
+                    nonce().map_err(ApiError::local)?
+                )
+            }
         } else {
             binding.into()
         };
@@ -183,6 +189,53 @@ impl Tickets {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn concurrent_initial_tickets_share_a_cookie_without_crossing_sessions() {
+        let tickets = Tickets::default();
+        let barrier = std::sync::Barrier::new(8);
+        let issued = std::thread::scope(|threads| {
+            (0..8)
+                .map(|id| {
+                    let (tickets, barrier) = (&tickets, &barrier);
+                    threads.spawn(move || {
+                        barrier.wait();
+                        tickets
+                            .issue(Target::Job(id.to_string()), "first", "", true)
+                            .unwrap()
+                    })
+                })
+                .collect::<Vec<_>>()
+                .into_iter()
+                .map(|thread| thread.join().unwrap())
+                .collect::<Vec<_>>()
+        });
+        let cookie = &issued[0].1;
+        let mut headers = HeaderMap::new();
+        headers.insert("cookie", cookie.parse().unwrap());
+        let binding = binding(&headers);
+        for (value, next_cookie) in &issued {
+            assert_eq!(cookie, next_cookie);
+            assert!(
+                tickets
+                    .resolve(
+                        DOWNLOAD_JOB_RESULT_WITH_TICKET,
+                        value["token"].as_str().unwrap(),
+                        &binding
+                    )
+                    .is_ok()
+            );
+        }
+        let (_, other_cookie) = tickets
+            .issue(Target::Job("other".into()), "second", "", true)
+            .unwrap();
+        assert_ne!(cookie, &other_cookie);
+        tickets.revoke("first").unwrap();
+        let (_, renewed) = tickets
+            .issue(Target::Job("new".into()), "first", "", true)
+            .unwrap();
+        assert_ne!(cookie, &renewed);
+    }
+
     #[test]
     fn tickets_require_the_bound_browser_and_are_revoked_on_logout() {
         let tickets = Tickets::default();

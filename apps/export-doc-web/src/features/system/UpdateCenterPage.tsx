@@ -15,7 +15,7 @@ import {
   type TauriUpdaterInstallResult,
   type TauriUpdaterProgress,
 } from "../../desktop/desktopBridge.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { readUpdaterEndpoint } from "./updaterEndpointModel.ts";

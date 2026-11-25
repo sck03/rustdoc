@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { ApiInvoiceDetailDto, ApiInvoiceItemDto, ApiProductDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { normalizeText, readApiError } from "../../ui/formUtils.ts";
 import {

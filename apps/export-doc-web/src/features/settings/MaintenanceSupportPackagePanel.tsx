@@ -8,7 +8,7 @@ import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
 import { downloadJobResultWhenReady } from "../../ui/downloadJobResult.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { formatBytes } from "./settingsFormatters.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 

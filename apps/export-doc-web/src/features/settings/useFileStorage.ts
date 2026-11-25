@@ -5,7 +5,7 @@ import { queryKeys } from "../../api/queryKeys.ts";
 import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { isTerminalJob } from "../jobs/jobPresentation.ts";
 import { queryPollingInterval } from "../../api/queryPollingPolicy.ts";
 

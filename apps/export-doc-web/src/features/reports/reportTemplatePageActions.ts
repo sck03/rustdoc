@@ -1,6 +1,6 @@
 import type { FormEvent } from "react";
 import type { ApiUserReportTemplateDto } from "../../api/index.ts";
-import type { ConfirmationRequest } from "../../ui/ConfirmationProvider.tsx";
+import type { ConfirmationRequest } from "../../ui/confirmationContext.ts";
 import type { UserReportTemplateLifecycleAction } from "./useUserReportTemplateLifecycleMutations.ts";
 
 type Confirm = (request: ConfirmationRequest) => Promise<boolean>;

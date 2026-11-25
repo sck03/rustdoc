@@ -22,7 +22,7 @@ export function oaApi(client: ExportDocManagerApiClient, kind: OaKind) {
       const body=officeCommand(client,`${kind}:${id}:${action}`,input);
       return execute(id,body,init,(request,options) => {
         if (action === "return") return client[`returnForCorrection${name}Request`](request,options);
-        if (action === "complete" || action === "void") {
+        if (action === "void") {
           if (kind === "personnel") throw new Error("人员变动最终批准后自动生效；后续变更须另行申请。");
           return client[`${action}${names[kind]}Request`](request,options);
         }

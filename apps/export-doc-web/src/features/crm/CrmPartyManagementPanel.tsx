@@ -2,7 +2,7 @@ import { useEffect, useState, type ComponentProps, type FormEvent } from "react"
 import { Pagination } from "../../ui/primitives/Pagination.tsx";
 import type { ApiCrmContactDto, ApiCrmCustomerDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { requestErrorFeedback, successFeedback, warningFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { isAbortError } from "../../ui/useAbortableOperation.ts";
 import { runRecordAction } from "../../ui/runRecordAction.ts";

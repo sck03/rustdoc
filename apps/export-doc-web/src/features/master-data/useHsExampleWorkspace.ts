@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ExportDocManagerApiClient, HsCodeDeclarationExample, HsCodeExampleInput } from "../../api/index.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { mergeSavedDraftFields } from "../../ui/recordDraftMerge.ts";
 import { useScopedSave } from "../../ui/useScopedSave.ts";

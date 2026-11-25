@@ -12,7 +12,7 @@ import type {
 import { ExportDocManagerApiClient } from "../../../api/index.ts";
 import { queryKeys } from "../../../api/queryKeys.ts";
 import { readApiError } from "../../../ui/formUtils.ts";
-import { useConfirmation } from "../../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../../ui/confirmationContext.ts";
 import { useScopedConfirmation } from "../../../ui/useScopedConfirmation.ts";
 import { useTransientPreview } from "../../../ui/useTransientPreview.ts";
 import {

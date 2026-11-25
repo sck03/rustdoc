@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useConfirmation } from "./ConfirmationProvider.tsx";
+import { useConfirmation } from "./confirmationContext.ts";
 
 const defaultUnsavedChangesMessage = "当前页面有未保存的修改。";
 

@@ -3,7 +3,7 @@ import type { ApiCrmFollowUpDto, ExportDocManagerApiClient } from "../../../api/
 import { useScopedSave } from "../../../ui/useScopedSave.ts";
 import { useVersionedRecordDraft } from "../../../ui/useVersionedRecordDraft.ts";
 import { isAbortError } from "../../../ui/useAbortableOperation.ts";
-import { useConfirmation } from "../../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../../ui/confirmationContext.ts";
 import { businessDateTimeLocalInputToIso, toBusinessDateTimeLocalInput } from "../../../ui/businessTime.ts";
 import { requestErrorFeedback, successFeedback, warningFeedback, type OperationFeedbackState } from "../../../ui/OperationFeedback.tsx";
 
@@ -37,7 +37,7 @@ export function useFollowUpCommands(options: {
       const body = {
         id: record?.id ?? 0, crmCustomerId: customerId, crmContactId: Number(submitted.crmContactId) || undefined,
         type: submitted.type || "邮件", summary: submitted.summary, nextAction: submitted.nextAction,
-        nextFollowUpAt: businessDateTimeLocalInputToIso(submitted.nextFollowUpAt, timeZone),
+        nextFollowUpAt: businessDateTimeLocalInputToIso(submitted.nextFollowUpAt, timeZone, record?.nextFollowUpAt),
         expectedVersion: draft.record?.versionNumber ?? 0,
       };
       const saved = record

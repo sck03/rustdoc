@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import type { BusinessAttachmentCategoryRecord } from "../../api/index.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 
 export function BusinessAttachmentCategoryManager({ items, busy, onSave, onDelete, onClose }: {

@@ -7,7 +7,7 @@ import {
 } from "../../desktop/desktopBridge.ts";
 import { readDesktopError } from "../../ui/DesktopPathActions.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
-import type { ConfirmationRequest } from "../../ui/ConfirmationProvider.tsx";
+import type { ConfirmationRequest } from "../../ui/confirmationContext.ts";
 import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { useReportTemplateFileMutations } from "./useReportTemplateFileMutations.ts";
 import { buildTemplateFileName, fileNameFromPath, type ReportTypeOption } from "./reportTemplateDesignerModel.ts";

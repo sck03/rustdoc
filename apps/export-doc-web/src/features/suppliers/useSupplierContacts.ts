@@ -5,7 +5,7 @@ import { largeDocumentQueryOptions } from "../../api/queryRetention.ts";
 import { useVersionedRecordDraft } from "../../ui/useVersionedRecordDraft.ts";
 import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { useScopedConfirmation } from "../../ui/useScopedConfirmation.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 import { requestErrorFeedback, successFeedback, warningFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";

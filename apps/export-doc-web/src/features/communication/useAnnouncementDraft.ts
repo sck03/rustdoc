@@ -18,8 +18,8 @@ export function useAnnouncementDraft(client: ExportDocManagerApiClient, user: Ap
   useUnsavedChangesGuard({ isDirty: dirty, message: "公告有未保存的修改。" });
   function save() {
     void operation.run(signal => {
-      const startsAt = businessDateTimeLocalInputToIso(draft.startsAt, user.businessTimeZone);
-      const expiresAt = businessDateTimeLocalInputToIso(draft.expiresAt, user.businessTimeZone);
+      const startsAt = businessDateTimeLocalInputToIso(draft.startsAt, user.businessTimeZone, record?.startsAt);
+      const expiresAt = businessDateTimeLocalInputToIso(draft.expiresAt, user.businessTimeZone, record?.expiresAt);
       if (!startsAt || !expiresAt) throw new Error("请填写完整的有效期。");
       const body = { ...draft, startsAt, expiresAt };
       return attachments.save(JSON.stringify(body), signal,

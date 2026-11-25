@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { ApiSettingsResponse, AppSettings, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { isConcurrencyConflict, readApiError } from "../../ui/formUtils.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { useScopedConfirmation } from "../../ui/useScopedConfirmation.ts";
 import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { cloneSettings, setNestedValue } from "../settings/settingsValueUtils.ts";

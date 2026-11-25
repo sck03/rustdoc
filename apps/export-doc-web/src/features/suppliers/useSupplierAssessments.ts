@@ -5,7 +5,7 @@ import { largeDocumentQueryOptions } from "../../api/queryRetention.ts";
 import { useSupplierRelatedWorkspace, type SupplierRelatedView } from "./useSupplierRelatedWorkspace.ts";
 import { ASSESSMENT_FIELDS, emptyAssessment, assessmentRequest } from "./supplierAssessmentModel.ts";
 import { useScopedMutation } from "../../ui/useScopedMutation.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { requestErrorFeedback, successFeedback, warningFeedback } from "../../ui/OperationFeedback.tsx";
 

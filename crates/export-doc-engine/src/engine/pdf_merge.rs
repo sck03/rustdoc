@@ -1,13 +1,16 @@
 use super::{
     NativeService, auth,
-    error::{Result, error, invalid},
+    error::{Result, error, invalid, unavailable},
     media,
     store::Actor,
     tasks::{FileOutput, TaskOutput},
 };
 use crate::{generated_api::*, paths};
 use serde_json::Value;
-use std::path::PathBuf;
+use std::{
+    io::{Seek, SeekFrom, Write},
+    path::PathBuf,
+};
 pub const OPERATIONS: &[Operation] = &[
     START_PDF_MERGE_SAVE_TO_PATH_JOB,
     UPLOAD_AND_START_PDF_MERGE_DOWNLOAD_JOB,
@@ -49,12 +52,21 @@ fn start(
     let store = service.store.clone();
     let task_actor = actor.clone();
     let library = service.paths.pdfium_path();
+    // Request admission still owns the uploaded buffers here. Jobs retain only
+    // an anonymous, budgeted file, released on rejection, cancellation or exit.
+    let mut input = paths::anonymous_file(&service.paths.cache_root).map_err(unavailable)?;
+    {
+        let mut writer = service.paths.disk_space.writer(&mut input)?;
+        crate::pdf::write_merge_input(files.into_iter().map(|file| file.content), &mut writer)?;
+        writer.flush()?;
+    }
+    input.seek(SeekFrom::Start(0))?;
     service
         .jobs
         .start(actor, operation, "PdfMerge", "合并 PDF", move |_| {
             auth::authorize_operation(&auth::refresh_actor(&store, &task_actor)?, operation, &[])?;
-            let inputs = files.into_iter().map(|f| f.content).collect::<Vec<_>>();
-            let merged = crate::pdf::merge(&inputs, &library)?;
+            let _rendering = super::reports::resources::acquire_for_job()?;
+            let merged = crate::pdf::merge(input, &library)?;
             auth::authorize_operation(&auth::refresh_actor(&store, &task_actor)?, operation, &[])?;
             let mut result = TaskOutput::file("合并文件.pdf".into(), "application/pdf", merged);
             result.destination = destination;

@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiPermissionTemplateDto, ApiPermissionTemplateSaveRequest, ApiPermissionTemplateCatalogResponse, ExportDocManagerApiClient } from "../../api/index.ts";
 import { identityQueryRoots, queryKeys } from "../../api/queryKeys.ts";
 import { readApiError } from "../../ui/formUtils.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { combinePermissionSchemes, copyPermissionScheme, schemeStartingPoints, toPermissionGrants, type SchemeStartingPoint } from "./permissionSchemeModel.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { useScopedMutation } from "../../ui/useScopedMutation.ts";

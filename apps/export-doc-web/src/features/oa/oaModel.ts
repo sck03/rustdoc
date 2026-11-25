@@ -19,7 +19,7 @@ export const oaModules = {
 } as const;
 export const oaStatus: Record<OaRequest["status"], string> = { Draft: "草稿", Pending: "待审批", Suspended: "已暂停", Terminated: "已终止", Approved: "已批准", Rejected: "最终驳回", Returned: "退回修改", Cancelled: "已取消", Completed: "已完成", HandedOff: "已移交财务" };
 export const oaHandlingLabels: Record<OaKind, string> = { leave: "待销假", overtime: "待确认", expense: "财务接收", travel: "待归档", purchase: "待验收", general: "待办理", personnel: "变动已生效" };
-const oaActionLabels = { submit: "提交审批", withdraw: "撤回修改", approve: "批准", reject: "最终驳回", return: "退回修改", cancel: "取消申请", void: "作废批准", complete: "完成登记", remind: "催办" } as const;
+const oaActionLabels = { submit: "提交审批", withdraw: "撤回修改", approve: "批准", reject: "最终驳回", return: "退回修改", cancel: "取消申请", void: "作废批准", remind: "催办" } as const;
 export type OaActionName = keyof typeof oaActionLabels;
 export function oaAccess(user: ApiUserDto, kind: OaKind, action: string, row?: OaRequest): boolean {
   if (row && row.companyScope !== user.companyScope) return false;
@@ -38,11 +38,10 @@ export function oaActions(row: OaRequest, user: ApiUserDto): OaActionName[] {
   const applicant = allows("edit") && row.ownerUserId === user.id;
   if (row.status === "Draft" || row.status === "Returned") return [...(applicant ? ["submit" as const] : []), ...(allows("cancel") ? ["cancel" as const] : [])];
   if (row.status === "Pending") return [...(applicant ? ["withdraw" as const, "remind" as const] : []), ...(row.canReview ? ["approve" as const, "return" as const, "reject" as const] : [])];
-  if (row.status === "Approved" && row.kind !== "personnel") return [...(!row.workflowTasks && allows("complete") ? ["complete" as const] : []), ...(allows("void") && reviewer ? ["void" as const] : [])];
+  if (row.status === "Approved" && row.kind !== "personnel") return [...(allows("void") && reviewer ? ["void" as const] : [])];
   return [];
 }
 export function oaActionLabel(action: OaActionName, kind: OaKind) {
-  if (action === "complete") return ({ expense: "财务接收", purchase: "登记验收", leave: "销假归档", travel: "返程归档", overtime: "确认加班完成", general: "办结登记", personnel: "变动已生效" } as const)[kind];
   if (action === "approve" && kind === "personnel") return "批准人员变动";
   return oaActionLabels[action];
 }

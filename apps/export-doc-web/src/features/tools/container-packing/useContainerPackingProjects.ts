@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { ApiContainerTypeDto, ExportDocManagerApiClient } from "../../../api/index.ts";
 import { queryKeys } from "../../../api/queryKeys.ts";
 import { readApiError } from "../../../ui/formUtils.ts";
-import { useConfirmation } from "../../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../../ui/confirmationContext.ts";
 import { useUnsavedChangesGuard } from "../../../ui/unsavedChangesGuard.tsx";
 import { useScopedMutation } from "../../../ui/useScopedMutation.ts";
 import { useAbortableOperationController } from "../../../ui/useAbortableOperation.ts";

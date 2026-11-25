@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import type { ConfirmationRequest } from "../../ui/ConfirmationProvider.tsx";
+import type { ConfirmationRequest } from "../../ui/confirmationContext.ts";
 import type { ReportTypeOption } from "./reportTemplateDesignerModel.ts";
 import type { ReportTemplateReturnTarget } from "./reportTemplateReturnNavigation.ts";
 import { matchesTemplatePath } from "./reportTemplateDesignerModel.ts";

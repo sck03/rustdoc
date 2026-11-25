@@ -1,5 +1,6 @@
 //! One bounded request/response at a time; the process and pipes live for one task.
 use super::*;
+use std::io::Write;
 use std::sync::mpsc::{Receiver, SyncSender};
 
 pub(crate) struct FramedProcess {

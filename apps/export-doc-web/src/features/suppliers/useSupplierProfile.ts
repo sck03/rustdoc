@@ -4,7 +4,7 @@ import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { largeDocumentQueryOptions } from "../../api/queryRetention.ts";
 import { useVersionedRecordDraft } from "../../ui/useVersionedRecordDraft.ts";
 import { useScopedMutation } from "../../ui/useScopedMutation.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { requestErrorFeedback, successFeedback, warningFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 

@@ -1,5 +1,5 @@
 import type { ApiUserDto, MeetingBookingRecord, MeetingBookingUpdateRequest, MeetingRoomSaveRequest, OfficeSupplyRequestRecord, OfficeSupplySaveRequest, SupplyRequestUpdateRequest } from "../../api/index.ts";
-import { businessDateTimeLocalInputToIso, toBusinessDateTimeLocalInput } from "../../ui/businessTime.ts";
+import { businessDayStart, businessDateTimeLocalInputToIso, toBusinessDateTimeLocalInput } from "../../ui/businessTime.ts";
 import { hasDepartment, isRecordWithinRestrictions } from "../../app/permissionScope.ts";
 
 export type OfficeKind = "rooms" | "supplies";
@@ -103,8 +103,8 @@ export function officeDayRange(day: string, timeZone: string) {
   try {
     const next = new Date(`${day}T12:00:00Z`);
     next.setUTCDate(next.getUTCDate() + 1);
-    const from = businessDateTimeLocalInputToIso(`${day}T00:00`, timeZone);
-    const to = businessDateTimeLocalInputToIso(`${next.toISOString().slice(0, 10)}T00:00`, timeZone);
+    const from = businessDayStart(day, timeZone);
+    const to = businessDayStart(next.toISOString().slice(0, 10), timeZone);
     return from && to ? { from, to } : null;
   } catch { return null; }
 }

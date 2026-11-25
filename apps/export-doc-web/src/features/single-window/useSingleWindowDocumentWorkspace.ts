@@ -2,7 +2,7 @@ import { useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { useQueryClient, type QueryKey } from "@tanstack/react-query";
 import type { ApiSingleWindowRepairGroupsResponse } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { mergeSavedDraftFields } from "../../ui/recordDraftMerge.ts";
 import { isAbortError } from "../../ui/useAbortableOperation.ts";

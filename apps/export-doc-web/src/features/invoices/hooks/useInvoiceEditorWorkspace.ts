@@ -10,7 +10,7 @@ import { normalizeText, readApiError, readRouteSuccessMessage } from "../../../u
 import { useUnsavedChangesGuard } from "../../../ui/unsavedChangesGuard.tsx";
 import { isComposingKey } from "../../../ui/keyboardEvent.ts";
 import { useServerDraftSync } from "../../../ui/serverDraftSync.tsx";
-import { useConfirmation } from "../../../ui/ConfirmationProvider.tsx";
+import { useConfirmation } from "../../../ui/confirmationContext.ts";
 import { useScopedConfirmation } from "../../../ui/useScopedConfirmation.ts";
 import { hasCustomOptionValue } from "../../custom-options/customOptionModel.ts";
 import { canDeleteInvoiceStatus, canUnverifyInvoiceStatus, canTransitionInvoiceStatus, createEmptyInvoice, getCounterpartInvoiceType, getInvoiceStatusActionLabel, getNextInvoiceStatus, isInvoiceEditableStatus, createInvoiceDetailsProjector, normalizeInvoiceForSave, normalizeInvoiceStatus, normalizeInvoiceType, readRouteInvoiceDraft, readRouteInvoiceImportAction, type RouteInvoiceImportAction, uppercaseInvoiceEnglishText } from "../invoiceModel.ts";
