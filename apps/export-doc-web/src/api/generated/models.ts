@@ -3270,8 +3270,7 @@ export interface ApiSettingsSecretsDto {
 }
 
 export interface ApiSettingsValidationMessageDto {
-  isAutoFixable: boolean;
-  level: string;
+  level: "error" | "warning" | "info";
   message: string;
   propertyName: string;
 }
@@ -3282,11 +3281,8 @@ export interface ApiSettingsValidationRequest {
 }
 
 export interface ApiSettingsValidationResponse {
-  canAutoFix: boolean;
-  hasWarnings: boolean;
   isValid: boolean;
   messages: ApiSettingsValidationMessageDto[];
-  normalizedSettings: AppSettings;
   storagePolicy: string;
 }
 
@@ -4847,16 +4843,6 @@ export interface OaApprovalPlan {
 export interface OaApprovalPreview {
   approvalPlan: OaApprovalPlan;
   approvalRoutingNotes: string[];
-}
-
-export interface OaApprovalReassign {
-  commandKey: string;
-  expectedVersion: number;
-  fromUserId: number;
-  note: string;
-  taskKey: string;
-  toContextId?: string;
-  toUserId: number;
 }
 
 export interface OaApprovalRule {
@@ -10207,6 +10193,10 @@ export interface PreviewUploadedInvoiceTransferPackageRequest {
   body: Blob;
 }
 
+export interface PreviewUploadedOcrImageRequest {
+  body: Blob;
+}
+
 export interface PreviewUserReportTemplateHistoryCleanupRequest {
   id: number;
   body: ApiTemplateHistoryCleanupPreviewRequest;
@@ -10295,41 +10285,6 @@ export interface QuerySuppliersRequest {
 
 export interface ReadNotificationRequest {
   id: number;
-}
-
-export interface ReassignExpenseRequestApprovalRequest {
-  id: number;
-  body: OaApprovalReassign;
-}
-
-export interface ReassignGeneralRequestApprovalRequest {
-  id: number;
-  body: OaApprovalReassign;
-}
-
-export interface ReassignLeaveRequestApprovalRequest {
-  id: number;
-  body: OaApprovalReassign;
-}
-
-export interface ReassignOvertimeRequestApprovalRequest {
-  id: number;
-  body: OaApprovalReassign;
-}
-
-export interface ReassignPersonnelChangeRequestApprovalRequest {
-  id: number;
-  body: OaApprovalReassign;
-}
-
-export interface ReassignPurchaseRequestApprovalRequest {
-  id: number;
-  body: OaApprovalReassign;
-}
-
-export interface ReassignTravelRequestApprovalRequest {
-  id: number;
-  body: OaApprovalReassign;
 }
 
 export interface ReassignUnitWorkflowTaskRequest {

@@ -10,8 +10,13 @@ pub(crate) fn decode_image(encoded: &[u8]) -> Result<RgbImage> {
     if encoded.is_empty() || encoded.len() as u64 > super::MAX_IMAGE_BYTES {
         bail!("image must be non-empty and no larger than 25 MiB");
     }
-    let mut decoder = image::ImageReader::new(Cursor::new(encoded))
-        .with_guessed_format()?
+    let mut reader = image::ImageReader::new(Cursor::new(encoded)).with_guessed_format()?;
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(MAX_IMAGE_SIDE);
+    limits.max_image_height = Some(MAX_IMAGE_SIDE);
+    limits.max_alloc = Some(256 * 1024 * 1024);
+    reader.limits(limits);
+    let mut decoder = reader
         .into_decoder()
         .context("unsupported or damaged image")?;
     let (width, height) = decoder.dimensions();
@@ -34,6 +39,13 @@ pub(crate) fn decode_image(encoded: &[u8]) -> Result<RgbImage> {
         }
         image => image.into_rgb8(),
     })
+}
+
+/// Preserve OCR coordinates and orientation; preview never loads model sessions.
+pub(crate) fn write_preview(image: &RgbImage, output: impl std::io::Write) -> Result<()> {
+    image::codecs::jpeg::JpegEncoder::new_with_quality(output, 85)
+        .encode_image(image)
+        .context("cannot encode image preview")
 }
 
 pub(crate) fn rgb_tensor(image: &RgbImage, detection: bool) -> Array4<f32> {

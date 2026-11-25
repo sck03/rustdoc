@@ -453,6 +453,12 @@ async fn execute(
                         .map(response::Reply::bytes);
                 }
                 if let Some((name, bytes)) = upload {
+                    if operation == PREVIEW_UPLOADED_OCR_IMAGE {
+                        return state
+                            .service
+                            .prepare_uploaded_ocr_preview(&bytes, &token)
+                            .map(response::Reply::download);
+                    }
                     let value = state.service.upload(
                         operation,
                         &parameters,

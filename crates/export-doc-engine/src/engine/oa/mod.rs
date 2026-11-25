@@ -369,7 +369,6 @@ pub(super) fn handle(
                 | "withdraw"
                 | "cancel"
                 | "void"
-                | "approval-reassign"
                 | "resource-submit"
                 | "workflow-command"
                 | "personnel-execute"
@@ -441,17 +440,6 @@ pub(super) fn handle(
         if matches!(action.as_str(), "resource-submit" | "resource-update") {
             materials::authorize_edit(tx, &actor, &row)?;
             return resource_requests::change(tx, &actor, meta, row, body, today);
-        }
-        if action == "approval-reassign" {
-            approval_handover::reassign(tx, &actor, &mut row, body)?;
-            return save(
-                tx,
-                &actor,
-                meta,
-                row,
-                "approval-reassign",
-                &text(body, "note"),
-            );
         }
         if action == "delete-attachment" {
             return super::record_documents::remove(tx, &actor, meta, row, parameters, body);

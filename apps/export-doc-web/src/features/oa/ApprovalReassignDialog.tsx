@@ -8,7 +8,8 @@ import { InlineNotice } from "../../ui/PageState.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import type { OfficeRequestRow } from "../office/officeModel.ts";
 
-export function ApprovalReassignDialog({ client, row, onClose }: { client: ExportDocManagerApiClient; row: OaRequest | OfficeRequestRow; onClose: () => void }) {
+export function ApprovalReassignDialog({ client, row: currentRow, onClose }: { client: ExportDocManagerApiClient; row: OaRequest | OfficeRequestRow; onClose: () => void }) {
+  const [row] = useState(currentRow);
   const kind = "meetingRoomId" in row ? "room" : "officeSupplyId" in row ? "supply" : row.kind;
   const operation = useOfficeOperation(officeWorkflowQueryRoots(kind),false);
   const accounts = useQuery({ queryKey: ["office","approval-reassign",row.companyScope], queryFn: ({ signal }) => client.getUnitApproverOptions({companyCode:row.companyScope}, { signal }) });
@@ -26,9 +27,9 @@ export function ApprovalReassignDialog({ client, row, onClose }: { client: Expor
     <form onSubmit={event => { event.preventDefault(); void operation.run(signal => client.reassignUnitWorkflowTask({body:{requestId:row.id,requestKind,expectedVersion:row.versionNumber,fromUserId:from,toUserId:to,toContextId:context,note,taskKey}},{signal}), onClose); }}>
       <fieldset disabled={operation.busy}><OfficeField label="待移交任务"><select required value={taskKey} onChange={event => setTaskKey(event.target.value)}>{waiting.map(step => <option value={step.taskKey} key={step.taskKey}>{row.approvalPlan?.nodes[step.stage].name} · {step.approverName}</option>)}</select></OfficeField>
       <OfficeField label="接任审批人"><select required value={to || ""} onChange={event => {const id=Number(event.target.value);setTo(id);setContext(accounts.data?.users.find(user=>user.id===id)?.contexts[0]?.id ?? "");}}><option value="">选择接任账号</option>{accounts.data?.users.filter(account => account.id !== row.ownerUserId).map(account => <option key={account.id} value={account.id}>{account.fullName} · {account.username}</option>)}</select></OfficeField>
-      <OfficeField label="接任身份"><select value={context} onChange={event=>setContext(event.target.value)}>{contexts.map(item=><option key={item.id} value={item.id}>{item.name} · {item.departmentName || item.departmentId}</option>)}</select></OfficeField>
+      <OfficeField label="接任身份"><select required value={context} onChange={event=>setContext(event.target.value)}>{contexts.map(item=><option key={item.id} value={item.id}>{item.name} · {item.departmentName || item.departmentId}</option>)}</select></OfficeField>
       <OfficeField label="移交原因"><textarea required maxLength={500} value={note} onChange={event => setNote(event.target.value)} /></OfficeField></fieldset>
-      <OfficeSubmit busy={operation.busy} disabled={!from || !to} label="确认移交审批" />
+      <OfficeSubmit busy={operation.busy} disabled={!from || !to || !context} label="确认移交审批" />
     </form>
   </OfficeDialog>;
 }

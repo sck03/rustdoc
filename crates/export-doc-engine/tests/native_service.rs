@@ -415,10 +415,12 @@ fn settings_keep_reference_defaults_and_reject_stale_or_invalid_updates() {
         .assert_rejected(UPDATE_SETTINGS, &[], Some(body.clone()), 409);
     body["settings"]["revision"] = json!(1);
     body["settings"]["system"]["itemEntrySpareColumnCount"] = json!(11);
-    assert_eq!(
-        fixture.request(VALIDATE_SETTINGS, None, Some(body.clone()))["isValid"],
-        false
-    );
+    let invalid = fixture.request(VALIDATE_SETTINGS, None, Some(body.clone()));
+    export_doc_contracts::validation::response(VALIDATE_SETTINGS.id, &invalid).unwrap();
+    assert_eq!(invalid["isValid"], false);
+    assert_eq!(invalid["messages"][0]["level"], "error");
+    assert!(invalid.get("normalizedSettings").is_none());
+    assert!(invalid.get("canAutoFix").is_none());
     fixture
         .client()
         .assert_rejected(UPDATE_SETTINGS, &[], Some(body), 400);

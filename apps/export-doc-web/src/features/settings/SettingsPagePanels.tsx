@@ -1,5 +1,4 @@
-import { RotateCcw } from "lucide-react";
-import type { ApiSettingsValidationResponse } from "../../api/index.ts";
+import type { ApiSettingsValidationMessageDto, ApiSettingsValidationResponse } from "../../api/index.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import type { SettingsCategoryConfig, SettingsCategoryKey } from "./settingsCategoryCatalog.ts";
@@ -40,12 +39,8 @@ export function SettingsCategoryNav({
 
 export function SettingsValidationPanel({
   result,
-  disabled,
-  onApplyAutoFix,
 }: {
   result: ApiSettingsValidationResponse;
-  disabled: boolean;
-  onApplyAutoFix: () => void;
 }) {
   const messages = Array.isArray(result.messages) ? result.messages : [];
   const errorCount = messages.filter((item) => item.level === "error").length;
@@ -58,15 +53,6 @@ export function SettingsValidationPanel({
           <h2>设置校验结果</h2>
           <span>{result.isValid ? "可保存" : "需处理"}</span>
         </div>
-        <button
-          className="command-button secondary"
-          type="button"
-          disabled={disabled || !result.canAutoFix}
-          onClick={onApplyAutoFix}
-        >
-          <RotateCcw size={17} aria-hidden="true" />
-          <span>应用自动修复</span>
-        </button>
       </div>
       <InlineNotice tone={result.isValid ? "success" : "error"}>
         {messages.length === 0
@@ -81,7 +67,6 @@ export function SettingsValidationPanel({
                 <th>级别</th>
                 <th>字段</th>
                 <th>信息</th>
-                <th>修复</th>
               </tr>
             </thead>
             <tbody>
@@ -90,7 +75,6 @@ export function SettingsValidationPanel({
                   <td>{settingsValidationLevelLabel(item.level)}</td>
                   <td>{item.propertyName || "-"}</td>
                   <td>{item.message || "-"}</td>
-                  <td>{item.isAutoFixable ? "可自动修复" : "-"}</td>
                 </tr>
               ))}
             </tbody>
@@ -101,7 +85,7 @@ export function SettingsValidationPanel({
   );
 }
 
-function settingsValidationLevelLabel(value?: string) {
+function settingsValidationLevelLabel(value: ApiSettingsValidationMessageDto["level"]) {
   switch (value) {
     case "error":
       return "错误";
@@ -109,7 +93,5 @@ function settingsValidationLevelLabel(value?: string) {
       return "警告";
     case "info":
       return "信息";
-    default:
-      return value?.trim() || "-";
   }
 }

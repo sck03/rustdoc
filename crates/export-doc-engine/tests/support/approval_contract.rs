@@ -1,15 +1,19 @@
 //! The same configured workflow is exercised on SQLite and PostgreSQL.
-use super::oa_contract::{call, operation, workflow};
+use super::oa_contract::{call, fulfillment_node, operation, workflow};
 use export_doc_engine::{engine::NativeService, generated_api::*, paths::nonce};
 use serde_json::{Value, json};
 
 fn act(service: &NativeService, token: &str, action: &str, row: &Value) -> Value {
+    let mut body = json!({"expectedVersion":row["versionNumber"],"note":"审批流程验收"});
+    if action == "fulfillment" {
+        body["nodeKey"] = fulfillment_node(row);
+    }
     call(
         service,
         token,
         operation("expense", action),
         row["id"].as_i64().unwrap(),
-        Some(json!({"expectedVersion":row["versionNumber"],"note":"审批流程验收"})),
+        Some(body),
     )
     .unwrap()
 }
@@ -213,7 +217,7 @@ pub fn exercise(service: &NativeService, root_admin: &str) {
     assert_eq!(row["status"], "Approved");
     assert_eq!(list(service, finance, true)["totalCount"], 1);
     assert_eq!(
-        act(service, finance, "complete", &row)["status"],
+        act(service, finance, "fulfillment", &row)["status"],
         "HandedOff"
     );
 

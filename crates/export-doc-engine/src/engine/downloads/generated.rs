@@ -24,6 +24,22 @@ fn description(operation: Operation) -> Option<(&'static str, &'static str)> {
 }
 
 impl NativeService {
+    #[cfg(feature = "ocr")]
+    pub fn prepare_uploaded_ocr_preview(
+        &self,
+        bytes: &[u8],
+        token: &str,
+    ) -> Result<backup_io::Download> {
+        self.with_download_access(PREVIEW_UPLOADED_OCR_IMAGE, token, |_| Ok(()))?;
+        let mut reservation = self.jobs.reserve_download(64 * 1024 * 1024, true)?;
+        let output = super::super::ocr::preview_upload(self, bytes)?;
+        reservation.shrink_to(output.content.capacity());
+        Ok(backup_io::Download::Memory {
+            output,
+            reservation,
+        })
+    }
+
     pub fn is_generated_download(operation: Operation) -> bool {
         description(operation).is_some()
     }

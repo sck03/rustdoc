@@ -309,7 +309,9 @@ pub fn ep(
                 })
                 .max()
                 .unwrap_or(crate::request_limits::MAX_JSON_RESPONSE_BYTES),
-            timeout_seconds: if responses.values().any(|response| {
+            timeout_seconds: if matches!(id, "PreviewOcrImage" | "PreviewUploadedOcrImage") {
+                30
+            } else if responses.values().any(|response| {
                 response
                     .content
                     .as_ref()
@@ -322,6 +324,7 @@ pub fn ep(
             processing_slot: matches!(
                 id,
                 "RecognizeOcrImage"
+                    | "PreviewOcrImage"
                     | "SaveShippingMarkImage"
                     | "SaveInvoiceSealImage"
                     | "PreviewShippingMarkImage"

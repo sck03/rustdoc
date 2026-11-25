@@ -3,7 +3,8 @@ import { useState } from "react";
 import { requestPersonLabel } from "../office/requestIdentity.ts";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import type { ApiUserDto, ExportDocManagerApiClient, OaRequest } from "../../api/index.ts";
-import { PageState } from "../../ui/PageState.tsx";
+import { InlineNotice, PageState } from "../../ui/PageState.tsx";
+import { shouldRetryQueryFailure } from "../../api/queryRetryPolicy.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { OfficeQueryState } from "../office/OfficeUi.tsx";
 import { OaRequestDialog } from "./OaRequestDialog.tsx";
@@ -74,7 +75,7 @@ export function OaRequestsPage({
           </button>
           {model.detail.isPending ? (
             <PageState tone="loading" title="正在读取申请" />
-          ) : model.detail.isError ? (
+          ) : model.detail.isError && (!model.detail.data || !shouldRetryQueryFailure(0, model.detail.error)) ? (
             <PageState
               tone="error"
               title="申请读取失败"
@@ -87,14 +88,25 @@ export function OaRequestsPage({
             />
           ) : (
             model.detail.data && (
-              <OaRequestDetails
-                key={model.detail.data.id}
-                client={client}
-                user={user}
-                row={model.detail.data}
-                onEdit={() => setEditing(model.detail.data!)}
-                onDeleted={() => model.select(0)}
-              />
+              <>
+                {model.detail.isError && (
+                  <InlineNotice tone="error" action={
+                    <button className="command-button secondary" type="button" disabled={model.detail.isFetching} onClick={() => void model.detail.refetch()}>
+                      重新读取
+                    </button>
+                  }>
+                    刷新失败：{readApiError(model.detail.error)}
+                  </InlineNotice>
+                )}
+                <OaRequestDetails
+                  key={model.detail.data.id}
+                  client={client}
+                  user={user}
+                  row={model.detail.data}
+                  onEdit={() => setEditing(model.detail.data!)}
+                  onDeleted={() => model.select(0)}
+                />
+              </>
             )
           )}
         </>

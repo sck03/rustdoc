@@ -1,6 +1,7 @@
 import { RecordWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { Copy, KeyRound, RefreshCw } from "lucide-react";
 import {
   type ApiLicenseStatusResponse,
@@ -29,13 +30,13 @@ export function LicensePage({ client }: { client: ExportDocManagerApiClient }) {
     }
   }, [statusQuery.error, statusQuery.isError]);
 
-  const registerMutation = useMutation({
-    mutationFn: () =>
+  const registerMutation = useScopedMutation("license", client, {
+    mutationFn: (_: void, signal) =>
       client.registerLicense({
         body: {
           licenseKey: licenseKey.trim(),
         },
-      }),
+      }, { signal }),
     onSuccess: (response) => {
       queryClient.setQueryData<ApiLicenseStatusResponse>(queryKeys.licenseStatus(), response.status);
       setMessage(response.message || response.status.message || "注册成功。");

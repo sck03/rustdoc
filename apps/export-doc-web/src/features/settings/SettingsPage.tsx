@@ -59,7 +59,7 @@ export function SettingsPage({
   isDesktopRuntime: boolean;
 }) {
   const model = useSettingsWorkspace({client,canManageSettings,canManageUsers,canUseDocumentWorkspace,isDesktopRuntime});
-  const { message, concurrencyMessage, successMessage, settings, isBusy, settingsQuery, handleReloadSettings, handleSubmit, activeCategoryConfig, hasUnsavedChanges, changedCategories, currentCategory, databaseProvider, updateSecrets, setUpdateSecrets, handleRestoreSystemDefaults, handleValidateSettings, availableSettingsCategories, setActiveCategory, healthQuery, patchSetting, secrets, canSelectDesktopDirectory, handleSelectDefaultExportDirectory, issuingAuthorityOptions, handleSingleWindowOrgCodeChange, handleSingleWindowFetchPlaceChange, handleSingleWindowAplAddChange, patchSettings, emailAddressCandidate, handleInferEmailServerConfig, handleTestEmailConnection, validationResult, handleApplyValidationFix, location } = model;
+  const { message, concurrencyMessage, successMessage, settings, isBusy, settingsQuery, handleReloadSettings, handleSubmit, activeCategoryConfig, hasUnsavedChanges, changedCategories, currentCategory, databaseProvider, updateSecrets, setUpdateSecrets, handleRestoreSystemDefaults, handleValidateSettings, availableSettingsCategories, setActiveCategory, healthQuery, patchSetting, secrets, canSelectDesktopDirectory, handleSelectDefaultExportDirectory, issuingAuthorityOptions, handleSingleWindowOrgCodeChange, handleSingleWindowFetchPlaceChange, handleSingleWindowAplAddChange, patchSettings, emailAddressCandidate, handleInferEmailServerConfig, handleTestEmailConnection, validationResult, location } = model;
   const counts = changedSettingCounts(model.settings, model.baselineSettings);
   return (
     <EditorWorkspace className="editor-surface settings-surface" aria-label="设置">
@@ -108,7 +108,7 @@ export function SettingsPage({
                 title={healthQuery.isError ? "无法读取当前数据库类型" : "正在读取运行模式"}
                 description={healthQuery.isError ? readApiError(healthQuery.error) : undefined}
                 action={healthQuery.isError ? <button className="command-button secondary" type="button" onClick={() => void healthQuery.refetch()}>重试运行状态</button> : undefined} />}
-              {validationResult && <SettingsValidationPanel result={validationResult} disabled={isBusy || !canManageSettings} onApplyAutoFix={handleApplyValidationFix} />}
+              {validationResult && <SettingsValidationPanel result={validationResult} />}
               <Suspense fallback={<PageState tone="loading" title="正在加载设置分类" />}>
               {currentCategory === "runtime" && canManageSettings && <LazyFileStorageSettingsPanel client={client} canManage={canManageSettings} />}
               {currentCategory === "runtime" ? (

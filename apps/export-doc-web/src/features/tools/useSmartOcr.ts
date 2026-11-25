@@ -39,14 +39,15 @@ export function useSmartOcr(client: ExportDocManagerApiClient, permitted: boolea
     sourceRef.current = source;
     activeRecognition.current = null;
     setImageSource(source);
-    setPreview(source?.kind === "content" ? source.blob : null);
+    setPreview(source?.kind === "content" && source.sourceMimeType !== "image/tiff" ? source.blob : null);
     setResult(null); setMessage(null); setBusy(false);
   }, [cancelRecognition, cancelPreview]);
 
   const loadPreview = useCallback(async (source: OcrImageSource) => {
-    if (source.kind !== "path") return;
     try {
-      const blob = await runPreview(signal => client.previewOcrImage({ filePath: source.filePath }, { signal }));
+      const blob = await runPreview(signal => source.kind === "path"
+        ? client.previewOcrImage({ filePath: source.filePath }, { signal })
+        : client.previewUploadedOcrImage({ body: source.blob }, { signal }));
       if (sourceRef.current === source) setPreview(blob);
     } catch (error) {
       if (!isAbortError(error) && sourceRef.current === source) showError(`图片已选择，但预览加载失败：${readApiError(error)}`);
@@ -64,9 +65,11 @@ export function useSmartOcr(client: ExportDocManagerApiClient, permitted: boolea
     const mime = blob.type || MIME_TYPES[sourceName.split(".").at(-1)?.toLowerCase() ?? ""];
     if (!Object.values(MIME_TYPES).includes(mime)) { showError("请选择 PNG、JPEG、BMP、WebP 或 TIFF 图片。"); return; }
     if (!blob.size || blob.size > 25 * 1024 * 1024) { showError("图片必须非空且不能超过 25 MiB。"); return; }
-    chooseSource({ kind: "content", blob, sourceName, sourceMimeType: mime });
+    const source: OcrImageSource = { kind: "content", blob, sourceName, sourceMimeType: mime };
+    chooseSource(source);
+    if (mime === "image/tiff") void loadPreview(source);
     setMessage("图片已载入。"); setMessageType("success");
-  }, [chooseSource, showError]);
+  }, [chooseSource, loadPreview, showError]);
 
   useEffect(() => {
     const paste = (event: ClipboardEvent) => {

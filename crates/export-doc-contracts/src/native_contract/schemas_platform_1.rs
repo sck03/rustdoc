@@ -311,14 +311,12 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("aiApiKeySet",b())
     ]).required(vec!["emailPasswordSet","webDavPasswordSet","aiApiKeySet"])),
     ("ApiSettingsValidationMessageDto",o(vec![
-        ("level",s()),("propertyName",s()),("message",s()),
-        ("isAutoFixable",b())
-    ]).required(vec!["level","propertyName","message","isAutoFixable"])),
+        ("level",s().enumeration(Enumeration::Values(vec![serde_json::json!("error"),serde_json::json!("warning"),serde_json::json!("info")]))),("propertyName",s()),("message",s())
+    ]).required(vec!["level","propertyName","message"])),
     ("ApiSettingsValidationRequest",o(vec![("settings",r("AppSettings")),("updateSecrets",b())]).required(vec!["settings","updateSecrets"])),
     ("ApiSettingsValidationResponse",o(vec![
-        ("isValid",b()),("hasWarnings",b()),("canAutoFix",b()),
-        ("messages",a(r("ApiSettingsValidationMessageDto"))),("normalizedSettings",r("AppSettings")),("storagePolicy",s())
-    ]).required(vec!["isValid","hasWarnings","canAutoFix","messages","normalizedSettings","storagePolicy"])),
+        ("isValid",b()),("messages",a(r("ApiSettingsValidationMessageDto"))),("storagePolicy",s())
+    ]).required(vec!["isValid","messages","storagePolicy"])),
     ("ApiSharedDatabaseOwnershipSummaryResponse",o(vec![
         ("totalInvoices",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("unassignedInvoices",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("totalPayments",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("unassignedPayments",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("totalOtherBusinessData",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("unassignedOtherBusinessData",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),

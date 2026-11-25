@@ -285,7 +285,7 @@ pub fn exercise(service: &NativeService, root: &str) {
         next["approvalPlan"]["steps"][0]["actedByUserId"],
         users[4]["id"]
     );
-    let failed = call(service, admin, REASSIGN_GENERAL_REQUEST_APPROVAL, next["id"].as_i64().unwrap(), Some(json!({"expectedVersion":next["versionNumber"],"taskKey":next["approvalPlan"]["steps"][1]["taskKey"],"fromUserId":users[3]["id"],"toUserId":users[4]["id"],"note":"禁止重复独立签署"}))).unwrap_err();
+    let failed = call(service, admin, REASSIGN_UNIT_WORKFLOW_TASK, 0, Some(json!({"requestKind":"oa-general","requestId":next["id"],"expectedVersion":next["versionNumber"],"taskKey":next["approvalPlan"]["steps"][1]["taskKey"],"fromUserId":users[3]["id"],"toUserId":users[4]["id"],"note":"禁止重复独立签署"}))).unwrap_err();
     assert_eq!(failed.status, Some(400));
     assert_eq!(
         get(

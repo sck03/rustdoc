@@ -28,6 +28,7 @@ import { PersonnelExecutionNotice } from "./PersonnelExecutionNotice.tsx";
 import { WorkflowFulfillmentPanel } from "./WorkflowFulfillmentPanel.tsx";
 import { WorkflowDecisionHistory } from "./WorkflowDecisionHistory.tsx";
 import { OaDraftDeleteDialog } from "./OaDraftDeleteDialog.tsx";
+import { canReassignApproval } from "./approvalPermissions.ts";
 
 export function OaRequestDetails({ client, user, row, onEdit, onDeleted }: { client: ExportDocManagerApiClient; user: ApiUserDto; row: OaRequest; onEdit: () => void; onDeleted: () => void }) {
   const operation = useOaOperation(row.kind);
@@ -75,7 +76,7 @@ export function OaRequestDetails({ client, user, row, onEdit, onDeleted }: { cli
     </section>
     </div>
     <aside className="oa-detail-sidebar" aria-label="审批流程与办理">
-    {user.capabilities.canManageUsers && row.status === "Pending" && Boolean(row.approvalPlan?.steps.some(step => step.status === "Waiting")) && <button type="button" className="command-button secondary" onClick={() => setReassigning(true)}>移交未完成审批</button>}
+    {canReassignApproval(user, row) && <button type="button" className="command-button secondary" onClick={() => setReassigning(true)}>移交未完成审批</button>}
     <OaApprovalSteps plan={row.approvalPlan} notes={row.approvalRoutingNotes} user={user} />
     <WorkflowOperations client={client} row={row}/>
     <WorkflowFulfillmentPanel client={client} user={user} row={row}/>
@@ -88,7 +89,9 @@ export function OaRequestDetails({ client, user, row, onEdit, onDeleted }: { cli
   </article>;
 }
 
-function OaActionDialog({ client, row, action, onClose }: { client: ExportDocManagerApiClient; user: ApiUserDto; row: OaRequest; action: OaActionName | number; onClose: () => void }) {
+function OaActionDialog({ client, row: currentRow, action, onClose }: { client: ExportDocManagerApiClient; user: ApiUserDto; row: OaRequest; action: OaActionName | number; onClose: () => void }) {
+  // A background refresh must not advance the version the reviewer actually read.
+  const [row] = useState(currentRow);
   const operation = useOaOperation(row.kind);
   const [note, setNote] = useState("");
   const [taskKey,setTaskKey]=useState(row.reviewTaskKeys?.[0]??"");

@@ -22,6 +22,9 @@ mod maintenance_cleanup;
 #[path = "../tests/fixtures/oa_payment_labels.rs"]
 mod oa_payment_labels;
 #[cfg(test)]
+#[path = "../tests/fixtures/oa_resource_cleanup.rs"]
+mod oa_resource_cleanup;
+#[cfg(test)]
 #[path = "contract_organization_quality.rs"]
 mod organization_quality;
 use std::sync::OnceLock;
@@ -307,6 +310,7 @@ mod tests {
         }
         backup_recovery::apply(&mut baseline);
         maintenance_cleanup::apply(&mut baseline);
+        oa_resource_cleanup::apply(&mut baseline);
         if let Some(change) = difference("contract", &document(), &baseline) {
             panic!("undeclared contract change: {change}");
         }

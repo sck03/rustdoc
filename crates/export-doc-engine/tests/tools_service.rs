@@ -54,6 +54,36 @@ fn tariff_preview_is_single_use_detects_stale_changes_and_roundtrips_knowledge()
         .json(SEARCH_HS_CODE_KNOWLEDGE, &[], &query, None)
         .unwrap();
     assert_eq!(response["items"][0]["canUse"], true);
+    for (prefix, expected) in [("6109", 2), ("6109.10", 1), ("6109100000", 1), ("6108", 0)] {
+        let found: Value = client
+            .json(
+                SEARCH_HS_CODE_KNOWLEDGE,
+                &[],
+                &[("query", prefix.into())],
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            found["items"].as_array().unwrap().len(),
+            expected,
+            "{prefix}"
+        );
+    }
+    let named: Value = client
+        .json(
+            SEARCH_HS_CODE_KNOWLEDGE,
+            &[],
+            &[("query", "棉制针织T恤衫".into())],
+            None,
+        )
+        .unwrap();
+    assert!(
+        named["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item["currentCode"] == "6109100000")
+    );
     for _ in 0..3 {
         client.json::<Value>(RECORD_HS_CODE_KNOWLEDGE_FEEDBACK, &[], &[], Some(json!({"queryText":"棉制针织T恤衫","productName":"棉制针织T恤衫","specification":"100%棉 针织","candidateCode":"6109100000","accepted":true}))).unwrap();
     }

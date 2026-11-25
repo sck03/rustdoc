@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ExportDocManagerApiClient } from "../../../api/index.ts";
@@ -8,8 +8,7 @@ import { useServerPageNumber } from "../../../ui/useServerPageNumber.ts";
 import { loadListViewState, normalizeListPageSize, saveListViewState } from "../../../ui/listViewState.ts";
 import { type MasterDataEntityConfig, type MasterDataEntityKey, type MasterDataRecord } from "../masterDataTypes.ts";
 import { hsCodeVersionReference } from "../hsCodeMaintenance.ts";
-import { useScopedSave } from "../../../ui/useScopedSave.ts";
-import { isAbortError } from "../../../ui/useAbortableOperation.ts";
+import { useScopedMutation } from "../../../ui/useScopedMutation.ts";
 function buildMasterDataListViewStateStorageKey(entityKey: MasterDataEntityKey) {
   return `export-doc-manager.master-data.${entityKey}.list-view-state.v1`;
 }
@@ -36,7 +35,7 @@ export function useMasterDataListWorkspace({ client, config, canManage }: {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const deletion = useScopedSave(config.key, client);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const routeSuccessMessage = readRouteSuccessMessage(location.state);
   const successMessage = listSuccessMessage ?? routeSuccessMessage;
 
@@ -51,6 +50,7 @@ export function useMasterDataListWorkspace({ client, config, canManage }: {
     setSelectedRecords(new Map());
     setPendingDeleteRecord(null);
     setBatchDeleteDialogOpen(false);
+    setDeleteError(null);
   }, [config.key, listViewStateStorageKey]);
 
   useEffect(() => {
@@ -110,48 +110,34 @@ export function useMasterDataListWorkspace({ client, config, canManage }: {
     setSelectedRecords(new Map());
   }
 
-  function removeRecords(records: MasterDataRecord[], batch: boolean) {
-    return deletion.run(async ({ signal, checkCurrent }) => {
-      if (!canManage || masterDataQuery.isFetching || masterDataQuery.isPlaceholderData) return;
-      const response = batch
-        ? await client.deleteHsCodesBatch({ body: { ids: records.map(row => row.id), expectedVersions: records.map(hsCodeVersionReference) } }, { signal })
-        : await config.delete(client, records[0], config.routeId(records[0]), signal);
-      checkCurrent();
+  const deletion = useScopedMutation(config.key, client, {
+    mutationFn: async ({ records, batch }: { records: MasterDataRecord[]; batch: boolean }, signal) => {
+      setDeleteError(null);
+      setListSuccessMessage(null);
+      return batch
+        ? client.deleteHsCodesBatch({ body: { ids: records.map(row => row.id), expectedVersions: records.map(hsCodeVersionReference) } }, { signal })
+        : config.delete(client, records[0], config.routeId(records[0]), signal);
+    },
+    onSuccess: (response, { records }) => {
       setPendingDeleteRecord(null);
       setBatchDeleteDialogOpen(false);
       setSelectedRecords(new Map());
-      const message = response.message || `${config.label}已删除。`;
-      setListSuccessMessage(message);
+      setListSuccessMessage(response.message || `${config.label}已删除。`);
       for (const record of records) queryClient.removeQueries({ queryKey: queryKeys.masterDataRecord(config.key, config.routeId(record)) });
-      try {
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot(config.key) }, { throwOnError: true }),
-          ...(config.key === "customers" || config.key === "exporters"
-            ? [queryClient.invalidateQueries({ queryKey: queryKeys.invoiceParties() }, { throwOnError: true })] : []),
-        ]);
-      } catch (error) {
-        checkCurrent();
-        setListSuccessMessage(`${message}列表刷新失败：${readApiError(error)}`);
-      }
-    });
-  }
-  const deleteMutation = useMutation({
-    mutationFn: (record: MasterDataRecord) => removeRecords([record], false),
+    },
+    refreshKeys: () => [queryKeys.masterDataRoot(config.key),
+      ...(config.key === "customers" || config.key === "exporters" ? [queryKeys.invoiceParties()] : [])],
     onError: error => {
-      if (isAbortError(error)) return;
       setPendingDeleteRecord(null);
-      setListSuccessMessage(null);
-    },
-  });
-
-  const batchDeleteHsCodesMutation = useMutation({
-    mutationFn: (records: MasterDataRecord[]) => removeRecords(records, true),
-    onError: error => {
-      if (isAbortError(error)) return;
       setBatchDeleteDialogOpen(false);
-      setListSuccessMessage(null);
+      setDeleteError(readApiError(error));
     },
   });
+  function removeRecords(records: MasterDataRecord[], batch: boolean) {
+    if (canManage && !isBusy && records.length) deletion.mutate({ records, batch });
+  }
+  const deleteMutation = { mutate: (record: MasterDataRecord) => removeRecords([record], false) };
+  const batchDeleteHsCodesMutation = { mutate: (records: MasterDataRecord[]) => removeRecords(records, true) };
 
   function handleDelete(record: MasterDataRecord) {
     if (!canManage || isBusy) {
@@ -211,14 +197,8 @@ export function useMasterDataListWorkspace({ client, config, canManage }: {
   }
 
   const page = masterDataQuery.data ?? null;
-  const message = batchDeleteHsCodesMutation.isError && !isAbortError(batchDeleteHsCodesMutation.error)
-    ? readApiError(batchDeleteHsCodesMutation.error)
-    : deleteMutation.isError && !isAbortError(deleteMutation.error)
-    ? readApiError(deleteMutation.error)
-    : masterDataQuery.isError
-      ? readApiError(masterDataQuery.error)
-      : null;
-  const isBusy = masterDataQuery.isFetching || masterDataQuery.isPlaceholderData || deletion.isSaving;
+  const message = deleteError ?? (masterDataQuery.isError ? readApiError(masterDataQuery.error) : null);
+  const isBusy = masterDataQuery.isFetching || masterDataQuery.isPlaceholderData || deletion.isPending;
   return {
     keyword, setKeyword, pageNumber, setPageNumber, pageSize,
     setListSuccessMessage, selectedRecords, setSelectedRecords, selectedRecordIds, pendingDeleteRecord,

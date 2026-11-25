@@ -124,11 +124,6 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("calendar",r("OaBusinessCalendar")),("activations",a(r("OaActivation")).max_items(100))
     ]).required(vec!["versionNumber","rules","delegations","publications"])),
     ("OaDefinitionAction",o(vec![("expectedVersion",i().format("int64")),("expectedRevision",i().minimum(num("0"))),("definitionKey",s())]).required(vec!["expectedVersion","expectedRevision","definitionKey"])),
-    ("OaApprovalReassign",o(vec![
-        ("expectedVersion",i().format("int64")),("fromUserId",i().minimum(num("1")).format("int64")),("toUserId",i().minimum(num("1")).format("int64")),
-        ("note",s().min_length(1).max_length(500)),("taskKey",s().min_length(1).max_length(180)),("commandKey",s().pattern("^[A-Za-z0-9_:-]+$").min_length(8).max_length(128)),
-        ("toContextId",s().max_length(150))
-    ]).required(vec!["expectedVersion","fromUserId","toUserId","note","taskKey","commandKey"])),
     ("OaSubmittedRequest",o(vec![
         ("requestKey",s()),("expectedVersion",i().format("int64")),("employeeId",i().format("int64")),
         ("appointmentId",s()),("title",s()),("reason",s()),

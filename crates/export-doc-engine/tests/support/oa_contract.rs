@@ -35,14 +35,32 @@ pub fn call(
     workflow::dispatch(service, token, op, &parameters, &[], body)
 }
 fn act(service: &NativeService, token: &str, kind: &str, action: &str, row: &Value) -> Value {
+    let mut body = json!({"expectedVersion":row["versionNumber"],"note":"流程验收说明"});
+    if action == "fulfillment" {
+        body["nodeKey"] = fulfillment_node(row);
+    }
     call(
         service,
         token,
         operation(kind, action),
         row["id"].as_i64().unwrap(),
-        Some(json!({"expectedVersion":row["versionNumber"],"note":"流程验收说明"})),
+        Some(body),
     )
     .unwrap_or_else(|cause| panic!("{kind}/{action}, input state {}: {cause:?}", row["status"]))
+}
+
+pub fn fulfillment_node(row: &Value) -> Value {
+    row["approvalPlan"]["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|node| {
+            node["kind"] == "Handling"
+                && node["phase"] == "Fulfillment"
+                && node["state"] == "Active"
+        })
+        .expect("active business handling node")["key"]
+        .clone()
 }
 
 fn finance_user(
@@ -125,8 +143,7 @@ fn receive_expense(service: &NativeService, admin: &str, finance: &str, row: &Va
         call(service, finance, operation("expense", "get"), id, None).unwrap()["id"],
         id
     );
-    let body =
-        json!({"expectedVersion":row["versionNumber"],"note":"凭证已核对，接收编号 FIN-001"});
+    let body = json!({"expectedVersion":row["versionNumber"],"nodeKey":fulfillment_node(row),"note":"凭证已核对，接收编号 FIN-001"});
     assert_eq!(
         call(
             service,
@@ -144,7 +161,7 @@ fn receive_expense(service: &NativeService, admin: &str, finance: &str, row: &Va
         call(
             service,
             &manager,
-            operation("expense", "complete"),
+            operation("expense", "fulfillment"),
             id,
             Some(body.clone())
         )
@@ -203,7 +220,7 @@ fn receive_expense(service: &NativeService, admin: &str, finance: &str, row: &Va
     let received = call(
         service,
         finance,
-        operation("expense", "complete"),
+        operation("expense", "fulfillment"),
         id,
         Some(body.clone()),
     )
@@ -212,7 +229,7 @@ fn receive_expense(service: &NativeService, admin: &str, finance: &str, row: &Va
         call(
             service,
             finance,
-            operation("expense", "complete"),
+            operation("expense", "fulfillment"),
             id,
             Some(body)
         )
@@ -302,6 +319,7 @@ fn receive_expense(service: &NativeService, admin: &str, finance: &str, row: &Va
 pub fn exercise(service: &Arc<NativeService>, admin: &str, applicant: &str, employee: Option<i64>) {
     // Exercise a published single-node workflow with an independent reviewer.
     let (reviewer_id, reviewer_token) = workflow::reviewer(service, admin);
+    let (alternate_id, _) = workflow::reviewer(service, admin);
     workflow::configure(service, admin, reviewer_id);
     let finance = finance_user(service, admin, "Finance", "DEFAULT", "GENERAL");
     let date = (chrono::Utc::now() - chrono::Duration::days(1))
@@ -348,10 +366,8 @@ pub fn exercise(service: &Arc<NativeService>, admin: &str, applicant: &str, empl
         let id = row["id"].as_i64().unwrap();
         if kind == "expense" {
             assert_eq!(
-                call(service, &finance, operation(kind, "get"), id, None)
-                    .unwrap_err()
-                    .status,
-                Some(403)
+                call(service, &finance, operation(kind, "get"), id, None).unwrap()["status"],
+                "Draft"
             );
         }
         assert!(row.get("identity").is_none());
@@ -435,12 +451,17 @@ pub fn exercise(service: &Arc<NativeService>, admin: &str, applicant: &str, empl
         }
         row = act(service, applicant, kind, "submit", &row);
         assert_eq!(row["status"], "Pending");
+        row = workflow::verify_handover_roundtrip(
+            service,
+            admin,
+            operation(kind, "get"),
+            row,
+            alternate_id,
+        );
         if kind == "expense" {
             assert_eq!(
-                call(service, &finance, operation(kind, "get"), id, None)
-                    .unwrap_err()
-                    .status,
-                Some(403)
+                call(service, &finance, operation(kind, "get"), id, None).unwrap()["status"],
+                "Pending"
             );
         }
         if employee.is_none() {
@@ -531,7 +552,7 @@ pub fn exercise(service: &Arc<NativeService>, admin: &str, applicant: &str, empl
         row = if kind == "expense" {
             receive_expense(service, admin, &finance, &row)
         } else {
-            act(service, admin, kind, "complete", &row)
+            act(service, &reviewer_token, kind, "fulfillment", &row)
         };
         assert_eq!(
             row["status"],
@@ -592,7 +613,7 @@ pub fn exercise(service: &Arc<NativeService>, admin: &str, applicant: &str, empl
             call(
                 service,
                 admin,
-                operation(kind, "complete"),
+                operation(kind, "fulfillment"),
                 id,
                 Some(json!({"expectedVersion":row["versionNumber"],"note":"重复完成"}))
             )

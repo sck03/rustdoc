@@ -1,8 +1,8 @@
-import { queryPollingInterval } from "../../api/queryPollingPolicy.ts";
 import { Button } from "../../ui/Button.tsx";
 import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { ApiRequestInit, ApiUserDto, OaSubmission } from "../../api/index.ts";
+import type { ApiRequestInit, ApiUserDto } from "../../api/index.ts";
+import { approvalSubmissionOptions, type ApprovalDocumentData } from "./approvalSubmissionQuery.ts";
 import { useBlobUrl } from "../../ui/useBlobUrl.ts";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
@@ -10,7 +10,7 @@ import { readApiError } from "../../ui/formUtils.ts";
 import { OfficeDialog } from "../office/OfficeUi.tsx";
 import { useOfficeOperation } from "../office/useOfficeData.ts";
 
-type Document = Pick<OaSubmission, "documentStatus" | "documentError" | "submissionNumber" | "materialAccess">;
+type Document = ApprovalDocumentData;
 export type ApprovalDocumentApi<T extends Document = Document> = {
   submission: (id: number, submissionId: number, init?: ApiRequestInit) => Promise<T>;
   generateApproval: (id: number, submissionId: number, init?: ApiRequestInit) => Promise<T>;
@@ -21,8 +21,7 @@ export function ApprovalDocument<T extends Document>({api,user,row,scope,submiss
   const operation = useOfficeOperation([["office","approval-document",scope,user.id,user.contextId,row.id]],false);
   const [preview,setPreview] = useState<Blob|null>(null);
   const url = useBlobUrl(preview);
-  const query = useQuery({queryKey:["office","approval-document",scope,user.id,user.contextId,row.id,submissionId,row.versionNumber],enabled:Boolean(submissionId),
-    queryFn:({signal})=>api.submission(row.id,submissionId!,{signal}),refetchInterval: query => queryPollingInterval(query, query.state.data?.documentStatus === "Running" ? 1500 : false),refetchIntervalInBackground:false});
+  const query = useQuery(approvalSubmissionOptions(api, user, row, scope, submissionId));
   if (!submissionId) return ["Approved","HandedOff","Completed","InUse","Issued","Returned"].includes(row.status) ? <p className="office-muted">此历史申请未保存提交快照，无法生成可追溯的正式审批单。</p> : null;
   const document = query.data;
   const partial=document?.materialAccess?.isPartial??false;

@@ -334,6 +334,88 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
             act(service, tokens[4], "general", "approve", &dual)["status"],
             "Approved"
         );
+        // A company executive may also manage the applicant's department. Each
+        // responsibility remains a distinct task, with explicit self-review rules.
+        let mut dual_role = serial(
+            "general",
+            json!([
+                {"source":"DepartmentManager","approverUserIds":[]},
+                {"source":"CompanyExecutive","approverUserIds":[]}
+            ]),
+        );
+        dual_role["stages"][1]["selfApproval"] = json!("Reject");
+        policy(service, admin, "general", dual_role.clone());
+        let submitted = act(
+            service,
+            tokens[1],
+            "general",
+            "submit",
+            &create("general", json!({})),
+        );
+        let tasks = submitted["approvalPlan"]["steps"].as_array().unwrap();
+        assert_eq!(tasks.len(), 2);
+        assert!(
+            tasks
+                .iter()
+                .all(|task| task["approverUserId"] == users[4]["id"])
+        );
+        assert_ne!(tasks[0]["taskKey"], tasks[1]["taskKey"]);
+        let reviewed = act(service, tokens[4], "general", "approve", &submitted);
+        assert_eq!(reviewed["status"], "Pending");
+        assert_eq!(reviewed["approvalPlan"]["steps"][0]["status"], "Approved");
+        assert_eq!(reviewed["approvalPlan"]["steps"][1]["status"], "Waiting");
+        assert_eq!(
+            act(service, tokens[4], "general", "approve", &reviewed)["status"],
+            "Approved"
+        );
+
+        let own = call(service, admin, CREATE_GENERAL_REQUEST, 0,
+            Some(json!({"requestKey":nonce().unwrap(),"employeeId":people[4]["employee"]["id"],"departmentId":b,"title":"兼任负责人本人申请","reason":"代申请同样不得自批","category":"Other"}))).unwrap();
+        let rejected = call(
+            service,
+            admin,
+            SUBMIT_GENERAL_REQUEST,
+            own["id"].as_i64().unwrap(),
+            Some(json!({"expectedVersion":own["versionNumber"],"note":"自批回避"})),
+        )
+        .unwrap_err();
+        assert_eq!(rejected.status, Some(400));
+        assert!(
+            rejected.message.contains("申请人本人"),
+            "{}",
+            rejected.message
+        );
+        assert_eq!(
+            get(
+                service,
+                admin,
+                GET_GENERAL_REQUEST,
+                own["id"].as_i64().unwrap()
+            )["status"],
+            "Draft"
+        );
+
+        dual_role["stages"][1]["repeatedApprover"] = json!("Reject");
+        let rejected = service
+            .dispatch(
+                SIMULATE_OA_DEFINITION,
+                &[],
+                &[],
+                Some(json!({
+                    "definition":dual_role,"employeeId":people[1]["employee"]["id"],
+                    "appointmentId":people[1]["organization"]["primaryAssignmentId"],
+                    "amount":"0","currency":"CNY","duration":"1","category":"Other"
+                })),
+                admin,
+            )
+            .unwrap_err();
+        assert_eq!(rejected.status, Some(400));
+        assert!(
+            rejected.message.contains("独立复核"),
+            "{}",
+            rejected.message
+        );
+
         let mut restored = directory["departments"]
             .as_array()
             .unwrap()
@@ -649,7 +731,19 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
         .status,
         Some(409)
     );
-    row = call(service,admin,REASSIGN_GENERAL_REQUEST_APPROVAL,row["id"].as_i64().unwrap(),Some(json!({"expectedVersion":row["versionNumber"],"fromUserId":users[2]["id"],"toUserId":users[5]["id"],"note":"移交等待中的签署"}))).unwrap();
+    let task = row["approvalPlan"]["steps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|step| step["status"] == "Waiting" && step["approverUserId"] == users[2]["id"])
+        .unwrap();
+    call(service,admin,REASSIGN_UNIT_WORKFLOW_TASK,0,Some(json!({"requestKind":"oa-general","requestId":row["id"],"expectedVersion":row["versionNumber"],"taskKey":task["taskKey"],"fromUserId":users[2]["id"],"toUserId":users[5]["id"],"note":"移交等待中的签署"}))).unwrap();
+    row = get(
+        service,
+        admin,
+        operation("general", "get"),
+        row["id"].as_i64().unwrap(),
+    );
     assert_eq!(
         row["approvalPlan"]["steps"][1]["actedByUserId"],
         users[3]["id"]
@@ -852,6 +946,14 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
     );
     let hire = call(service,admin,CREATE_PERSONNEL_CHANGE_REQUEST,0,Some(json!({"requestKey":nonce().unwrap(),"title":"矩阵任职入职审批","reason":"按拟入职关系选取负责人","personnelChange":{"action":"Hire","registration":registration}}))).unwrap();
     let pending = act(service, admin, "personnel", "submit", &hire);
+    let (alternate, _) = workflow::reviewer(service, admin);
+    let pending = workflow::verify_handover_roundtrip(
+        service,
+        admin,
+        GET_PERSONNEL_CHANGE_REQUEST,
+        pending,
+        alternate,
+    );
     assert_eq!(
         pending["approvalPlan"]["steps"][0]["approverUserId"],
         users[4]["id"]

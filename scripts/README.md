@@ -420,6 +420,8 @@ pwsh -NoProfile -File scripts/clean-generated-artifacts.ps1 -IncludeCodexRuntime
 
 `npm --prefix apps/export-doc-web run test:review-lifecycle-ui` 验证公告迟到详情、HS 查询/客户端/权限切换与卸载取消，以及资源提交历史的按需加载、分页和身份/记录隔离；它也纳入 `test:settings-models`。
 
+`npm --prefix apps/export-doc-web run test:oa-review-lifecycle-ui` 验证普通审批节点删除与依赖衔接／撤销重做、临时刷新错误保留草稿、原始版本提交、七类移交资格、历史快照单次查询及释放、设置校验文案、许可证与模板诊断取消。`test:smart-ocr-ui` 另覆盖 TIFF 转换预览与原文件识别、取消和 Blob URL 回收。2026-11-26 本批仅执行受影响的定向回归；命令、数量、实际后端证据与清理范围见[本批记录](../docs/archive/2026-11/2026-11-26审批一致性与资源优化.md)。
+
 `cargo test --locked -p export-doc-engine --test account_scopes` 覆盖公司内自然键与跨公司单证权限，`--test document_files_service` 覆盖单据包名称/强标识冲突，`cargo test --locked -p export-doc-storage --test contract` 覆盖有界工作台扫描。共享契约同时由 `test-native-postgres.ps1 -Scope All` 在隔离 PostgreSQL 18 执行。所有手工 Cargo 命令使用仓库 CARGO_HOME 并串行执行；旧 schema 18 实验数据库不自动升级或删除。
 
 ### 指定单位集合的前后端一致性验收

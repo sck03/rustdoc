@@ -43,6 +43,8 @@ pub fn exercise(service: &NativeService, admin: &str) {
     );
     let token = login["accessToken"].as_str().unwrap();
     let applicant = person("申请材料所有者");
+    // Fulfillment requires an actual business handler as well as the restricted reviewer.
+    workflow::reviewer(service, admin);
     let mut settings = workflow::request(service, admin, GET_OA_APPROVAL_SETTINGS, None);
     let mut node = workflow::node("material-review", &[], "Named", json!([user["id"]]));
     node["materialPolicy"] = json!({"hiddenFields":["title","reason"]});

@@ -1,5 +1,5 @@
 import type { ApiRequestInit, ExportDocManagerApiClient, OaRequestSave, OaWorkflowCommandSave } from "../../api/index.ts";
-import { acknowledgedCommands, officeCommand, type OfficeActionInput, type ApprovalReassignInput } from "../office/officeCommands.ts";
+import { acknowledgedCommands, officeCommand, type OfficeActionInput } from "../office/officeCommands.ts";
 import type { OaActionName, OaKind } from "./oaModel.ts";
 
 const names = { personnel: "PersonnelChange", leave: "Leave", overtime: "Overtime", expense: "Expense", travel: "Travel", purchase: "Purchase", general: "General" } as const;
@@ -12,7 +12,6 @@ export function oaApi(client: ExportDocManagerApiClient, kind: OaKind) {
     list: (request: { pageNumber: number; pageSize: number; mineOnly: boolean; status?: string; financeOnly?: boolean; approvalsOnly?: boolean; handlingOnly?: boolean; definitionKey?:string }, init?: ApiRequestInit) => client[`list${name}Request`](request, init),
     get: (id: number, init?: ApiRequestInit) => client[`get${name}Request`]({ id }, init),
     previewApproval: (id: number, init?: ApiRequestInit) => client[`previewApprovalOf${name}Request`]({ id }, init),
-    reassign: (id: number, body: ApprovalReassignInput, init?: ApiRequestInit) => execute(id,officeCommand(client,`${kind}:${id}:reassign`,body),init,(request,options)=>client[`reassign${name}RequestApproval`](request,options)),
     workflow: (id:number,body:OaWorkflowCommandSave,init?:ApiRequestInit)=>execute(id,body,init,(request,options)=>client[`execute${name}RequestWorkflow`](request,options)),
     fulfillment:(id:number,input:OfficeActionInput,init?:ApiRequestInit)=>execute(id,officeCommand(client,`${kind}:${id}:fulfillment`,input),init,(request,options)=>client[`execute${name}RequestFulfillment`](request,options)),
     workflowCandidates: (id:number,beforeId?:number,init?:ApiRequestInit)=>client[`list${name}RequestWorkflowCandidates`]({id,beforeId},init),

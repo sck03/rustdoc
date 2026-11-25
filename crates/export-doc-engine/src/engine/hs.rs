@@ -68,6 +68,14 @@ pub fn codes(tx: &Connection) -> Result<BTreeMap<String, ApiHsCodeDto>> {
         .collect()
 }
 pub fn codes_for_year(tx: &Connection, year: i32) -> Result<BTreeMap<String, hs::Standard>> {
+    codes_for_prefix(tx, year, "")
+}
+
+pub(super) fn codes_for_prefix(
+    tx: &Connection,
+    year: i32,
+    prefix: &str,
+) -> Result<BTreeMap<String, hs::Standard>> {
     let fields = [
         "code",
         "name",
@@ -81,6 +89,7 @@ pub fn codes_for_year(tx: &Connection, year: i32) -> Result<BTreeMap<String, hs:
     .map(|key| (key, key));
     let mut query = super::hs_queries::query(CODES, &fields);
     query.current_year = Some(year);
+    query.prefix = prefix;
     let mut values = BTreeMap::new();
     super::hs_queries::visit(tx, &mut query, |row| {
         let mut dto: hs::Standard = serde_json::from_value(row)?;

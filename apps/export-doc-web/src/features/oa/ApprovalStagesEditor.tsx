@@ -1,6 +1,6 @@
 import { Button } from "../../ui/Button.tsx";
 import type { ExportDocManagerApiClient,OaApprovalStage,OaApprovalRule,OaRoutingUnit } from "../../api/index.ts";
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { ApprovalAccount } from "./useApprovalSettings.ts";
 import { OfficeField } from "../office/OfficeUi.tsx";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
@@ -8,14 +8,17 @@ import { ApprovalRevisionPolicyEditor } from "./ApprovalRevisionPolicyEditor.tsx
 import { ApprovalMaterialPolicyEditor } from "./ApprovalMaterialPolicyEditor.tsx";
 import { ApprovalSourcePicker,approvalSources } from "./ApprovalSourcePicker.tsx";
 import { WorkflowNodeSettings } from "./WorkflowNodeSettings.tsx";
+import { removeWorkflowStage, stageRemovalBlock } from "./workflowGraphModel.ts";
 const initialStage=(dependsOn:string[]=[]):OaApprovalStage=>({key:createRequestKey(),name:"审批节点",kind:"Approval",phase:"Decision",dependsOn,source:"DepartmentManager",approverUserIds:[],decision:"All",selfApproval:"Skip",repeatedApprover:"Allow",conditions:[],dueHours:48});
 export type ApprovalStagesEditorProps={client:ExportDocManagerApiClient;stages:OaApprovalStage[];accounts:ApprovalAccount[];handlers:ApprovalAccount[];units:OaRoutingUnit[];currentCompanyCode:string;definitions:OaApprovalRule[];definition?:OaApprovalRule;onChange:(stages:OaApprovalStage[])=>void};
 export function ApprovalStagesEditor({client,stages,accounts,handlers,units,currentCompanyCode,definitions,definition,onChange}:ApprovalStagesEditorProps) {
   const [catalogUnits,setCatalogUnits]=useState<Record<string,number>>({});
+  const removalHintId=useId();
   const ancestorIds=new Set(units.find(unit=>unit.code===currentCompanyCode)?.ancestorCompanyIds??[]);
   const patch=(index:number,change:Partial<OaApprovalStage>)=>onChange(stages.map((old,i)=>i===index?{...old,...change}:old));
   return <div className="oa-stages-editor"><p className="office-muted">无前置节点的节点同时开始，多个前置须全部完成。获批办理仅在批准后激活；编辑后须用实际人员样例模拟并发布。</p>
     {stages.map((stage,index)=>{
+      const removalBlock=stageRemovalBlock(stages,stage);
       const kind=stage.kind??"Approval",hasActors=["Approval","Handling","Copy"].includes(kind),approval=kind==="Approval";
       const sourceAccounts=kind==="Handling"?handlers:accounts;
       const routes=["CompanyExecutive","CompanyLeaders","Position","Responsibility"].includes(stage.source);
@@ -44,7 +47,8 @@ export function ApprovalStagesEditor({client,stages,accounts,handlers,units,curr
         {hasActors&&stage.source==="Named"&&<OfficeField label="责任账号（可多选）"><select multiple required value={stage.approverUserIds.map(String)} onChange={e=>patch(index,{approverUserIds:Array.from(e.target.selectedOptions,o=>Number(o.value))})}>{sourceAccounts.map(a=><option key={a.id} value={a.id}>{a.fullName} · {a.username}</option>)}</select></OfficeField>}
         {hasActors&&<ApprovalMaterialPolicyEditor form={definition?.form??undefined} value={stage.materialPolicy} onChange={materialPolicy=>patch(index,{materialPolicy})}/>}
         {approval&&<ApprovalRevisionPolicyEditor value={stage.revisionPolicy} accounts={accounts} onChange={revisionPolicy=>patch(index,{revisionPolicy})}/>}
-        <Button type="button" disabled={stages.length===1||stages.some(n=>n.dependsOn.includes(stage.key)||(n.branches??[]).some(b=>b.target===stage.key))} onClick={()=>onChange(stages.filter((_,i)=>i!==index))}>移除节点</Button>
+        <Button type="button" disabled={Boolean(removalBlock)} aria-describedby={removalBlock?`${removalHintId}-${stage.key}`:undefined} onClick={()=>onChange(removeWorkflowStage(stages,stage.key))}>移除节点</Button>
+        {removalBlock&&<p id={`${removalHintId}-${stage.key}`} className="office-muted">{removalBlock}</p>}
       </fieldset>;
     })}
     <Button type="button" disabled={stages.length>=32} onClick={()=>onChange([...stages,initialStage(stages.length?[stages[stages.length-1].key]:[])])}>添加流程节点</Button>

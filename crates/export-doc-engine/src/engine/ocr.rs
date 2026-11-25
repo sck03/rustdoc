@@ -16,7 +16,13 @@ use std::{
     sync::TryLockError,
     time::Duration,
 };
-pub const OPERATIONS: &[Operation] = &[RECOGNIZE_OCR_IMAGE, UPLOAD_OCR_IMAGE, PREVIEW_OCR_IMAGE];
+mod preview;
+pub const OPERATIONS: &[Operation] = &[
+    RECOGNIZE_OCR_IMAGE,
+    UPLOAD_OCR_IMAGE,
+    PREVIEW_OCR_IMAGE,
+    PREVIEW_UPLOADED_OCR_IMAGE,
+];
 const MAX_INPUT: usize = 25 * 1024 * 1024;
 pub struct Resources {
     pub worker: PathBuf,
@@ -93,11 +99,15 @@ impl NativeService {
     ) -> Result<tasks::FileOutput> {
         let actor = self.sessions.actor(&self.store, token)?;
         self.authorize_operation(&actor, PREVIEW_OCR_IMAGE, query)?;
-        preview(query)
+        preview(self, query)
     }
 }
 
-fn preview(query: &[(&str, String)]) -> Result<tasks::FileOutput> {
+pub(super) fn preview_upload(service: &NativeService, bytes: &[u8]) -> Result<tasks::FileOutput> {
+    preview::convert(service, bytes)
+}
+
+fn preview(service: &NativeService, query: &[(&str, String)]) -> Result<tasks::FileOutput> {
     let selected = crate::engine::request_values::find(query, "filePath").unwrap_or("");
     if selected.is_empty() {
         return Err(invalid("请提供本机图片路径。"));
@@ -114,7 +124,7 @@ fn preview(query: &[(&str, String)]) -> Result<tasks::FileOutput> {
         "png" => "image/png",
         "jpg" | "jpeg" => "image/jpeg",
         "bmp" => "image/bmp",
-        "tif" | "tiff" => "image/tiff",
+        "tif" | "tiff" => return preview::convert(service, &bytes),
         "webp" => "image/webp",
         _ => return Err(invalid("OCR 预览只支持图片文件。")),
     };

@@ -3,7 +3,7 @@ import { hasPermission } from "../../app/PermissionAccessContext.tsx";
 import { oaKinds } from "../oa/oaModel.ts";
 
 export const announcementStatus = { Draft: "草稿", Published: "已发布", Withdrawn: "已撤回", Archived: "已归档" };
-export const notificationActions: Record<string, string> = { submit: "待您审批", "approve-step": "下一步待您审批", "handling-step":"办理进度已更新", remind: "申请人催办", approve: "审批通过", reject: "审批驳回", complete: "已办结 / 移交", void: "批准已作废", reassign: "办理分工已交接", issue: "已发放 / 交接", return: "已登记归还", cancel: "申请已取消" };
+export const notificationActions: Record<string, string> = { submit: "待您审批", "approval-reassign": "审批已移交，待您审批", "approve-step": "下一步待您审批", "handling-step":"办理进度已更新", remind: "申请人催办", approve: "审批通过", reject: "审批驳回", complete: "已办结 / 移交", void: "批准已作废", reassign: "办理分工已交接", issue: "已发放 / 交接", return: "已登记归还", cancel: "申请已取消" };
 export function notificationActionLabel(row: SiteNotification) {
   if (["submit", "approve-step", "approval-reassign", "remind"].includes(row.action) && row.actionRequired === false) {
     return ["Approved", "HandedOff", "Completed", "InUse", "Issued", "Returned"].includes(row.requestStatus ?? "")

@@ -12,6 +12,7 @@ import { attachmentUploadForm } from "../../ui/documentAttachments.ts";
 import { toBusinessDateTimeLocalInput } from "../../ui/businessTime.ts";
 import { ApprovalDocument } from "../oa/ApprovalDocument.tsx";
 import { ApprovalReassignDialog } from "../oa/ApprovalReassignDialog.tsx";
+import { canReassignApproval } from "../oa/approvalPermissions.ts";
 import { WorkflowOperations } from "../oa/WorkflowOperations.tsx";
 import { WorkflowFulfillmentPanel } from "../oa/WorkflowFulfillmentPanel.tsx";
 import { OfficeDialog, OfficeField, OfficeSubmit } from "./OfficeUi.tsx";
@@ -52,7 +53,7 @@ function Details({client,user,kind,row}: {client: ExportDocManagerApiClient;user
     <ResourceSubmissionHistory client={client} user={user} kind={kind} row={current}/>
     <WorkflowOperations client={client} row={current} disabled={query.isFetching}/>
     <WorkflowFulfillmentPanel client={client} user={user} row={current}/>
-    {(user.capabilities.canManageUsers || user.capabilities.unitManagement?.workflows) && current.status === "Pending" && <button type="button" className="command-button secondary" onClick={()=>setReassigning(true)}>移交未完成审批</button>}
+    {canReassignApproval(user, current) && <button type="button" className="command-button secondary" onClick={()=>setReassigning(true)}>移交未完成审批</button>}
     {operation.error && <InlineNotice tone="error">{operation.error}</InlineNotice>}
     {editing && <ResourceDraftEditor client={client} user={user} kind={kind} row={editing} onClose={()=>setEditing(null)} />}
     {reassigning && <ApprovalReassignDialog client={client} row={current} onClose={()=>setReassigning(false)} />}

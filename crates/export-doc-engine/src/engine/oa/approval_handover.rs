@@ -95,12 +95,7 @@ pub(in crate::engine) fn managed_reassign(
         Ok(json!({"requestId":id,"versionNumber":saved["versionNumber"]}))
     })
 }
-pub(super) fn reassign(
-    tx: &Connection,
-    actor: &Actor,
-    row: &mut Value,
-    body: &Value,
-) -> Result<()> {
+fn reassign(tx: &Connection, actor: &Actor, row: &mut Value, body: &Value) -> Result<()> {
     super::super::units::demand(actor, &text(row, "companyScope"), "organization.workflows")?;
     required(body, "note", "审批移交原因", 500)?;
     required(body, "taskKey", "审批任务", 180)?;

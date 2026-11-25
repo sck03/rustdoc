@@ -6,6 +6,7 @@ import type { ApiUserDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { oaApi } from "./oaApi.ts";
 import { oaAccess, type OaKind } from "./oaModel.ts";
 import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
+import { largeDocumentQueryOptions } from "../../api/queryRetention.ts";
 
 export function useOaRequests(client: ExportDocManagerApiClient, user: ApiUserDto, kind: OaKind) {
   const [params, setParams] = useSearchParams();
@@ -54,6 +55,7 @@ export function useOaRequests(client: ExportDocManagerApiClient, user: ApiUserDt
     queryFn: ({ signal }) => api.get(selected, { signal }),
     ...officePolling,
     refetchInterval: oaRequestPollingInterval,
+    ...largeDocumentQueryOptions,
   });
   return {
     query,

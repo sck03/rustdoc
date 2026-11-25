@@ -1,5 +1,5 @@
 //! Service handover and narrow custodian access run on both supported databases.
-use super::oa_contract::{call, operation};
+use super::oa_contract::{call, fulfillment_node, operation};
 use export_doc_engine::{engine::NativeService, generated_api::*, paths::nonce};
 use serde_json::{Value, json};
 #[path = "handling_permissions.rs"]
@@ -14,12 +14,16 @@ fn list(service: &NativeService, token: &str, op: Operation, query: &[(&str, Str
     result
 }
 fn act(service: &NativeService, token: &str, action: &str, row: &Value) -> Value {
+    let mut body = json!({"expectedVersion":row["versionNumber"],"note":"实物办理验收"});
+    if action == "fulfillment" {
+        body["nodeKey"] = fulfillment_node(row);
+    }
     call(
         service,
         token,
         operation("general", action),
         row["id"].as_i64().unwrap(),
-        Some(json!({"expectedVersion":row["versionNumber"],"note":"实物办理验收"})),
+        Some(body),
     )
     .unwrap()
 }
@@ -234,9 +238,9 @@ pub fn exercise(service: &NativeService, root: &str) {
         call(
             service,
             &leader,
-            operation("general", "complete"),
+            operation("general", "fulfillment"),
             id,
-            Some(json!({"expectedVersion":approved["versionNumber"],"note":"越过分工"}))
+            Some(json!({"expectedVersion":approved["versionNumber"],"nodeKey":fulfillment_node(&approved),"note":"越过分工"}))
         )
         .unwrap_err()
         .status,
@@ -272,7 +276,7 @@ pub fn exercise(service: &NativeService, root: &str) {
         act(
             service,
             &supplies,
-            "complete",
+            "fulfillment",
             &call(service, &supplies, operation("general", "get"), id, None).unwrap()
         )["status"],
         "Completed"
@@ -288,7 +292,7 @@ pub fn exercise(service: &NativeService, root: &str) {
     let certificate = act(service, &applicant, "submit", &certificate);
     let certificate = act(service, &leader, "approve", &certificate);
     assert_eq!(
-        act(service, &supplies, "complete", &certificate)["status"],
+        act(service, &supplies, "fulfillment", &certificate)["status"],
         "Completed"
     );
     for (key, name, handler, other) in [

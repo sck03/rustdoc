@@ -1,8 +1,7 @@
-import { ApiError, type ApiRequestInit, type ExportDocManagerApiClient, type OaAction, type OaApprovalReassign } from "../../api/index.ts";
+import { ApiError, type ApiRequestInit, type ExportDocManagerApiClient, type OaAction } from "../../api/index.ts";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
 
 export type OfficeActionInput = Omit<OaAction,"commandKey"> & {commandKey?:string};
-export type ApprovalReassignInput = Omit<OaApprovalReassign,"commandKey"> & {commandKey?:string};
 const commands = new WeakMap<ExportDocManagerApiClient,Map<string,string>>();
 
 /** A retry in the same identity keeps its acknowledgement key. The bounded

@@ -5,6 +5,33 @@ use serde_json::{Value, json};
 pub fn node(key: &str, deps: &[&str], source: &str, ids: Value) -> Value {
     json!({"key":key,"name":key,"dependsOn":deps,"source":source,"approverUserIds":ids,"decision":"All","selfApproval":"Skip","repeatedApprover":"Allow","conditions":[],"dueHours":48})
 }
+
+pub fn verify_handover_roundtrip(
+    service: &NativeService,
+    admin: &str,
+    get: Operation,
+    mut row: Value,
+    alternate: i64,
+) -> Value {
+    let original = row["approvalPlan"]["steps"][0]["approverUserId"]
+        .as_i64()
+        .unwrap();
+    let key = row["approvalPlan"]["steps"][0]["taskKey"].clone();
+    for (from, to) in [(original, alternate), (alternate, original)] {
+        let result = call(service, admin, REASSIGN_UNIT_WORKFLOW_TASK, 0, Some(json!({
+            "requestKind":format!("oa-{}", row["kind"].as_str().unwrap()), "requestId":row["id"],
+            "expectedVersion":row["versionNumber"], "taskKey":key,
+            "fromUserId":from, "toUserId":to, "note":"统一入口移交合同"
+        }))).unwrap();
+        let next = call(service, admin, get, row["id"].as_i64().unwrap(), None).unwrap();
+        assert_eq!(next["versionNumber"], result["versionNumber"]);
+        assert_eq!(next["approvalPlan"]["steps"][0]["taskKey"], key);
+        assert_eq!(next["approvalPlan"]["steps"][0]["approverUserId"], to);
+        assert_eq!(next["status"], row["status"]);
+        row = next;
+    }
+    row
+}
 pub fn rule(kind: &str, variant: &str, stages: Value) -> Value {
     let key = format!(
         "{kind}{}",
@@ -54,6 +81,9 @@ pub fn query(
 ) -> Result<Value, export_doc_engine::api::ApiError> {
     let body = body.map(|value| {
         let mut defaults = contracts::object(op.id, true);
+        if op == REASSIGN_UNIT_WORKFLOW_TASK && value.get("toContextId").is_none() {
+            defaults.as_object_mut().unwrap().remove("toContextId");
+        }
         if op == SIMULATE_OA_DEFINITION && value.get("reporting").is_none() {
             defaults.as_object_mut().unwrap().remove("reporting");
         }
@@ -282,7 +312,12 @@ pub fn reviewer(service: &NativeService, admin: &str) -> (i64, String) {
         .flat_map(|r| {
             r.actions
                 .iter()
-                .filter(|a| matches!(a.key.as_str(), "view" | "approve"))
+                .filter(|a| {
+                    matches!(
+                        a.key.as_str(),
+                        "view" | "approve" | "complete" | "receive" | "issue" | "return"
+                    )
+                })
                 .map(|a| json!({"resourceKey":r.key,"action":a.key,"dataScope":"company"}))
         })
         .collect::<Vec<_>>();
@@ -372,8 +407,7 @@ pub fn decision_body(
                 | "withdraw"
                 | "cancel"
                 | "void"
-                | "complete"
-                | "approval-reassign"
+                | "fulfillment"
                 | "resource-submit"
                 | "workflow-command"
                 | "personnel-execute"
@@ -417,7 +451,7 @@ pub fn decision_body(
     let meta = &contracts::contract()["operations"][op.id]["office"];
     let review = matches!(
         meta["action"].as_str(),
-        Some("approve" | "reject" | "return" | "approval-reassign")
+        Some("approve" | "reject" | "return")
     );
     if id <= 0 || !review || body["taskKey"].as_str().is_some_and(|s| !s.is_empty()) {
         return Some(body);
@@ -429,19 +463,7 @@ pub fn decision_body(
     if let Some(get) = get {
         if let Ok(bytes) = service.dispatch(*get, &[("id", id.to_string())], &[], None, token) {
             let row: Value = serde_json::from_slice(&bytes).unwrap();
-            body["taskKey"] = if meta["action"] == "approval-reassign" {
-                row["approvalPlan"]["steps"]
-                    .as_array()
-                    .and_then(|ss| {
-                        ss.iter().find(|s| {
-                            s["status"] == "Waiting" && s["approverUserId"] == body["fromUserId"]
-                        })
-                    })
-                    .map(|s| s["taskKey"].clone())
-                    .unwrap_or(json!(""))
-            } else {
-                row["reviewTaskKeys"][0].clone()
-            };
+            body["taskKey"] = row["reviewTaskKeys"][0].clone();
         }
     }
     Some(body)

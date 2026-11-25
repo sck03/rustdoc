@@ -1,6 +1,6 @@
 use super::{
     error::{Result, invalid},
-    hs::{self, codes_for_year, read},
+    hs::{self, read},
     records::text,
 };
 use crate::engine::store::Connection;
@@ -111,8 +111,8 @@ pub fn search(tx: &Connection, query: &[(&str, String)], year: i32) -> Result<Va
         .parse::<usize>()
         .unwrap_or(20)
         .clamp(1, 50);
-    let codes = codes_for_year(tx, year)?;
     let prefix = rules::code(raw).ok().filter(|c| c.len() >= 4);
+    let codes = hs::codes_for_prefix(tx, year, prefix.as_deref().unwrap_or(""))?;
     let fields = [
         "id",
         "rawReportedHsCode",
@@ -126,20 +126,26 @@ pub fn search(tx: &Connection, query: &[(&str, String)], year: i32) -> Result<Va
     let mut example_query = super::hs_queries::query(hs::EXAMPLES, &fields);
     example_query.prefix = prefix.as_deref().unwrap_or("");
     example_query.ranked_examples = true;
-    let feedback = super::hs_queries::feedback(tx, &normalized)?;
+    let feedback = if prefix.is_none() {
+        super::hs_queries::feedback(tx, &normalized)?
+    } else {
+        BTreeMap::new()
+    };
     let mut relations = BTreeMap::<String, Vec<Value>>::new();
     let relation_fields = ["oldCode", "newCode", "isManuallyVerified"].map(|key| (key, key));
-    super::hs_queries::visit(
-        tx,
-        &mut super::hs_queries::query(hs::REPLACEMENTS, &relation_fields),
-        |row| {
-            relations
-                .entry(text(&row, "oldCode"))
-                .or_default()
-                .push(row);
-            Ok(())
-        },
-    )?;
+    if prefix.is_none() {
+        super::hs_queries::visit(
+            tx,
+            &mut super::hs_queries::query(hs::REPLACEMENTS, &relation_fields),
+            |row| {
+                relations
+                    .entry(text(&row, "oldCode"))
+                    .or_default()
+                    .push(row);
+                Ok(())
+            },
+        )?;
+    }
     let mut related_examples = BTreeMap::<String, Evidence>::new();
     let mut example_count = 0;
     let mut results = BTreeMap::<String, Candidate>::new();
@@ -236,11 +242,6 @@ pub fn search(tx: &Connection, query: &[(&str, String)], year: i32) -> Result<Va
         if !standard.trusted() || results.contains_key(code) {
             continue;
         }
-        let combined = rules::text(&format!(
-            "{} {} {}",
-            standard.name, standard.elements, standard.description
-        ));
-        let assessment = rules::attributes(&normalized, &combined);
         let score = if let Some(prefix) = &prefix {
             if !code.starts_with(prefix) {
                 continue;
@@ -251,6 +252,11 @@ pub fn search(tx: &Connection, query: &[(&str, String)], year: i32) -> Result<Va
                 (72 + prefix.len() as i64 * 3).min(96)
             }
         } else {
+            let combined = rules::text(&format!(
+                "{} {} {}",
+                standard.name, standard.elements, standard.description
+            ));
+            let assessment = rules::attributes(&normalized, &combined);
             rules::score(&normalized, &combined) - assessment.penalty
         };
         if score < 22 {

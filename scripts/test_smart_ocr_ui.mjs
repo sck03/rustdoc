@@ -32,7 +32,8 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   const client={getHealth:async()=>({runtimeDependencies:[{key:'ocr-runtime',status:'ready',ready:true}]}),
     uploadOcrImage:(input,options)=>delayed('upload',input,options),
     recognizeOcrImage:(input,options)=>delayed('recognize',input,options),
-    previewOcrImage:(input,options)=>delayed('preview',input,options)};
+    previewOcrImage:(input,options)=>delayed('preview',input,options),
+    previewUploadedOcrImage:(input,options)=>delayed('preview-upload',input,options)};
   function Probe(){const ocr=useSmartOcr(client,true);return <>
     <button onClick={()=>ocr.usePathImage('C:/first.png',true)}>第一张</button>
     <button onClick={()=>ocr.usePathImage('C:/second.png',true)}>第二张</button>
@@ -157,6 +158,26 @@ try {
     await page.getByRole('button',{name:'离开',exact:true}).click();
     await page.waitForFunction(()=>window.pending[2].signal.aborted);
     await page.evaluate(()=>window.pending[2].reject(new Error('离开后的错误')));await settle(page);
+  });
+  await scenario('TIFF preview converts but recognition retains original; stale conversion is cancelled','browser',async page=>{
+    const original=Buffer.from('bounded TIFF fixture');
+    await page.getByLabel('上传 OCR 图片').setInputFiles({name:'scan.tiff',mimeType:'image/tiff',buffer:original});
+    await page.waitForFunction(()=>window.pending.length===1);
+    assert.equal(await page.evaluate(()=>window.pending[0].kind),'preview-upload');
+    await page.evaluate(()=>window.pending[0].resolve(new Blob(['jpeg preview'],{type:'image/jpeg'})));
+    await page.waitForFunction(()=>window.createdUrls.length===1);
+    assert.equal(await page.evaluate(()=>window.createdUrls[0].blob.type),'image/jpeg');
+    await page.getByRole('button',{name:'开始识别'}).click();
+    await page.waitForFunction(()=>window.pending.length===2);
+    assert.equal(await page.evaluate(()=>window.pending[1].input.body.type),'image/tiff');
+    assert.equal(await page.evaluate(()=>window.pending[1].input.body.text()),original.toString());
+    await page.getByLabel('上传 OCR 图片').setInputFiles({name:'second.tif',mimeType:'image/tiff',buffer:original});
+    await page.waitForFunction(()=>window.pending.length===3&&window.pending[1].signal.aborted);
+    await page.getByRole('button',{name:'离开',exact:true}).click();
+    await page.waitForFunction(()=>window.pending[2].signal.aborted);
+    await page.evaluate(()=>{window.pending[1].resolve({fullText:'stale',lines:[]});window.pending[2].resolve(new Blob(['stale']));});
+    await settle(page);
+    assert.deepEqual(await page.evaluate(()=>window.revokedUrls.sort()),await page.evaluate(()=>window.createdUrls.map(item=>item.url).sort()));
   });
   await scenario('permission keeps recognition disabled','denied',async page=>{
     assert(await page.getByRole('button',{name:'选择 OCR 图片'}).isDisabled());

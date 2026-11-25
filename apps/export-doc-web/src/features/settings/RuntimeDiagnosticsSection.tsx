@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { useState } from "react";
 import { RuntimeMetricsSection } from "./RuntimeMetricsSection.tsx";
 import { FolderCheck, HardDrive, PackageOpen, RefreshCw } from "lucide-react";
@@ -41,8 +41,12 @@ export function RuntimeDiagnosticsSection({
   onPathError: (message: string) => void;
 }) {
   const [metricsOpen, setMetricsOpen] = useState(false);
-  const templateStorageMutation = useMutation({
-    mutationFn: () => client.checkReportTemplateStorage(),
+  const [templateStorage, setTemplateStorage] = useState<Awaited<ReturnType<ExportDocManagerApiClient["checkReportTemplateStorage"]>> | null>(null);
+  const [templateStorageError, setTemplateStorageError] = useState<string | null>(null);
+  const templateStorageMutation = useScopedMutation("template-storage-check", client, {
+    mutationFn: (_: void, signal) => client.checkReportTemplateStorage({ signal }),
+    onSuccess: result => { setTemplateStorage(result); setTemplateStorageError(null); },
+    onError: error => { setTemplateStorage(null); setTemplateStorageError(readApiError(error)); },
   });
   const groups = buildRuntimePathGroups(health);
   const summary = summarizeRuntimePathGroups(groups);
@@ -79,17 +83,17 @@ export function RuntimeDiagnosticsSection({
       </div>
       {metadataIssues > 0 ? <InlineNotice tone="error">{metadataIssues} 项诊断信息异常，请刷新并检查服务返回的目录或依赖状态。</InlineNotice> : null}
       {errorMessage ? <InlineNotice tone="error" title="运行诊断加载失败">{errorMessage}</InlineNotice> : null}
-      {templateStorageMutation.isError ? <InlineNotice tone="error" title="模板存储检查失败">{readApiError(templateStorageMutation.error)}</InlineNotice> : null}
-      {templateStorageMutation.data ? (
-        <InlineNotice tone={templateStorageMutation.data.writable ? "success" : "error"} className="runtime-template-storage-result">
+      {templateStorageError ? <InlineNotice tone="error" title="模板存储检查失败">{templateStorageError}</InlineNotice> : null}
+      {templateStorage ? (
+        <InlineNotice tone={templateStorage.writable ? "success" : "error"} className="runtime-template-storage-result">
           <div>
-            <strong>{templateStorageMutation.data.writable ? "模板目录可用" : "模板目录需要处理"}</strong>
-            <span>{templateStorageMutation.data.message}</span>
+            <strong>{templateStorage.writable ? "模板目录可用" : "模板目录需要处理"}</strong>
+            <span>{templateStorage.message}</span>
           </div>
           <div className="runtime-template-storage-path">
-            <code title={formatManagedPath(templateStorageMutation.data.templateRoot)}>{formatManagedPath(templateStorageMutation.data.templateRoot)}</code>
-            {templateStorageMutation.data.exists && templateStorageMutation.data.templateRoot
-              ? renderOpenPathAction(templateStorageMutation.data.templateRoot, "打开模板目录", onPathError)
+            <code title={formatManagedPath(templateStorage.templateRoot)}>{formatManagedPath(templateStorage.templateRoot)}</code>
+            {templateStorage.exists && templateStorage.templateRoot
+              ? renderOpenPathAction(templateStorage.templateRoot, "打开模板目录", onPathError)
               : null}
           </div>
         </InlineNotice>

@@ -201,9 +201,15 @@ pub fn save(
     }
     let validation = validate(&settings, paths, store.provider()?);
     if operation == VALIDATE_SETTINGS {
-        let messages=validation.as_ref().err().map(|error|vec![json!({"level":"Error","propertyName":"settings","message":error.message,"isAutoFixable":false})]).unwrap_or_default();
+        let messages = validation
+            .as_ref()
+            .err()
+            .map(|error| {
+                vec![json!({"level":"error","propertyName":"settings","message":error.message})]
+            })
+            .unwrap_or_default();
         return Ok(
-            json!({"isValid":validation.is_ok(),"hasWarnings":false,"canAutoFix":false,"messages":messages,"normalizedSettings":settings,"storagePolicy":"所有持久化路径均限定在当前数据目录中。"}),
+            json!({"isValid":validation.is_ok(),"messages":messages,"storagePolicy":"所有持久化路径均限定在当前数据目录中。"}),
         );
     }
     validation?;

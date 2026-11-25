@@ -31,7 +31,8 @@ struct Response {
 
 fn main() -> Result<()> {
     let mut args = env::args_os().skip(1);
-    let (mut model_root, mut health, mut recognize, mut frames) = (None, false, false, false);
+    let (mut model_root, mut health, mut recognize, mut frames, mut preview) =
+        (None, false, false, false, false);
     while let Some(arg) = args.next() {
         match arg.to_str() {
             Some("--model-root") => {
@@ -40,18 +41,19 @@ fn main() -> Result<()> {
             Some("--health") => health = true,
             Some("--recognize-stdin") => recognize = true,
             Some("--recognize-frames") => frames = true,
+            Some("--preview-stdin") => preview = true,
             _ => bail!("unsupported OCR argument"),
         }
     }
     let root = model_root.context("--model-root is required")?;
     if !root.is_absolute()
-        || [health, recognize, frames]
+        || [health, recognize, frames, preview]
             .into_iter()
             .filter(|value| *value)
             .count()
             != 1
     {
-        bail!("provide an absolute model root and exactly one of --health / --recognize-stdin / --recognize-frames");
+        bail!("provide an absolute model root and exactly one of --health / --recognize-stdin / --recognize-frames / --preview-stdin");
     }
     if health {
         engine::Engine::load(&root)?;
@@ -66,6 +68,20 @@ fn main() -> Result<()> {
         .take(MAX_IMAGE_BYTES + 1)
         .read_to_end(&mut encoded)?;
     // Reject bad input before loading the native runtime or allocating model sessions.
+    if preview {
+        let image = match image_processing::decode_image(&encoded) {
+            Ok(image) => image,
+            Err(cause) => {
+                eprintln!("{cause:#}");
+                std::process::exit(2);
+            }
+        };
+        drop(encoded);
+        let mut output = io::BufWriter::new(io::stdout());
+        image_processing::write_preview(&image, &mut output)?;
+        output.flush()?;
+        return Ok(());
+    }
     let response = recognize_image(&root, &mut None, encoded);
     let mut output = io::BufWriter::new(io::stdout());
     serde_json::to_writer(&mut output, &response)?;

@@ -454,14 +454,14 @@ pub(super) fn exercise(
             true
         );
     }
-    super::act(service, second, "complete", &approved);
+    super::act(service, second, "fulfillment", &approved);
     assert_eq!(
         call(
             service,
             first,
-            operation("general", "complete"),
+            operation("general", "fulfillment"),
             approved["id"].as_i64().unwrap(),
-            Some(json!({"expectedVersion":approved["versionNumber"],"note":"重复用印"}))
+            Some(json!({"expectedVersion":approved["versionNumber"],"nodeKey":super::fulfillment_node(&approved),"note":"重复用印"}))
         )
         .unwrap_err()
         .status,

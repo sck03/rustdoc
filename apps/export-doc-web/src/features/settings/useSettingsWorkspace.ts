@@ -159,7 +159,7 @@ export function useSettingsWorkspace({
       setMessage(response.isValid ? null : "设置校验发现需要处理的问题。");
       setSuccessMessage(
         response.isValid
-          ? response.hasWarnings
+          ? response.messages.some(message => message.level === "warning")
             ? "设置校验完成，有警告项可复核。"
             : "设置校验通过。"
           : null,
@@ -415,20 +415,6 @@ export function useSettingsWorkspace({
     validateSettingsMutation.mutate(settings);
   }
 
-  function handleApplyValidationFix() {
-    if (!validationResult?.canAutoFix || !validationResult.normalizedSettings || !canManageSettings) {
-      return;
-    }
-
-    setSettings(validationResult.normalizedSettings as unknown as SettingsRecord);
-    setMessage(null);
-    setSuccessMessage("已把自动修复结果应用到当前草稿，请检查后保存。");
-    setValidationResult({
-      ...validationResult,
-      canAutoFix: false,
-    });
-  }
-
   async function handleCleanupSystemLogs() {
     if (!settings || !canManageSettings || isBusy) {
       return;
@@ -466,5 +452,5 @@ export function useSettingsWorkspace({
     saveMutation.mutate(settings);
   }
 
-  return { setSuccessMessage, message, concurrencyMessage, successMessage, settings, isBusy, settingsQuery, handleReloadSettings, handleSubmit, activeCategoryConfig, hasUnsavedChanges, changedCategories, currentCategory, databaseProvider, updateSecrets, setUpdateSecrets, handleRestoreSystemDefaults, handleValidateSettings, availableSettingsCategories, setActiveCategory, healthQuery, patchSetting, secrets, canSelectDesktopDirectory, handleSelectDefaultExportDirectory, issuingAuthorityOptions, handleSingleWindowOrgCodeChange, handleSingleWindowFetchPlaceChange, handleSingleWindowAplAddChange, patchSettings, emailAddressCandidate, handleInferEmailServerConfig, handleTestEmailConnection, setMessage, handleCleanupSystemLogs, validationResult, handleApplyValidationFix, location, baselineSettings, save: () => { if(settings && canManageSettings && !isBusy) saveMutation.mutate(settings); } };
+  return { setSuccessMessage, message, concurrencyMessage, successMessage, settings, isBusy, settingsQuery, handleReloadSettings, handleSubmit, activeCategoryConfig, hasUnsavedChanges, changedCategories, currentCategory, databaseProvider, updateSecrets, setUpdateSecrets, handleRestoreSystemDefaults, handleValidateSettings, availableSettingsCategories, setActiveCategory, healthQuery, patchSetting, secrets, canSelectDesktopDirectory, handleSelectDefaultExportDirectory, issuingAuthorityOptions, handleSingleWindowOrgCodeChange, handleSingleWindowFetchPlaceChange, handleSingleWindowAplAddChange, patchSettings, emailAddressCandidate, handleInferEmailServerConfig, handleTestEmailConnection, setMessage, handleCleanupSystemLogs, validationResult, location, baselineSettings, save: () => { if(settings && canManageSettings && !isBusy) saveMutation.mutate(settings); } };
 }
