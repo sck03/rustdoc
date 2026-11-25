@@ -87,7 +87,7 @@ pub fn expense_total(lines: &Value, currency: &str, today: NaiveDate) -> Result<
         }
         total = total.checked_add(amount).ok_or("金额超出范围。")?;
         if total > Decimal::from(100_000_000) {
-            return Err("单笔报销合计不能超过一亿元。".into());
+            return Err("单笔付款报销合计不能超过一亿元。".into());
         }
     }
     Ok(total)

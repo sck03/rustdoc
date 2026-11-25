@@ -277,7 +277,7 @@ function RequestEditor({
           )}
           <OfficeField label="本批附件用途">
             <select value={purpose} onChange={(event) => setPurpose(event.target.value)}>
-              <option value="ReimbursementForm">报销单</option>
+              <option value="ReimbursementForm">付款报销单</option>
               <option value="Voucher">发票／其他凭证</option>
               <option value="Supporting">补充资料</option>
             </select>

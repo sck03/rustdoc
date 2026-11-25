@@ -12,7 +12,7 @@ export function useOaApprovalHub(client: ExportDocManagerApiClient, user: ApiUse
   }));
   if (oaAccess(user, "expense", "view") && oaAccess(user, "expense", "complete")) {
     queues.push({ kind: "expense", finance: true, handling:false, status:"Approved", title: "财务待接收",
-      description: "核对已批准的报销明细、凭证和审批记录，并登记接收。",
+      description: "核对已批准的付款报销明细、凭证和审批记录，并登记接收。",
       label: "待财务接收", href: "/office/requests/expense?view=finance" });
   }
   for (const kind of oaKinds.filter(kind => kind !== "expense" && kind !== "personnel" && oaAccess(user,kind,"view") && oaAccess(user,kind,"complete"))) {

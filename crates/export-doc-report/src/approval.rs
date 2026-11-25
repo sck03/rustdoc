@@ -129,7 +129,7 @@ pub fn data(snapshot: &Value, generated_at: &str) -> Result<ReportData> {
         ));
     }
     if request["kind"] == "expense" {
-        summary.push("详细费用见提交的报销单及凭证附件；金额以本次批准记录为准。".into());
+        summary.push("详细费用见提交的付款报销单及凭证附件；金额以本次批准记录为准。".into());
         for line in request["lines"].as_array().into_iter().flatten() {
             summary.push(format!(
                 "{} · {} · {} {}",
@@ -164,7 +164,7 @@ pub fn data(snapshot: &Value, generated_at: &str) -> Result<ReportData> {
                         index + 1,
                         text(item, "fileName"),
                         match text(item, "purpose").as_str() {
-                            "ReimbursementForm" => "报销单",
+                            "ReimbursementForm" => "付款报销单",
                             "Supporting" => "补充资料",
                             _ => "发票/凭证",
                         }
@@ -235,7 +235,7 @@ pub fn data(snapshot: &Value, generated_at: &str) -> Result<ReportData> {
             "CompanyName":text(snapshot,"companyName"),"FormName":text(snapshot,"formName"),
             "ApplicantName":text(request,"employeeName"),"DepartmentName":text(snapshot,"departmentName"),"EmployeeNumber":text(request,"employeeNumber"),"JobTitle":text(snapshot,"applicantJobTitle"),"SubmittedAt":time(&text(snapshot,"submittedAt")),
             "ApprovalResult":std::iter::once(if request["kind"] == "expense" {
-                "本次提交已批准。财务请在费用报销的财务接收中，按申请编号及提交版本核对；纸单不代表当前仍有效或已付款。"
+                "本次提交已批准。财务请在付款报销的财务接收中，按申请编号及提交版本核对；纸单不代表当前仍有效或已付款。"
             } else { "本次提交版本已审批通过，请按公司制度办理后续事项。" }.to_owned())
                 .chain(request["approvalRoutingNotes"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_owned)))
                 .collect::<Vec<_>>().join("\n"),

@@ -8,7 +8,9 @@ await withOfficeUi('oa-approval-documents-ui', async ({ output, url, invoke, ope
   const token = login.accessToken;
   const initial = await invoke('GetOaApprovalSettings', undefined, {}, token);
   assert(initial.rules.every(rule => rule.stages[1].source === 'CompanyExecutive'));
+  assert.equal(initial.rules.find(rule => rule.key === 'expense').name, '付款报销审批');
   const template = initial.sheetTemplates.find(item => item.key === 'expense');
+  assert.equal(template.name, '付款报销审批单');
   const design = JSON.parse(template.content);
   const serialized = JSON.stringify(design);
   assert(serialized.includes('Oa.Approvals'));
@@ -36,6 +38,8 @@ await withOfficeUi('oa-approval-documents-ui', async ({ output, url, invoke, ope
   coloredDesign.layers[0].elements[0].style.backgroundColor = '#abcdef';
   colored.sheetTemplates[0].content = JSON.stringify(coloredDesign);
   await invoke('SaveOaApprovalSettings', { section:'sheetTemplates',sheetTemplates:colored.sheetTemplates,expectedRevision:initial.revisions?.sheetTemplates??0 }, {}, token);
+  const savedTemplates = await invoke('GetOaApprovalSettings', undefined, {}, token);
+  assert.equal(savedTemplates.sheetTemplates.find(item=>item.key==='expense').name, '付款报销审批单');
   const page = await openPage('oa-review', 'Review-2026-Test');
   await page.goto(`${url}/#/office/approval-settings`);
   const rule = await openDefinitionInUi(page, 'expense');
@@ -52,7 +56,7 @@ await withOfficeUi('oa-approval-documents-ui', async ({ output, url, invoke, ope
   await page.getByRole('button', { name: '使用黑白打印样式', exact: true }).first().click();
   await page.getByRole('button', { name: '编辑审批单模板', exact: true }).first().click();
   const dialog = page.getByRole('dialog', { name: '编辑审批单模板', exact: true });
-  await dialog.getByLabel('审批单名称', { exact: true }).fill('费用报销审批记录');
+  await dialog.getByLabel('审批单名称', { exact: true }).fill('付款报销审批记录');
   await dialog.getByRole('button', { name: '预览审批单样例', exact: true }).click();
   const previewDialog = page.getByRole('dialog', { name: '审批单样例预览', exact: true });
   await previewDialog.locator('iframe').waitFor();
@@ -62,7 +66,7 @@ await withOfficeUi('oa-approval-documents-ui', async ({ output, url, invoke, ope
   await dialog.waitFor({ state: 'hidden' });
   await saveApprovalPartInUi(page, '保存审批单模板');
   const saved = await invoke('GetOaApprovalSettings', undefined, {}, token);
-  assert.equal(saved.sheetTemplates[0].name, '费用报销审批记录');
+  assert.equal(saved.sheetTemplates[0].name, '付款报销审批记录');
   assert.equal(JSON.parse(saved.sheetTemplates[0].content).reportType, 'OaApproval');
   monochrome(JSON.parse(saved.sheetTemplates[0].content));
   const savedRule = saved.rules.find(item => item.kind === 'expense');

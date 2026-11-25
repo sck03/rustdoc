@@ -1,4 +1,4 @@
-import { approvalStage, publishDefinitions, publishPermissionScheme } from './lib/approval-fixtures.mjs';
+import { approvalStage, publishDefinitions, publishPermissionScheme, linkBusinessPerson } from './lib/approval-fixtures.mjs';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
@@ -70,13 +70,20 @@ await withOfficeUi('approval-permissions-ui', async ({ output, url, invoke, open
   await assert.rejects(() => invoke('GetPersonnel', undefined, { id: manager.employee.id }, login.accessToken), /403/u);
   await assert.rejects(() => invoke('ListUsers', undefined, {}, login.accessToken), /403/u);
   const gm = await openPage('approval-gm', 'Approval-Manager-2026');
-  await verifyApprovalNavigation(gm, ['人员变动审批', '员工请假', '费用报销', '通用申请']);
+  await verifyApprovalNavigation(gm, ['人员变动审批', '员工请假', '付款报销', '通用申请']);
   assert.equal(await gm.locator('nav').getByRole('link', { name: '人员档案', exact: true, hidden: true }).count(), 0);
   const employee = await invoke('CreatePersonnel', { requestKey: 'approval-worker', employeeNumber: 'APPROVAL-WORKER', departmentId: 'TRADE',
     jobTitle: '普通员工', employmentType: 'FullTime', hireDate: '2026-09-01', onProbation: true, profile: { fullName: '跨部门审批员工' } }, {}, adminToken);
   const policy = await invoke('GetOaApprovalSettings', undefined, {}, adminToken);
+  const handler = (await invoke('createUserAccount', { username:'approval-handler', fullName:'通用事项办理验收', role:'OfficeEmployee',
+    companyScope:'DEFAULT', departmentId:'FINANCE', isActive:true, resetPassword:'Approval-Handler-2026',
+    permissionGrants:['view','complete'].map(action=>({resourceKey:'office.general',action,dataScope:'company'})) }, {}, adminToken)).user;
+  await linkBusinessPerson(invoke, adminToken, handler);
+  // Approval authority does not imply handling authority; provide an actual business handler.
   await publishDefinitions(invoke, adminToken, { ...policy,
-    rules: policy.rules.map(rule => ['general', 'personnel:Confirm'].includes(rule.key) ? { ...rule, stages: [approvalStage('review', [account.id])] } : rule) }, ['general', 'personnel:Confirm']);
+    rules: policy.rules.map(rule => ['general', 'personnel:Confirm'].includes(rule.key) ? { ...rule, stages: [approvalStage('review', [account.id]),
+      ...(rule.key==='general'?rule.stages.filter(stage=>stage.phase==='Fulfillment').map(stage=>({...stage,dependsOn:['review'],
+        ...(stage.kind==='Handling'?{source:'Named',approverUserIds:[handler.id]}:{})})):[])] } : rule) }, ['general', 'personnel:Confirm']);
   for (const [kind, op, extra, button] of [
     ['general', 'General', { category: 'Other' }, '批准'],
     ['personnel', 'PersonnelChange', { personnelChange: { action: 'Confirm', expectedPersonnelVersion: employee.versionNumber, effectiveDate: login.user.businessDate } }, '批准人员变动'],
@@ -142,7 +149,7 @@ await withOfficeUi('approval-permissions-ui', async ({ output, url, invoke, open
   assert.equal((await invoke('GetPersonnel', undefined, { id: employee.employee.id }, combinedLogin.accessToken)).employee.status, 'Active');
   await assert.rejects(() => invoke('ListUsers', undefined, {}, combinedLogin.accessToken), /403/u);
   const worker = await openPage('combined-worker', 'Combined-Worker-2026');
-  await verifyApprovalNavigation(worker, ['通用申请', '费用报销']);
+  await verifyApprovalNavigation(worker, ['通用申请', '付款报销']);
   await worker.locator('nav').getByRole('button', { name: '行政与人事', exact: true }).click();
   await worker.locator('nav').getByRole('link', { name: '人员档案', exact: true }).waitFor({ state: 'visible' });
   await worker.screenshot({ path: path.join(output, 'combined-duties-navigation.png'), fullPage: true });

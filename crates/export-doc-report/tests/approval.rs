@@ -78,11 +78,17 @@ fn approval_sheet_is_one_page_and_preserves_long_content_in_order() {
     assert!(encoded.contains("Oa.Approvals"));
     let round_trip = export_doc_domain::designer::Design::from_source(&encoded).unwrap();
     assert_eq!(design, round_trip);
-    let mut snapshot = json!({"requestId":42,"submissionNumber":2,"companyName":"示例贸易有限公司","departmentName":"业务部","submittedAt":"2026-10-28T09:00:00+08:00","formName":"费用报销审批单","request":{
+    let mut snapshot = json!({"requestId":42,"submissionNumber":2,"companyName":"示例贸易有限公司","departmentName":"业务部","submittedAt":"2026-10-28T09:00:00+08:00","formName":"付款报销审批单","request":{
         "kind":"expense","title":"差旅费报销","employeeName":"张三","employeeNumber":"A001","currency":"CNY","totalAmount":"1234.56","reason":"出差费用，明细见附件。","attachments":[{"fileName":"报销明细.pdf","purpose":"ReimbursementForm"},{"fileName":"原始凭证.xml","purpose":"Voucher"}],"approvalStageLabels":["部门负责人审批","公司领导审批"]},
         "approvalPlan":{"steps":[{"stage":0,"status":"Approved","approverName":"李四","approverUserId":2,"actedByName":"李四","actedByUserId":2,"actedAt":"2026-10-28T10:00:00+08:00","note":"同意","delegationKey":""},{"stage":1,"status":"Approved","approverName":"王五","approverUserId":3,"actedByName":"赵六","actedByUserId":4,"actedAt":"2026-10-28T11:00:00+08:00","note":"同意按制度报销","delegationKey":"leader-proxy"}]}});
     let cancelled = AtomicBool::new(false);
     snapshot["applicantJobTitle"] = json!("业务专员");
+    assert_eq!(
+        approval::data(&snapshot, "2026-10-28T11:01:00+08:00")
+            .unwrap()
+            .text("Oa.FormName"),
+        "付款报销审批单"
+    );
     for long in [false, true] {
         if long {
             snapshot["request"]["reason"] = json!(
@@ -105,6 +111,8 @@ fn approval_sheet_is_one_page_and_preserves_long_content_in_order() {
             .map(|page| page.svg.as_str())
             .collect::<String>();
         assert!(svg.contains("代理审批"));
+        assert!(svg.contains("付款报销审批单"));
+        assert!(!svg.contains("费用报销审批单"));
         assert!(svg.contains("公司领导审批"));
         if long {
             let mut cursor = 0;

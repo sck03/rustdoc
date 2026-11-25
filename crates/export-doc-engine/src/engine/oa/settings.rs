@@ -42,7 +42,7 @@ pub(super) fn defaults() -> Result<Vec<Value>> {
     let mut rules: Vec<_> = [
         ("leave", "请假审批"),
         ("overtime", "加班审批"),
-        ("expense", "费用报销审批"),
+        ("expense", "付款报销审批"),
         ("travel", "出差审批"),
         ("purchase", "采购审批"),
         ("general", "通用事项审批"),

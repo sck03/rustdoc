@@ -130,7 +130,7 @@ pub(super) fn submission(tx: &Connection, row: &Value) -> Result<()> {
         }
     }
     if row["kind"] == "expense" && children(tx, row, "oa-attachment", 0, 1)?.0 == 0 {
-        return Err(invalid("请先上传至少一份报销凭证。"));
+        return Err(invalid("请先上传至少一份付款报销凭证。"));
     }
     if !["leave", "travel", "overtime"].contains(&text(row, "kind").as_str()) {
         return Ok(());

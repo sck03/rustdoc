@@ -12,7 +12,7 @@ export const oaModules = {
   personnel: { name: "人员变动审批", resource: "office.personnel-changes", description: "提交入职、转正、调岗、离职或返聘申请，最终批准后更新档案与关联账号。" },
   leave: { name: "员工请假", resource: "office.leave", description: "按半天申请，审批后销假归档；自然日时长不自动扣减年假余额。" },
   overtime: { name: "加班申请", resource: "office.overtime", description: "记录加班事由和时段，审批后确认实际完成。" },
-  expense: { name: "费用报销", resource: "office.expenses", description: "提交费用明细和凭证，审批通过后移交独立财务软件。" },
+  expense: { name: "付款报销", resource: "office.expenses", description: "提交费用明细和凭证，审批通过后移交独立财务软件。" },
   travel: { name: "出差申请", resource: "office.travel", description: "登记出差地点、日期和事由，返程后完成归档。" },
   purchase: { name: "采购申请", resource: "office.purchase", description: "提交物品、数量和预算，审批后登记采购验收结果。" },
   general: { name: "通用申请", resource: "office.general", description: "办理用印、证明、IT 支持和维修申请，保留审批与办结记录。" },

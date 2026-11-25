@@ -35612,7 +35612,7 @@
       },
       {
         "key": "office.expenses",
-        "name": "费用报销",
+        "name": "付款报销",
         "group": "行政办公",
         "workspace": "office",
         "moduleKey": "office.expenses",
@@ -36393,7 +36393,7 @@
       },
       {
         "key": "office.expenses",
-        "name": "费用报销",
+        "name": "付款报销",
         "group": "行政办公",
         "workspace": "office",
         "sortOrder": 370,
@@ -38823,7 +38823,7 @@
       {
         "code": "Finance",
         "name": "财务人员",
-        "description": "查看本公司费用报销并登记财务接收，维护本人付款和申请；审批决定另行授权。",
+        "description": "查看本公司付款报销并登记财务接收，维护本人付款和申请；审批决定另行授权。",
         "grants": [
           {
             "resourceKey": "office.people",

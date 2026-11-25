@@ -13,6 +13,9 @@ mod audit_fixes;
 #[path = "contract_browser_downloads.rs"]
 mod browser_downloads;
 #[cfg(test)]
+#[path = "../tests/fixtures/oa_payment_labels.rs"]
+mod oa_payment_labels;
+#[cfg(test)]
 #[path = "contract_organization_quality.rs"]
 mod organization_quality;
 use std::sync::OnceLock;
@@ -275,6 +278,7 @@ mod tests {
         account_security::apply(&mut baseline);
         custom_oa::expense_categories(&mut baseline);
         payment_goods::apply(&mut baseline);
+        oa_payment_labels::apply(&mut baseline);
         if let Some(change) = difference("contract", &document(), &baseline) {
             panic!("undeclared contract change: {change}");
         }

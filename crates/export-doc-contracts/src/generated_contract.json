@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "ce5fb1f6a461ca35553b61784c9c330a9c370c729fcdf6c46288231327fe6b77",
+  "digest": "f4d1edc1d26ba1e6e9cf81eaccf24a9caf83a21e7196261c20771e7918cd7575",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -2418,7 +2418,7 @@
       },
       {
         "key": "office.expenses",
-        "name": "费用报销",
+        "name": "付款报销",
         "group": "行政办公",
         "workspace": "office",
         "moduleKey": "office.expenses",
@@ -3199,7 +3199,7 @@
       },
       {
         "key": "office.expenses",
-        "name": "费用报销",
+        "name": "付款报销",
         "group": "行政办公",
         "workspace": "office",
         "sortOrder": 370,
@@ -5629,7 +5629,7 @@
       {
         "code": "Finance",
         "name": "财务人员",
-        "description": "查看本公司费用报销并登记财务接收，维护本人付款和申请；审批决定另行授权。",
+        "description": "查看本公司付款报销并登记财务接收，维护本人付款和申请；审批决定另行授权。",
         "grants": [
           {
             "resourceKey": "office.people",

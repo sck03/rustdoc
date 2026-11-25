@@ -75,7 +75,7 @@ pub(super) fn list_with(
         return Err(invalid("待我审批仅查询待审批申请。"));
     }
     if finance && !FINANCE_STATUSES.contains(&status) {
-        return Err(invalid("财务接收仅查询已批准或已移交财务的报销单。"));
+        return Err(invalid("财务接收仅查询已批准或已移交财务的付款报销单。"));
     }
     if handling && !handling::GENERAL_STATES.contains(&status) {
         return Err(invalid("待我办理仅查询已批准或已完成的申请。"));

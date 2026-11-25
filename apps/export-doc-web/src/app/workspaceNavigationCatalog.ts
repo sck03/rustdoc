@@ -95,7 +95,7 @@ const navigationEntries = {
         requiredPermissions: [{ resourceKey: permissionResources.suppliers, action: permissionActions.view }] },
   invoices: { label: "发票管理", description: "新建和维护出口发票，核对并输出单据", to: "/invoices", icon: FileText,
         isActive: (path) => path.startsWith("/invoices") && !isBusinessAttachmentRoute(path), workspace: "document", moduleKey: "document.invoices" },
-  payments: { label: "付款报销打印", description: "填写付款单或报销打印单，保存后打印或导出 PDF；申请审批在费用报销中办理", keywords: "付款单 报销单 凭证 PDF 打印", to: "/payments", icon: CreditCard,
+  payments: { label: "付款报销打印", description: "填写付款单或报销打印单，保存后打印或导出 PDF；申请审批在付款报销中办理", keywords: "付款单 报销单 凭证 PDF 打印", to: "/payments", icon: CreditCard,
         isActive: (path) => path.startsWith("/payments"), moduleKey: "document.payments" },
   invoiceQuery: { label: "统计查询", description: "按日期、客户和商品检索业务明细，汇总并导出数据", keywords: "单据查询", to: "/query/invoices", icon: Search,
         isActive: (path) => path.startsWith("/query"), workspace: "document", moduleKey: "document.query" },

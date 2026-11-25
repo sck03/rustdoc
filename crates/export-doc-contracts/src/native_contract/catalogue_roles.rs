@@ -105,7 +105,7 @@ pub(super) fn value() -> serde_json::Value { serde_json::Value::Array(vec![
         (&["document.report-templates"],&["design","clone"],"own"),
         (&["document.report-resources"],&["upload"],"own"),
     ]),
-    role("Finance","财务人员","查看本公司费用报销并登记财务接收，维护本人付款和申请；审批决定另行授权。", &[
+    role("Finance","财务人员","查看本公司付款报销并登记财务接收，维护本人付款和申请；审批决定另行授权。", &[
         (&["office.people"],&["view"],"company"),
         (&["office.rooms","office.supplies"],&["view","create","edit","cancel"],"own"),
         (&["document.payments"],&["view"],"company"),

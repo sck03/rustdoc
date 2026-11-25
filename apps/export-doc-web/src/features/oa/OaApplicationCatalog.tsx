@@ -39,7 +39,7 @@ export function OaApplicationCatalog({ client, user, resources }: {
     {applications.isError&&<PageState tone="error" title="自定义事项读取失败" description={readApiError(applications.error)} action={<Button type="button" onClick={()=>void applications.refetch()}>重试</Button>}/>}
     <PageHeader title="选择申请事项" count={visible.length} unit="项">
       <FilterBar className="list-workspace-filters" label="查找申请事项">
-        <Field label="申请类型"><input type="search" aria-label="查找申请类型" placeholder="查找请假、报销、用印、会议室…" maxLength={100} value={search} onChange={event => setSearch(event.target.value)} /></Field>
+        <Field label="申请类型"><input type="search" aria-label="查找申请类型" placeholder="查找请假、付款报销、用印、会议室…" maxLength={100} value={search} onChange={event => setSearch(event.target.value)} /></Field>
         <Field label="申请分类"><select value={group} onChange={event => setGroup(event.target.value)}><option value="">全部分类</option>{availableGroups.map(name => <option key={name}>{name}</option>)}</select></Field>
       </FilterBar>
     </PageHeader>

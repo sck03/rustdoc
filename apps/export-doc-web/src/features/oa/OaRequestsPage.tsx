@@ -128,7 +128,7 @@ export function OaRequestsPage({
           )}
           {model.financeOnly && (
             <p className="office-muted">
-              核对已批准报销单的明细、凭证和审批记录，确认后登记接收；付款由独立财务软件办理。
+              核对已批准付款报销单的明细、凭证和审批记录，确认后登记接收；付款由独立财务软件办理。
             </p>
           )}
           {model.financeOnly && <OaApprovalVerification client={client} user={user} onOpen={model.select} />}

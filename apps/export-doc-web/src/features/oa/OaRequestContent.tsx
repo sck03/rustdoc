@@ -27,7 +27,7 @@ export function OaRequestContent({row,user}:{row:OaSubmittedRequest|OaRequest;us
     {row.overtime && <p>{row.overtime.location} · {formatBusinessDateTime(row.overtime.startsAt, user.businessTimeZone)} 至 {formatBusinessDateTime(row.overtime.endsAt, user.businessTimeZone)} · {row.durationHours} 小时</p>}
     {row.category && <p>申请类别：{generalCategories[row.category]}</p>}
     {row.handlingName && <p>办理事项：{row.handlingName} · 当前办理人员：{row.handlerNames || "请联系管理员核对分工"}</p>}
-    {row.totalAmount && <p><strong>{row.kind === "purchase" ? "预算合计" : "报销合计"}：{row.currency} {row.totalAmount}</strong></p>}
+    {row.totalAmount && <p><strong>{row.kind === "purchase" ? "预算合计" : "付款报销合计"}：{row.currency} {row.totalAmount}</strong></p>}
     {row.lines && <ol className="oa-lines">{row.lines.map((line, index) => <li key={`${row.id}-${index}`} className="oa-line">{line.category ? expenseCategories[line.category] : "受限字段"} · {line.spentOn} · {line.description} · {line.amount} {row.currency}</li>)}</ol>}
     {row.purchaseLines && <ol className="oa-lines">{row.purchaseLines.map((line, index) => <li key={`${row.id}-${index}`} className="oa-line">{line.name} {line.specification} · {line.quantity} {line.unit} × {line.unitPrice} {row.currency}</li>)}</ol>}
     </section>;

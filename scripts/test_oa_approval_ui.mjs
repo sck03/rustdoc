@@ -86,7 +86,7 @@ await withOfficeUi('approval-ui', async ({ output, require, url, operations, inv
   assert.deepEqual(await admin.evaluate(async () => (await window.axe.run(document.querySelector('.oa-workspace'))).violations.filter(v => ['critical', 'serious'].includes(v.impact)).map(v => ({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))}))), []);
   await admin.screenshot({ path: path.join(output, 'approval-settings.png'), fullPage: true });
   await admin.goto(`${url}/#/office/requests/expense`);
-  await admin.getByRole('button', { name: '新建费用报销', exact: true }).click();
+  await admin.getByRole('button', { name: '新建付款报销', exact: true }).click();
   const form = admin.getByRole('dialog');
   await form.getByLabel('登记人员', { exact: true }).fill('OA-001');
   await form.getByRole('option', { name: /OA-001/u }).click();

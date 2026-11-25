@@ -52,8 +52,8 @@ await withOfficeUi('finance-receipt-ui', async ({ output, url, invoke, openPage,
   await invoke('updateUserAccount', { ...account, expectedVersion:account.versionNumber, resetPassword:'' }, { id:account.id }, admin);
   const applicantLogin = await invoke('Login', { username:'finance-applicant', password:'Finance-Receipt-2026' });
   const applicant = applicantLogin.accessToken;
-  const requestTitle = '业务部本月海外客户拜访交通与办公用品费用报销-' + 'ExpenseReference'.repeat(3);
-  const request = await invoke('CreateExpenseRequest', { requestKey:randomUUID(), title:requestTitle, reason:'其他员工费用报销', currency:'CNY', lines:[{ category:'Other', spentOn:applicantLogin.user.businessDate, description:'交通费', amount:'12.35' }] }, {}, applicant);
+  const requestTitle = '业务部本月海外客户拜访交通与办公用品付款报销-' + 'ExpenseReference'.repeat(3);
+  const request = await invoke('CreateExpenseRequest', { requestKey:randomUUID(), title:requestTitle, reason:'其他员工付款报销', currency:'CNY', lines:[{ category:'Other', spentOn:applicantLogin.user.businessDate, description:'交通费', amount:'12.35' }] }, {}, applicant);
   const applicantPage = await openPage('finance-applicant', 'Finance-Receipt-2026');
   await applicantPage.goto(`${url}/#/office/requests/expense?requestId=${request.id}`);
   await applicantPage.getByRole('button', { name:'编辑草稿', exact:true }).click();

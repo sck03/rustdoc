@@ -54,7 +54,7 @@ export async function verifyBusinessWorkspaceLayouts({ page, invoke, token, url,
   await capture('applications', '/office/approvals?view=start', () => page.getByRole('searchbox', { name: '查找申请类型' }).waitFor());
   const cards = page.locator('.oa-hub-start-card');
   const count = await cards.count();
-  await page.getByRole('searchbox', { name: '查找申请类型' }).fill('费用报销');
+  await page.getByRole('searchbox', { name: '查找申请类型' }).fill('付款报销');
   assert.equal(await cards.count(), 1);
   await page.getByRole('searchbox', { name: '查找申请类型' }).fill('');
   assert.equal(await cards.count(), count);

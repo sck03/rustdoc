@@ -62,14 +62,14 @@ export function OaRequestDetails({ client, user, row, onEdit, onDeleted }: { cli
     <OaApprovalDocument key={row.submissionId} client={client} user={user} row={row} />
     <OaRequestContent row={row} user={user} />
     {row.materialAccess?.isPartial && <InlineNotice tone="info">当前身份仅可查看部分申请材料。编辑完整草稿和下载全部原件需要完整材料权限。</InlineNotice>}
-    <section className="oa-attachments" aria-label="申请附件"><h3>{row.kind === "expense" ? "报销凭证" : "申请附件"}</h3>
+    <section className="oa-attachments" aria-label="申请附件"><h3>{row.kind === "expense" ? "付款报销凭证" : "申请附件"}</h3>
       {!editable && <p className="office-muted">{documentDescription}</p>}
-      {editable && row.kind === "expense" && <p className="office-muted">提交报销前至少上传一份凭证。</p>}
-      {editable && <><label>本批附件用途<select value={purpose} onChange={event=>setPurpose(event.target.value)}><option value="ReimbursementForm">报销单</option><option value="Voucher">发票／其他凭证</option><option value="Supporting">补充资料</option></select></label><AttachmentUploadPanel key={`${row.kind}-${row.id}`} record={row} operation={operation} upload={(current, body, signal) => { body.set("purpose",purpose); return api.upload(current.id, body, { signal }); }} /></>}
+      {editable && row.kind === "expense" && <p className="office-muted">提交付款报销前至少上传一份凭证。</p>}
+      {editable && <><label>本批附件用途<select value={purpose} onChange={event=>setPurpose(event.target.value)}><option value="ReimbursementForm">付款报销单</option><option value="Voucher">发票／其他凭证</option><option value="Supporting">补充资料</option></select></label><AttachmentUploadPanel key={`${row.kind}-${row.id}`} record={row} operation={operation} upload={(current, body, signal) => { body.set("purpose",purpose); return api.upload(current.id, body, { signal }); }} /></>}
       {operation.error && <InlineNotice tone="error">{operation.error}</InlineNotice>}
       {!row.attachments.length && <p className="office-muted">{row.materialAccess?.omittedFields.includes("attachments") ? "附件未在当前材料权限内展示。" : "尚未上传附件。"}</p>}
       <ul>{row.attachments.map((file) => <li key={file.id} className="office-card-actions"><span>{file.fileName} · {Math.ceil(file.sizeBytes / 1024)} KiB</span>
-        <span>{{ReimbursementForm:"报销单",Voucher:"发票／凭证",Supporting:"补充资料"}[file.purpose??"Voucher"]}</span><button className="command-button secondary" type="button" disabled={operation.busy} onClick={() => void operation.run((signal) => api.download(row.id, file.id, { signal }), (blob) => downloadBlob(blob, file.fileName), false)}>下载</button>
+        <span>{{ReimbursementForm:"付款报销单",Voucher:"发票／凭证",Supporting:"补充资料"}[file.purpose??"Voucher"]}</span><button className="command-button secondary" type="button" disabled={operation.busy} onClick={() => void operation.run((signal) => api.download(row.id, file.id, { signal }), (blob) => downloadBlob(blob, file.fileName), false)}>下载</button>
         {editable && <button className="command-button secondary" type="button" disabled={operation.busy} onClick={() => setAction(file.id)}>移除</button>}
       </li>)}</ul>
     </section>
