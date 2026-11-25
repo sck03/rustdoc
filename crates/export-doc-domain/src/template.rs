@@ -21,6 +21,32 @@ fn safe_color(value: &str) -> bool {
             .all(|character| character.is_ascii_hexdigit())
 }
 
+/// Shared by template acceptance and layout, independent of field bindings.
+pub fn validate_flow_pagination(design: &Design) -> Result<(), String> {
+    let (mut detail, mut page_break) = (false, false);
+    for element in design
+        .layers
+        .iter()
+        .filter(|layer| layer.visible)
+        .flat_map(|layer| &layer.elements)
+        .filter(|element| element.visible && element.output_enabled)
+    {
+        if let Kind::Flow { block, .. } = &element.kind
+            && block.output_enabled()
+        {
+            detail |= matches!(block, ReportBlock::DetailTable(_));
+            page_break |= matches!(block, ReportBlock::PageBreak(_));
+        }
+    }
+    if detail && page_break {
+        return Err(
+            "商品明细表自动分页，不能与独立分页符同时输出；请在明细表打印设置中调整每页行数。"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
 pub fn validate(design: &Design, fields: &[Field]) -> Result<(), String> {
     if design
         .detail_row_height_hundredth_mm
@@ -43,6 +69,7 @@ pub fn validate(design: &Design, fields: &[Field]) -> Result<(), String> {
     }
     crate::designer::page::validate(page)?;
     structure::validate(design)?;
+    validate_flow_pagination(design)?;
     let mut detail_count = 0;
     let mut growing_count = 0;
     let mut block_ids = std::collections::BTreeSet::new();

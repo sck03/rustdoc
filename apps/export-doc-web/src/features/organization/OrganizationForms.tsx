@@ -32,7 +32,7 @@ export function OrganizationCompanyForm({ client, record, companies = [], canStr
     void operation.run((signal) => record ? client.updateOrganizationCompany({ id: record.id, body }, { signal })
       : client.createOrganizationCompany({ body }, { signal }), onSaved);
   }
-  return <><OfficeDialog title={record ? "编辑公司" : "新增公司"} onClose={onClose} {...operation} protectChanges hasChanges={(executive?.id ?? null) !== (record?.executiveEmployeeId ?? null) || JSON.stringify(positions) !== JSON.stringify(record?.positions ?? []) || JSON.stringify(additionalLeaders) !== JSON.stringify(record?.additionalLeaders ?? [])}>
+  return <><OfficeDialog title={record ? "编辑公司" : "新增公司"} onClose={onClose} {...operation} protectChanges hasChanges={(executive?.id ?? null) !== (record?.executiveEmployeeId ?? null) || (executive?.appointmentId ?? null) !== (record?.executiveAppointmentId ?? null) || JSON.stringify(positions) !== JSON.stringify(record?.positions ?? []) || JSON.stringify(additionalLeaders) !== JSON.stringify(record?.additionalLeaders ?? [])}>
     <form ref={formRef} onSubmit={submit} onChange={() => setImpact(null)} onInvalidCapture={event => { const section = (event.target as HTMLElement).closest("details"); if (section) section.open = true; }}><fieldset className="office-form-grid" disabled={operation.busy}>
       <OfficeField label="公司代码"><input name="code" required maxLength={50} defaultValue={record?.code ?? ""} readOnly={Boolean(record)} autoFocus={!record} /></OfficeField>
       <OfficeField label="公司名称"><input name="name" required maxLength={120} defaultValue={record?.name ?? ""} autoFocus={Boolean(record)} /></OfficeField>
@@ -75,7 +75,7 @@ export function OrganizationDepartmentForm({ client, company, departments, recor
       : client.createOrganizationDepartment({ body }, { signal }), onSaved);
   }
   return <>
-    <OfficeDialog title={record ? "编辑部门" : "新增部门"} onClose={onClose} {...operation} protectChanges hasChanges={(manager?.id ?? null) !== (record?.managerEmployeeId ?? null) || JSON.stringify(additionalLeaders) !== JSON.stringify(record?.additionalLeaders ?? [])}>
+    <OfficeDialog title={record ? "编辑部门" : "新增部门"} onClose={onClose} {...operation} protectChanges hasChanges={(manager?.id ?? null) !== (record?.managerEmployeeId ?? null) || (manager?.appointmentId ?? null) !== (record?.managerAppointmentId ?? null) || JSON.stringify(additionalLeaders) !== JSON.stringify(record?.additionalLeaders ?? [])}>
       <form onSubmit={submit}><fieldset className="office-form-grid" disabled={operation.busy}>
         <p className="office-field-wide office-muted">所属公司：{company.name}。部门代码和所属公司创建后固定。</p>
         <OfficeField label="部门代码"><input name="code" required maxLength={50} defaultValue={record?.code ?? ""} readOnly={Boolean(record)} autoFocus={!record} /></OfficeField>

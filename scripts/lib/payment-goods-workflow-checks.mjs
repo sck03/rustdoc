@@ -5,9 +5,9 @@ export async function verifyPaymentGoods({ page, url, invoke, token, payment, ou
   const seeded = (await invoke('UpdatePayment', { ...payment, payerName: '样例贸易有限公司', payeeName: '样例服饰有限公司',
     department: '业务部', invoiceNo: 'FACTORY-2026-001', bankName: '样例银行支行', accountNo: 'TEST-ACCOUNT-001',
     paymentMethod: '电汇', tradeMethod: 'T/T', taxRebateRate: '13%', shipmentCountry: '美国', cnyAmount: '232151.04',
-    goodsItems: [], goodsName: '原单行付款货物', quantity: '12.5', quantityUnit: '件' },
+    goodsItems: [{ goodsName: '付款货物', quantity: '12.5', quantityUnit: '件' }] },
     { id: payment.id }, token)).payment;
-  assert.deepEqual(seeded.goodsItems, [{ goodsName: '原单行付款货物', quantity: '12.5', quantityUnit: '件' }]);
+  assert.deepEqual(seeded.goodsItems, [{ goodsName: '付款货物', quantity: '12.5', quantityUnit: '件' }]);
   const goods = [
     { goodsName: '男式针织上衣', quantity: '8448', quantityUnit: '件' },
     { goodsName: '女式棉衬衫', quantity: '3200', quantityUnit: '件' },

@@ -188,7 +188,7 @@ function PaymentTable({
                 <td>{payment.payerName || "-"}</td>
                 <td>{payment.department || "-"}</td>
                 <td>{payment.project || "-"}</td>
-                <td>{payment.goodsName || "-"}</td>
+                <td>{payment.goodsItems?.map(item => item.goodsName).filter(Boolean).join("、") || "-"}</td>
                 <td className="amount-cell">{formatAmount(payment.usdAmount, "USD")}</td>
                 <td className="amount-cell">{formatAmount(payment.cnyAmount, "CNY")}</td>
                 <td>

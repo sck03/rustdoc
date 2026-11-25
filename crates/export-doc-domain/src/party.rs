@@ -4,6 +4,13 @@ use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
 pub const SUPPLIER_STATUSES: &[&str] = &["合作中", "考察中", "暂停", "停用"];
+pub fn initial_status(supplier: bool) -> &'static str {
+    if supplier {
+        "考察中"
+    } else {
+        "潜在客户"
+    }
+}
 pub const COMMON_FIELDS: &[(&str, &str, usize)] = &[
     ("name", "名称", 200),
     ("countryRegion", "国家/地区", 100),
@@ -90,14 +97,18 @@ pub fn normalize(row: &Value, supplier: bool) -> Value {
         } else {
             crm::CUSTOMER_STATUSES
         },
-        if supplier {
-            "合作中"
-        } else {
-            "潜在客户"
-        },
+        initial_status(supplier),
         "状态",
     ) {
-        Ok(status) => result["status"] = json!(status),
+        Ok(status) => {
+            if status != initial_status(supplier) {
+                errors.push(format!(
+                    "导入新建状态须为“{}”，状态变更请在导入后办理。",
+                    initial_status(supplier)
+                ));
+            }
+            result["status"] = json!(status);
+        }
         Err(cause) => errors.push(cause),
     }
     let email = result["contactEmail"].as_str().unwrap_or("");

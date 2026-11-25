@@ -18,12 +18,6 @@ pub const ACTIONS: &[Operation] = &[
     ADMIT_SUPPLIER,
     DEACTIVATE_SUPPLIER,
     RESTORE_SUPPLIER,
-    PUBLISH_USER_REPORT_TEMPLATE,
-    SHARE_USER_REPORT_TEMPLATE,
-    DISABLE_USER_REPORT_TEMPLATE,
-    RESTORE_USER_REPORT_TEMPLATE,
-    ARCHIVE_USER_REPORT_TEMPLATE,
-    CLONE_USER_REPORT_TEMPLATE,
 ];
 
 pub fn review(body: &Value) -> Result<Value> {
@@ -70,12 +64,6 @@ pub fn action(
         "AdmitSupplier" => ("suppliers", "admit"),
         "DeactivateSupplier" => ("suppliers", "deactivate"),
         "RestoreSupplier" => ("suppliers", "restore"),
-        "PublishUserReportTemplate" => ("report-templates", "publish"),
-        "ShareUserReportTemplate" => ("report-templates", "share"),
-        "DisableUserReportTemplate" => ("report-templates", "deactivate"),
-        "RestoreUserReportTemplate" => ("report-templates", "restore"),
-        "ArchiveUserReportTemplate" => ("report-templates", "archive"),
-        "CloneUserReportTemplate" => ("report-templates", "clone"),
         _ => return Err(invalid("业务动作未注册。")),
     };
     let resource = catalog::resource(kind).ok_or_else(|| invalid("业务资源未注册。"))?;
@@ -87,8 +75,7 @@ pub fn action(
         if matches!(operation.id,"CloneInvoice"|"CloneInvoiceAsType") {
             return invoice_clone::save(transaction, actor, resource, operation, &value, body, business_date);
         }
-        let cloning=operation.id=="CloneUserReportTemplate";
-        if !cloning{store::check_version(&value,store::expected(&body))?;}
+        store::check_version(&value,store::expected(&body))?;
         let state=text(&value,"status");
         match operation.id {
             "TransitionInvoiceStatus"=>{
@@ -101,15 +88,10 @@ pub fn action(
             "UnverifyInvoice"=>{if !["Verified","Shipped","Completed"].contains(&state.as_str()){return Err(conflict("当前发票状态不能撤销核对。"));}required(&body,"note","撤销核对原因",500)?;value["status"]=json!("Draft");},
             "DeactivateCrmCustomer"=>{if ["暂停","已流失"].contains(&state.as_str()){return Err(conflict("客户已处于暂停或流失状态。"));}value["status"]=json!("暂停");},"RestoreCrmCustomer"=>{if !["暂停","已流失"].contains(&state.as_str()){return Err(conflict("只有暂停或流失客户可以恢复。"));}value["status"]=json!("跟进中");},
             "AdmitSupplier"=>{if state!="考察中"{return Err(conflict("仅能准入考察中的供应商。"));}value["status"]=json!("合作中");},"DeactivateSupplier"=>{if state=="停用"{return Err(conflict("供应商已经停用。"));}value["status"]=json!("停用");},"RestoreSupplier"=>{if !["暂停","停用"].contains(&state.as_str()){return Err(conflict("只有暂停或停用的供应商可以恢复考察。"));}value["status"]=json!("考察中");},
-            _=>{
-                let next=match action{"publish"=>"Published","share"=>"Shared","deactivate"=>"Disabled","restore"=>"Draft","archive"=>"Archived","clone"=>"Draft",_=>return Err(invalid("模板操作无效。"))};
-                if matches!(action,"publish"|"share")&&text(&value,if kind=="report-templates"{"contentHtml"}else{"bodyHtml"}).is_empty(){return Err(invalid("模板内容不能为空。"));}
-                value["status"]=json!(next);if cloning{value["id"]=json!(0);value["name"]=json!(format!("{} 副本",text(&value,"name")));}
-            },
+            _=>return Err(invalid("业务动作未注册。")),
         }
         let identity=if resource.identity.is_empty(){None}else{Some(text(&value,resource.identity))};
-        let saved=store::save(transaction,kind,if cloning{0}else{id},value,identity,actor,action)?;
-        if ["report-templates","email-templates"].contains(&kind){store::save(transaction,"template-versions",0,json!({"templateKind":kind,"templateId":saved["id"],"content":saved,"note":text(&body,"note")}),None,actor,"version")?;}
+        let saved=store::save(transaction,kind,id,value,identity,actor,action)?;
         if kind == "invoices" {
             transaction.append_invoice_status(&export_doc_storage::InvoiceStatusEvent {
                 id: saved["versionNumber"].as_i64().ok_or_else(|| super::error::unavailable("发票版本缺失。"))?,

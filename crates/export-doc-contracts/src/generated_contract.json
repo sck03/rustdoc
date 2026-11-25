@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "f4d1edc1d26ba1e6e9cf81eaccf24a9caf83a21e7196261c20771e7918cd7575",
+  "digest": "750b4898b0bde54be31e0dd39f17fb4a5a51e96efb4617e9eded106c9e47d04e",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -103443,12 +103443,9 @@
           "items": {
             "$ref": "#/components/schemas/ApiPaymentGoodsItem"
           },
-          "description": "本次付款独立货物明细，最多四项；已有单行品名、数量和单位在保存时归入明细。",
+          "description": "本次付款独立货物明细，最多四项；品名、数量与单位仅在明细内填写。",
           "default": [],
           "maxItems": 4
-        },
-        "goodsName": {
-          "type": "string"
         },
         "id": {
           "type": [
@@ -103516,12 +103513,6 @@
           "type": "string"
         },
         "project": {
-          "type": "string"
-        },
-        "quantity": {
-          "type": "string"
-        },
-        "quantityUnit": {
           "type": "string"
         },
         "receiptDate": {
@@ -103614,7 +103605,6 @@
         "companyScope",
         "invoiceNo",
         "voucherNo",
-        "quantityUnit",
         "tradeMethod",
         "taxRebateRate",
         "spare1",
@@ -103638,8 +103628,6 @@
         "bankName",
         "accountNo",
         "notes",
-        "goodsName",
-        "quantity",
         "shipmentCountry",
         "travelExpense",
         "businessEntertainmentExpense",

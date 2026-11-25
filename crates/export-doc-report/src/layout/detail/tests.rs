@@ -50,6 +50,54 @@ fn coordinate(svg: &str, text: &str, axis: &str) -> f32 {
 }
 
 #[test]
+fn detail_page_break_is_rejected_before_rendering_while_automatic_paging_remains_valid() {
+    let mut design = Builtin::Invoice.design().unwrap();
+    let body = design
+        .layers
+        .iter_mut()
+        .find(|layer| layer.role == "Body")
+        .unwrap();
+    let mut element = body
+        .elements
+        .iter()
+        .find(|element| {
+            matches!(
+                element.kind,
+                Kind::Flow {
+                    block: ReportBlock::DetailTable(_),
+                    ..
+                }
+            )
+        })
+        .unwrap()
+        .clone();
+    element.id = "manual-break".into();
+    element.kind = Kind::Flow {
+        flow_kind: "PageBreak".into(),
+        block: ReportBlock::PageBreak(export_doc_domain::designer::ReportPageBreakBlock {
+            id: "manual-break-block".into(),
+            output: None,
+        }),
+    };
+    body.elements.push(element);
+    let error = render_design(&sample(), &design, &AtomicBool::new(false))
+        .err()
+        .unwrap()
+        .to_string();
+    assert!(error.contains("不能与独立分页符"), "{error}");
+    design
+        .layers
+        .iter_mut()
+        .find(|layer| layer.role == "Body")
+        .unwrap()
+        .elements
+        .last_mut()
+        .unwrap()
+        .output_enabled = false;
+    assert!(render_design(&sample(), &design, &AtomicBool::new(false)).is_ok());
+}
+
+#[test]
 fn grouped_headers_repeat_and_fixed_cells_share_the_declared_merged_width() {
     let mut design = Builtin::Invoice.design().unwrap();
     let detail = table(&mut design);

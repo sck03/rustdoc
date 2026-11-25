@@ -25,11 +25,8 @@ pub fn query(store: &Store, actor: &Actor, clock: &BusinessClock) -> Result<Valu
     let mut totals = [[Decimal::ZERO; 2]; 2];
     let mut monthly_count = 0usize;
     let mut currencies = BTreeMap::<String, [Decimal; 2]>::new();
-    let mut statuses = BTreeMap::<String, usize>::new();
-    // Only recent display rows and bounded per-status todos survive a batch.
-    let mut records = Vec::<Value>::new();
+    // Historical rows contribute only to database counts; monetary scans cover two months.
     let mut todo_records = BTreeMap::<String, Vec<Value>>::new();
-    let mut total_active = 0usize;
     let schema = contracts::schema("ApiDashboardRecentInvoiceDto");
     let mut fields: Vec<_> = schema["properties"]
         .as_object()
@@ -44,29 +41,52 @@ pub fn query(store: &Store, actor: &Actor, clock: &BusinessClock) -> Result<Valu
             (key.as_str(), source)
         })
         .collect();
-    for key in [
-        "companyScope",
-        "type",
-        "invoiceNo",
-        "invoiceDate",
-        "status",
-        "currency",
-        "totalAmount",
-        "totalProfit",
-        "totalTaxRefundAmount",
-    ] {
+    for key in ["id", "invoiceNo", "status"] {
         if !fields.iter().any(|(name, _)| *name == key) {
             fields.push((key, key));
         }
     }
-    store.read(|tx| {
+    let (counts, records) = store.read(|tx| {
         let actor = auth::refresh_actor_in(tx, actor)?;
         auth::authorize(&actor, "document.invoices", "view")?;
         let mut before = None;
         let scope = auth::data_scope(&actor, "document.invoices", "view");
+        let counts = tx.dashboard_counts(&scope)?;
+        let records = tx.scan_dashboard(&scope, &fields, None, None, "", 10)?;
+        for (status, limit) in [("Draft", 3), ("Verified", 5), ("Shipped", 5)] {
+            todo_records.insert(
+                status.into(),
+                tx.scan_dashboard(
+                    &scope,
+                    &[("id", "id"), ("invoiceNo", "invoiceNo")],
+                    None,
+                    None,
+                    status,
+                    limit,
+                )?,
+            );
+        }
+        let window_start = previous.to_string();
+        let window_end = end.to_string();
+        let amount_fields = [
+            "id",
+            "invoiceDate",
+            "currency",
+            "totalAmount",
+            "totalProfit",
+            "totalTaxRefundAmount",
+        ]
+        .map(|field| (field, field));
         loop {
             crate::operation::check()?;
-            let batch = tx.scan_dashboard(&scope, &fields, before)?;
+            let batch = tx.scan_dashboard(
+                &scope,
+                &amount_fields,
+                before,
+                Some((&window_start, &window_end)),
+                "",
+                200,
+            )?;
             if batch.is_empty() {
                 break;
             }
@@ -77,26 +97,8 @@ pub fn query(store: &Store, actor: &Actor, clock: &BusinessClock) -> Result<Valu
                         .as_i64()
                         .ok_or_else(|| unavailable("发票编号损坏。"))?,
                 );
-                total_active += 1;
-                let status = text(&record, "status");
-                *statuses.entry(status.clone()).or_default() += 1;
-                if records.len() < 10 {
-                    records.push(record.clone());
-                }
-                let limit = match status.as_str() {
-                    "Draft" => 3,
-                    "Verified" | "Shipped" => 5,
-                    _ => 0,
-                };
-                let todos = todo_records.entry(status).or_default();
-                if todos.len() < limit {
-                    todos.push(record.clone());
-                }
                 let date = NaiveDate::parse_from_str(&text(&record, "invoiceDate"), "%Y-%m-%d")
                     .map_err(|_| unavailable("发票业务日期损坏。"))?;
-                if date < previous || date >= end {
-                    continue;
-                }
                 let period = usize::from(date >= start);
                 monthly_count += period;
                 let currency = text(&record, "currency").trim().to_ascii_uppercase();
@@ -118,7 +120,7 @@ pub fn query(store: &Store, actor: &Actor, clock: &BusinessClock) -> Result<Valu
                 }
             }
         }
-        Ok(())
+        Ok((counts, records))
     })?;
     let mut result = contracts::object(GET_DASHBOARD.id, false);
     for (period, prefix) in [(0, "previousMonthly"), (1, "monthly")] {
@@ -129,18 +131,18 @@ pub fn query(store: &Store, actor: &Actor, clock: &BusinessClock) -> Result<Valu
     result["monthlyInvoiceCount"] = json!(monthly_count);
     result["exportAmountsByCurrency"] = json!(currencies.into_iter().map(|(currency,amounts)|json!({"currency":currency,"monthlyAmount":amounts[1],"previousMonthlyAmount":amounts[0]})).collect::<Vec<_>>());
     result["periodLabel"] = json!(format!("{}年{}月", today.year(), today.month()));
-    for (field, status) in [
-        ("draftCount", "Draft"),
-        ("verifiedCount", "Verified"),
-        ("shippedCount", "Shipped"),
-        ("completedCount", "Completed"),
+    for (field, count) in [
+        ("draftCount", counts.draft),
+        ("verifiedCount", counts.verified),
+        ("shippedCount", counts.shipped),
+        ("completedCount", counts.completed),
     ] {
-        result[field] = json!(statuses.get(status).copied().unwrap_or(0));
+        result[field] = json!(count);
     }
     result["pendingCount"] = json!(
         result["draftCount"].as_u64().unwrap_or(0) + result["verifiedCount"].as_u64().unwrap_or(0)
     );
-    result["totalActiveCount"] = json!(total_active);
+    result["totalActiveCount"] = json!(counts.total);
     result["recentInvoices"] = json!(
         records
             .iter()

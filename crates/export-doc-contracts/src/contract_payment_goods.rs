@@ -1,4 +1,4 @@
-//! Independently reviewed additive payment goods contract; endpoint metadata remains frozen.
+//! Independently reviewed payment goods contract; endpoint metadata remains frozen.
 use serde_json::{Value, json};
 
 pub(super) fn apply(baseline: &mut Value) {
@@ -13,6 +13,14 @@ pub(super) fn apply(baseline: &mut Value) {
     baseline["components"]["schemas"]["ApiPaymentDto"]["properties"]["goodsItems"] = json!({
         "type":"array", "items":{"$ref":"#/components/schemas/ApiPaymentGoodsItem"},
         "default":[], "maxItems":4,
-        "description":"本次付款独立货物明细，最多四项；已有单行品名、数量和单位在保存时归入明细。"
+        "description":"本次付款独立货物明细，最多四项；品名、数量与单位仅在明细内填写。"
     });
+    let payment = &mut baseline["components"]["schemas"]["ApiPaymentDto"];
+    for field in ["goodsName", "quantity", "quantityUnit"] {
+        payment["properties"].as_object_mut().unwrap().remove(field);
+        payment["required"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|name| name != field);
+    }
 }

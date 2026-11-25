@@ -8,12 +8,14 @@ import {
 
 export function getV3ProductLayoutIssue(elements: Iterable<ReportDesignerV3Element>) {
   let productFields = false, detailTable = false;
-  let activeTables = 0;
+  let activeTables = 0, pageBreak = false;
   for (const element of elements) {
     productFields ||= isProductElement(element);
     detailTable ||= element.type === "Flow" && element.flowKind === "DetailTable";
     if (element.type === "Flow" && element.flowKind === "DetailTable" && element.visible && element.outputEnabled && element.block.output?.enabled !== false && ++activeTables > 1) return "同一模板只能输出一张商品明细表，请先隐藏或移除已有明细表。";
     if (productFields && detailTable) return "自由商品字段与高级明细表不能混用，请选择一种商品排版方式。";
+    pageBreak ||= element.type === "Flow" && element.flowKind === "PageBreak" && element.visible && element.outputEnabled && element.block.output?.enabled !== false;
+    if (activeTables > 0 && pageBreak) return "商品明细表自动分页，不能与独立分页符同时输出；请在明细表打印设置中调整每页行数。";
   }
   return null;
 }
@@ -26,5 +28,5 @@ export function getV3InsertionIssue(state: ReportDesignerV3DocumentState, layerI
   if (layer.elements.length >= REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER) return `该图层最多 ${REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER} 个元素。`;
   const elements = state.schema.layers.flatMap(candidate => candidate.elements);
   if (elements.length >= REPORT_DESIGNER_V3_MAX_TOTAL_ELEMENTS) return `模板最多 ${REPORT_DESIGNER_V3_MAX_TOTAL_ELEMENTS} 个元素。`;
-  return getV3ProductLayoutIssue([...elements, element]);
+  return getV3ProductLayoutIssue([...state.schema.layers.filter(candidate => candidate.visible).flatMap(candidate => candidate.elements), element]);
 }

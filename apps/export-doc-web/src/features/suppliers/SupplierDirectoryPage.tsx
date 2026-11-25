@@ -9,6 +9,7 @@ import { ListWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { FilterBar } from "../../ui/primitives/Field.tsx";
 import { useEffect, useMemo } from "react";
 import { useFileImportWorkspace } from "../../ui/useFileImportWorkspace.ts";
+import { DirectoryImportPreview } from "../../ui/DirectoryImportPreview.tsx";
 import { ServerDraftUpdateNotice } from "../../ui/serverDraftSync.tsx";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { currentLocalDateInputValue, readApiError } from "../../ui/formUtils.ts";
@@ -152,10 +153,8 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
         {canImportSupplier ? <label className="secondary-button">选择导入文件<input type="file" hidden disabled={importing} accept=".csv,.xlsx,.xlsm" onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; previewImport(file); }} /></label> : null}
         {canImportSupplier ? <button className="primary-button" type="button" disabled={busy || !importPreview?.validRows} onClick={() => void confirmImport()}>确认导入有效行</button> : null}
       </div>
-      {importPreview ? <><p>共 {importPreview.totalRows} 行，有效 {importPreview.validRows} 行，重复 {importPreview.duplicateRows} 行。提交将使用服务端预检快照并重新校验；下表最多展示前 30 行。</p>
-        <ResponsiveTableFrame label="供应商导入预览" mobileLayout="scroll"><table className="data-table"><thead><tr><th>行</th><th>供应商</th><th>分类</th><th>联系人</th><th>结果</th></tr></thead><tbody>
-          {importPreview.rows.slice(0, 30).map((row) => <tr key={row.rowNumber}><td>{row.rowNumber}</td><td>{row.name || "-"}</td><td>{row.category || "-"}</td><td>{row.contactName || "-"}</td><td>{row.error || (row.isDuplicate ? "重复，跳过" : "可导入")}</td></tr>)}
-        </tbody></table></ResponsiveTableFrame></> : null}
+      {importPreview ? <><p>共 {importPreview.totalRows} 行，有效 {importPreview.validRows} 行，重复 {importPreview.duplicateRows} 行。新供应商以考察中状态导入。</p>
+        <DirectoryImportPreview key={importPreview.previewId} rows={importPreview.rows} supplier busy={busy} /></> : null}
     </section> : null}
     {view === "directory" ? <section className="form-section" {...getTaskViewPanelProps(supplierTabsId, "directory")}>
       <PageHeader title="供应商目录" count={page?.totalCount} unit="家" actions={<>

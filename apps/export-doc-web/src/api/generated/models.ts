@@ -2523,7 +2523,6 @@ export interface ApiPaymentDto {
   departmentId: string;
   freightMiscExpense: string;
   goodsItems?: ApiPaymentGoodsItem[];
-  goodsName: string;
   id: number;
   inspectionExpense: string;
   invoiceNo: string;
@@ -2537,8 +2536,6 @@ export interface ApiPaymentDto {
   paymentDate?: string | null;
   paymentMethod: string;
   project: string;
-  quantity: string;
-  quantityUnit: string;
   receiptDate?: string | null;
   repairExpense: string;
   rowVersion: string;

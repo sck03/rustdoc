@@ -579,7 +579,7 @@ fn crm_supplier_and_payment_records_roundtrip_and_keep_optional_fields() {
         Some(json!({"expectedVersion":supplier["versionNumber"]})),
     );
     assert_eq!(admitted["status"], "合作中");
-    let payment=fixture.create(CREATE_PAYMENT,json!({"invoiceNo":"NATIVE-PAY","cnyAmount":"99999999999999.99","payeeName":"供应商","paymentDate":"2026-09-16","spare10":"保留备用十","goodsName":"独立付款货物","quantity":"12.5","quantityUnit":"件"}));
+    let payment=fixture.create(CREATE_PAYMENT,json!({"invoiceNo":"NATIVE-PAY","cnyAmount":"99999999999999.99","payeeName":"供应商","paymentDate":"2026-09-16","spare10":"保留备用十","goodsItems":[{"goodsName":"独立付款货物","quantity":"12.5","quantityUnit":"件"}]}));
     assert_eq!(payment["payment"]["spare10"], "保留备用十");
     assert_eq!(payment["payment"]["cnyAmount"], json!("99999999999999.99"));
     assert_eq!(

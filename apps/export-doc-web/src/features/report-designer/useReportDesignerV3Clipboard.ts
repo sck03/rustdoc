@@ -21,7 +21,7 @@ export function useReportDesignerV3Clipboard({ state, editable, content, reportT
     pasteClipboard() {
       if (!editable || elements.length === 0) return;
       const next = pasteV3Elements(state, elements, state.activeLayerId ?? undefined);
-      onNotice(next === state ? getV3ProductLayoutIssue([...state.schema.layers.flatMap(layer => layer.elements), ...elements]) ?? getV3ElementCapacityIssue(state, state.activeLayerId ?? undefined, elements.length) ?? "当前区域已锁定、隐藏或无法容纳这些组件。" : null);
+      onNotice(next === state ? getV3ProductLayoutIssue([...state.schema.layers.filter(layer => layer.visible).flatMap(layer => layer.elements), ...elements]) ?? getV3ElementCapacityIssue(state, state.activeLayerId ?? undefined, elements.length) ?? "当前区域已锁定、隐藏或无法容纳这些组件。" : null);
       onCommit(next);
     },
     copyStyle() { if (source) setStyle({ ...source.style }); },

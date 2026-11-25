@@ -156,6 +156,9 @@ pub fn exercise(c: &Connection) {
                 &scope(),
                 &[("id", "id"), ("invoiceNo", "invoiceNo")],
                 before,
+                None,
+                "",
+                200,
             )
             .unwrap();
         if rows.is_empty() {
@@ -196,11 +199,97 @@ pub fn exercise(c: &Connection) {
             },
             &[("id", "id")],
             None,
+            None,
+            "",
+            200,
         )
         .unwrap();
     assert_eq!(
         rows[0]["id"], visible,
         "invisible or cancelled versions cannot displace an authorized invoice"
+    );
+    let window_scope = DataScope {
+        company: "DASH-WINDOW",
+        company_wide: true,
+        ..Default::default()
+    };
+    for (number, kind, date, status) in [
+        ("SAME", "报关数据", "2026-11-05", "Draft"),
+        ("SAME", "实际数据", "2026-09-05", "Completed"),
+        ("CURRENT", "实际数据", "2026-11-06", "Verified"),
+        ("CANCELLED", "实际数据", "2026-11-06", "Cancelled"),
+    ] {
+        insert(
+            c,
+            "invoices",
+            json!({"companyScope":"DASH-WINDOW", "invoiceNo":number, "type":kind, "invoiceDate":date, "status":status, "versionNumber":1}),
+        );
+    }
+    let counts = c.dashboard_counts(&window_scope).unwrap();
+    assert_eq!(
+        (
+            counts.total,
+            counts.draft,
+            counts.verified,
+            counts.completed
+        ),
+        (2, 0, 1, 1)
+    );
+    let current = c
+        .scan_dashboard(
+            &window_scope,
+            &[("invoiceNo", "invoiceNo")],
+            None,
+            Some(("2026-11-01", "2026-12-01")),
+            "",
+            200,
+        )
+        .unwrap();
+    assert_eq!(
+        current.len(),
+        1,
+        "select preferred version before date filtering"
+    );
+    assert_eq!(current[0]["invoiceNo"], "CURRENT");
+    assert_eq!(
+        c.scan_dashboard(
+            &window_scope,
+            &[("invoiceNo", "invoiceNo")],
+            None,
+            None,
+            "Completed",
+            1
+        )
+        .unwrap()[0]["invoiceNo"],
+        "SAME"
+    );
+    insert(
+        c,
+        "suppliers",
+        json!({"name":"École", "companyScope":"DASH-WINDOW", "versionNumber":1}),
+    );
+    insert(
+        c,
+        "suppliers",
+        json!({"name":"Hidden", "companyScope":"OTHER", "versionNumber":1}),
+    );
+    assert_eq!(
+        c.existing_party_names(
+            "suppliers",
+            &window_scope,
+            &["e\u{301}cole".into(), "Hidden".into()]
+        )
+        .unwrap(),
+        vec!["école"]
+    );
+    let mut candidates = (0..5000)
+        .map(|index| format!("NAME-{index}"))
+        .collect::<Vec<_>>();
+    candidates[4999] = "e\u{301}cole".into();
+    assert_eq!(
+        c.existing_party_names("suppliers", &window_scope, &candidates)
+            .unwrap(),
+        vec!["école"]
     );
     for (name, tax, company) in [
         ("École", "A", "QUERY"),

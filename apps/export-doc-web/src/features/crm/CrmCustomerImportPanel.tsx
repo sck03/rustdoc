@@ -1,6 +1,6 @@
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { OperationFeedback } from "../../ui/OperationFeedback.tsx";
-import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { DirectoryImportPreview } from "../../ui/DirectoryImportPreview.tsx";
 import { useFileImportWorkspace } from "../../ui/useFileImportWorkspace.ts";
 
 export function CrmCustomerImportPanel({ client, canImport, onImported }: {
@@ -24,10 +24,8 @@ export function CrmCustomerImportPanel({ client, canImport, onImported }: {
     </div>
     <OperationFeedback feedback={feedback} />
     {preview ? <>
-      <p>共 {preview.totalRows} 行，有效 {preview.validRows} 行，重复 {preview.duplicateRows} 行。提交将使用服务端预检快照并重新校验；下表最多展示前 30 行。</p>
-      <ResponsiveTableFrame label="CRM 客户导入预览" mobileLayout="scroll"><table className="data-table"><thead><tr><th>行</th><th>客户</th><th>国家</th><th>联系人</th><th>结果</th></tr></thead>
-        <tbody>{preview.rows.slice(0, 30).map((row) => <tr key={row.rowNumber}><td>{row.rowNumber}</td><td>{row.name || "-"}</td><td>{row.countryRegion || "-"}</td><td>{row.contactName || "-"}</td><td>{row.error || (row.isDuplicate ? "重复，跳过" : "可导入")}</td></tr>)}</tbody>
-      </table></ResponsiveTableFrame>
+      <p>共 {preview.totalRows} 行，有效 {preview.validRows} 行，重复 {preview.duplicateRows} 行。新客户以潜在客户状态导入。</p>
+      <DirectoryImportPreview key={preview.previewId} rows={preview.rows} busy={busy} />
     </> : null}
   </section>;
 }

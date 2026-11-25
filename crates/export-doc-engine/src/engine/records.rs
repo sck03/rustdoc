@@ -562,9 +562,6 @@ fn validate(
                 .map_err(|cause| invalid(cause.to_string()))?;
             export_doc_domain::payment::normalize_goods(&mut payment);
             value["goodsItems"] = serde_json::to_value(&payment.goods_items)?;
-            for field in ["goodsName", "quantity", "quantityUnit"] {
-                value[field] = json!("");
-            }
             if payment.payee_id > 0 {
                 let payee = store::get(connection, "payees", payment.payee_id)?;
                 if !auth::visible(actor, "document.reference-data", "view", &payee)
@@ -577,7 +574,7 @@ fn validate(
         "crm-customers" => {
             required(value, "name", "客户名称", 200)?;
             if id == 0 {
-                value["status"] = json!("潜在客户");
+                value["status"] = json!(export_doc_domain::party::initial_status(false));
             } else {
                 value["status"] = previous["status"].clone();
             }
@@ -596,7 +593,7 @@ fn validate(
         "suppliers" => {
             required(value, "name", "供应商名称", 200)?;
             if id == 0 {
-                value["status"] = json!("考察中");
+                value["status"] = json!(export_doc_domain::party::initial_status(true));
             } else {
                 value["status"] = previous["status"].clone();
             }

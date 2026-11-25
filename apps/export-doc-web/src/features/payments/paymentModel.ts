@@ -20,16 +20,14 @@ export const paymentExpenseFields = [
 export const paymentAmountFields = [{ field: "usdAmount", label: "USD 金额" }, { field: "cnyAmount", label: "CNY 金额" }, ...paymentExpenseFields] as const;
 
 export function paymentGoodsItems(payment: ApiPaymentDto): ApiPaymentGoodsItem[] {
-  if (payment.goodsItems?.length) return payment.goodsItems;
-  const item = { goodsName: payment.goodsName, quantity: payment.quantity, quantityUnit: payment.quantityUnit };
-  return Object.values(item).some(value => value?.trim()) ? [item] : [];
+  return payment.goodsItems ?? [];
 }
 
 export function paymentGoodsPatch(goodsItems: ApiPaymentGoodsItem[]): Partial<ApiPaymentDto> {
-  return { goodsItems, goodsName: "", quantity: "", quantityUnit: "" };
+  return { goodsItems };
 }
 
-const paymentTextFields = ["accountNo", "bankName", "companyScope", "department", "departmentId", "goodsName", "invoiceNo", "voucherNo", "tradeMethod", "taxRebateRate", "quantityUnit", "notes", "payeeName", "payerName", "paymentMethod", "project", "quantity", "shipmentCountry"] as const;
+const paymentTextFields = ["accountNo", "bankName", "companyScope", "department", "departmentId", "invoiceNo", "voucherNo", "tradeMethod", "taxRebateRate", "notes", "payeeName", "payerName", "paymentMethod", "project", "shipmentCountry"] as const;
 function fieldValues<K extends string>(keys: readonly K[], get: (key: K) => string) {
   return Object.fromEntries(keys.map(key => [key,get(key)])) as Record<K,string>;
 }
@@ -99,18 +97,15 @@ export function validatePaymentDraft(payment: ApiPaymentDto) {
     [payment.voucherNo, 100, "付款单号"],
     [payment.tradeMethod, 100, "贸易方式"],
     [payment.taxRebateRate, 100, "退税率"],
-    [payment.quantityUnit, 20, "数量单位"],
     ...documentSpareKeys.map((key, index): [string, number, string] => [payment[key], 500, `备用字段${index + 1}`]),
     [payment.department, 100, "部门"],
     [payment.paymentMethod, 100, "付款方式"],
-    [payment.quantity, 100, "数量"],
     [payment.shipmentCountry, 100, "出运国家"],
     [payment.project, 200, "项目"],
     [payment.payeeName, 200, "收款方"],
     [payment.payerName, 200, "付款方"],
     [payment.bankName, 200, "银行"],
     [payment.accountNo, 100, "账号"],
-    [payment.goodsName, 500, "品名"],
     [payment.notes, 2000, "备注"],
   ];
   const overlong = textLimits.find(([value, maximumLength]) => (value?.trim().length ?? 0) > maximumLength);

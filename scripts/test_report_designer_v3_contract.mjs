@@ -955,6 +955,21 @@ assert(!unsafeImageHtml.includes("evil.example") && !unsafeImageHtml.includes("h
   assert(html.includes("vertical-align: bottom") && html.includes("border-top: 0") && html.includes("border-bottom: 0"), "设计画布必须执行明细横线与垂直对齐设置");
 }
 
+{
+  const schema = api.parseReportDesignerV3Source("", "ExportDocument").schema;
+  const body = schema.layers.find(layer => layer.role === "Body");
+  const detail = api.createV3FlowElement(api.createDetailTableBlock());
+  const pageBreak = api.createV3FlowElement(api.createPageBreakBlock(), 1500, 16000);
+  for (const elements of [[detail, pageBreak], [pageBreak, detail]]) {
+    assert(api.getV3ProductLayoutIssue(elements)?.includes("不能与独立分页符"));
+    body.elements = elements;
+    assert(api.normalizeReportDesignerV3Schema(schema).issues.some(issue => issue.severity === "error" && issue.message.includes("不能与独立分页符")));
+  }
+  assert(api.getV3ProductLayoutIssue([detail]) === null, "明细自动分页仍可用");
+  assert(api.getV3ProductLayoutIssue([pageBreak]) === null, "普通正文仍支持独立分页符");
+  assert(api.getV3ProductLayoutIssue([detail, { ...pageBreak, outputEnabled: false }]) === null, "不输出的分页符不影响明细");
+}
+
 const markSchema = createShippingMarksScenario(api);
 const markHtml = api.renderReportDesignerV3HtmlFixture(markSchema, "ExportDocument");
 assert(markHtml.length > 0, "唛头必须可用于自由画布、普通行、表格、条件内容和明细旁栏");

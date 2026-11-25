@@ -70,21 +70,7 @@ pub fn expense_total(value: &ApiPaymentDto) -> Result<Decimal, FieldError> {
 
 /// One ordered set of goods belongs to the payment, independently of invoice items.
 pub fn goods_items(value: &ApiPaymentDto) -> Vec<ApiPaymentGoodsItem> {
-    if let Some(items) = value.goods_items.as_ref().filter(|items| !items.is_empty()) {
-        return items.clone();
-    }
-    if [&value.goods_name, &value.quantity, &value.quantity_unit]
-        .iter()
-        .all(|v| v.trim().is_empty())
-    {
-        return vec![];
-    }
-    vec![ApiPaymentGoodsItem {
-        goods_name: value.goods_name.clone(),
-        quantity: value.quantity.clone(),
-        quantity_unit: value.quantity_unit.clone(),
-        ..Default::default()
-    }]
+    value.goods_items.clone().unwrap_or_default()
 }
 
 pub fn normalize_goods(value: &mut ApiPaymentDto) {
@@ -102,9 +88,6 @@ pub fn normalize_goods(value: &mut ApiPaymentDto) {
             })
             .collect(),
     );
-    value.goods_name.clear();
-    value.quantity.clear();
-    value.quantity_unit.clear();
 }
 
 pub fn validate(value: &ApiPaymentDto) -> Result<(), FieldError> {
@@ -146,7 +129,6 @@ pub fn validate(value: &ApiPaymentDto) -> Result<(), FieldError> {
     for (field, label, limit, text) in [
         ("invoiceNo", "发票号", 100, &value.invoice_no),
         ("voucherNo", "付款单号", 100, &value.voucher_no),
-        ("quantityUnit", "数量单位", 20, &value.quantity_unit),
         ("tradeMethod", "贸易方式", 100, &value.trade_method),
         ("taxRebateRate", "退税率", 100, &value.tax_rebate_rate),
         ("spare1", "备用字段1", 500, &value.spare1),
@@ -161,17 +143,15 @@ pub fn validate(value: &ApiPaymentDto) -> Result<(), FieldError> {
         ("spare10", "备用字段10", 500, &value.spare10),
         ("department", "部门", 100, &value.department),
         ("paymentMethod", "付款方式", 100, &value.payment_method),
-        ("quantity", "数量", 100, &value.quantity),
         ("shipmentCountry", "出运国家", 100, &value.shipment_country),
         ("project", "项目", 200, &value.project),
         ("payeeName", "收款方", 200, &value.payee_name),
         ("payerName", "付款方", 200, &value.payer_name),
         ("bankName", "银行", 200, &value.bank_name),
         ("accountNo", "账号", 100, &value.account_no),
-        ("goodsName", "品名", 500, &value.goods_name),
         ("notes", "备注", 2000, &value.notes),
     ] {
-        // Retain the public .NET contract's UTF-16 length boundary.
+        // Match the browser's UTF-16 text length boundary.
         if text.trim().encode_utf16().count() > limit {
             return Err(error(field, format!("{label}不能超过 {limit} 个字符。")));
         }
@@ -199,18 +179,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn independent_goods_preserve_order_text_and_existing_single_item() {
+    fn independent_goods_preserve_order_and_decimal_text() {
         let mut value = ApiPaymentDto {
-            goods_name: "原付款货物".into(),
-            quantity: "12.5".into(),
-            quantity_unit: "件".into(),
-            goods_items: Some(vec![]),
+            goods_items: Some(vec![ApiPaymentGoodsItem {
+                goods_name: "付款货物".into(),
+                quantity: "12.5".into(),
+                quantity_unit: "件".into(),
+                ..Default::default()
+            }]),
             ..Default::default()
         };
         normalize_goods(&mut value);
         assert_eq!(goods_items(&value).len(), 1);
         assert_eq!(goods_items(&value)[0].quantity, "12.5");
-        assert!(value.goods_name.is_empty());
         value
             .goods_items
             .as_mut()

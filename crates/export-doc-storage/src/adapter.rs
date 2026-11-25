@@ -32,8 +32,10 @@ pub(crate) trait Adapter: Send {
         delete_import_preview_rows(preview: i64) -> () => import_preview_rows::remove;
         crm_follow_up_counts(query: &CrmQuery<'_>, now: &str, until: &str) -> CrmFollowUpCounts => crm_query::follow_up_counts;
         booking_overlaps(company: &str, room: i64, from: &str, to: &str, states: &[&str]) -> bool => office_query::booking_overlaps;
-        scan_dashboard(scope: &DataScope<'_>, fields: &[(&str, &str)], before: Option<i64>) -> Vec<Value> => dashboard_query::scan;
+        scan_dashboard(scope: &DataScope<'_>, fields: &[(&str, &str)], before: Option<i64>, window: Option<(&str, &str)>, status: &str, limit: i64) -> Vec<Value> => dashboard_query::scan;
+        dashboard_counts(scope: &DataScope<'_>) -> DashboardCounts => dashboard_query::counts;
         party_candidates(kind: &str, company: &str, keys: &[(&str, String)]) -> Vec<Value> => party_query::candidates;
+        existing_party_names(kind: &str, scope: &DataScope<'_>, names: &[String]) -> Vec<String> => party_query::existing_names;
         sole_exporter_name(scope: &DataScope<'_>) -> Option<String> => party_query::sole_exporter_name;
         insert_file(file:&FileWrite<'_>)->() => file_catalog::insert;
         file_info(record:i64,kind:&str)->Option<FileInfo> => file_catalog::get;

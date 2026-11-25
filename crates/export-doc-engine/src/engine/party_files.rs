@@ -55,32 +55,28 @@ fn existing_names(
     actor: &Actor,
     kind: &str,
     permission: &str,
+    rows: &[Value],
 ) -> Result<BTreeSet<String>> {
-    let mut names = BTreeSet::new();
-    let mut offset = 0;
-    loop {
-        operation::check()?;
-        let rows = tx
-            .query_record_fields(
-                &export_doc_storage::GenericQuery {
-                    kind,
-                    scope: auth::data_scope(actor, permission, "view"),
-                    fields: &[("name", "name")],
-                    offset,
-                    limit: 2000,
-                    ..Default::default()
-                },
-                &[],
-                false,
-            )?
-            .1;
-        let complete = rows.len() < 2000;
-        names.extend(rows.iter().map(|row| store::normalize(&text(row, "name"))));
-        if complete {
-            return Ok(names);
-        }
-        offset += 2000;
+    let candidates: BTreeSet<_> = rows
+        .iter()
+        .map(|row| store::normalize(&text(row, "name")))
+        .collect();
+    Ok(tx
+        .existing_party_names(
+            kind,
+            &auth::data_scope(actor, permission, "view"),
+            &candidates.into_iter().collect::<Vec<_>>(),
+        )?
+        .into_iter()
+        .collect())
+}
+fn authorize_contact(actor: &Actor, supplier: bool, row: &Value) -> Result<()> {
+    if row["error"] == "" && row["isDuplicate"] != true && row["contactName"] != "" {
+        let contacts = catalog::resource(contact_kind(supplier)).unwrap();
+        auth::authorize(actor, contacts.permission, "create")?;
+        auth::authorize(actor, contacts.permission, "set-primary")?;
     }
+    Ok(())
 }
 /// Invalid rows never reserve a name; preview and commit use the same rule.
 fn accept_row(row: &mut Value, names: &mut BTreeSet<String>) -> bool {
@@ -104,16 +100,28 @@ pub fn upload(
     let table = export_doc_excel::read_table(bytes, name, 5000, &check).map_err(invalid)?;
     let mut rows = party::map_rows(&table, supplier).map_err(invalid)?;
     let resource = catalog::resource(kind(supplier)).unwrap();
-    service.store.transaction_for(actor, operation, &[], |tx, actor| {
-        let mut names = existing_names(tx,actor,resource.key,resource.permission)?;
+    service.store.read_for(actor, operation, &[], |tx, actor| {
+        let mut names = existing_names(tx, actor, resource.key, resource.permission, &rows)?;
         for row in &mut rows {
             operation::check()?;
             accept_row(row, &mut names);
+            authorize_contact(actor, supplier, row)?;
         }
-        let identity = import_previews::save(tx,actor,&service.clock,resource.key,&rows)?;
-        Ok(json!({"totalRows":rows.len(),"validRows":rows.iter().filter(|row| row["error"] == "" && row["isDuplicate"] != true).count(),
-            "duplicateRows":rows.iter().filter(|row| row["isDuplicate"] == true).count(),"rows":rows,"previewId":identity}))
-    })
+        Ok(())
+    })?;
+    let prepared = import_previews::prepare(resource.key, &rows)?;
+    let identity = service
+        .store
+        .transaction_for(actor, operation, &[], |tx, actor| {
+            for row in &rows {
+                authorize_contact(actor, supplier, row)?;
+            }
+            import_previews::save_prepared(tx, actor, &service.clock, &prepared)
+        })?;
+    Ok(
+        json!({"totalRows":rows.len(),"validRows":rows.iter().filter(|row| row["error"] == "" && row["isDuplicate"] != true).count(),
+        "duplicateRows":rows.iter().filter(|row| row["isDuplicate"] == true).count(),"rows":rows,"previewId":identity}),
+    )
 }
 fn import(
     service: &NativeService,
@@ -126,12 +134,13 @@ fn import(
     let contacts = catalog::resource(contact_kind(supplier)).unwrap();
     service.store.transaction_for(actor, operation, &[], |tx, actor| {
         let rows = import_previews::consume(tx,actor,&service.clock,resource.key,&text(body,"previewId"))?;
-        let mut names = existing_names(tx,actor,resource.key,resource.permission)?;
+        let mut names = existing_names(tx,actor,resource.key,resource.permission,&rows)?;
         let (mut created,mut contact_count,mut skipped) = (0,0,0);
         for row in rows {
             operation::check()?;
             let mut row = party::normalize(&row,supplier);
             if !accept_row(&mut row, &mut names) { skipped += 1; continue; }
+            authorize_contact(actor, supplier, &row)?;
             let mut party = contracts::initial(contracts::schema(resource.schema));
             for key in ["name","countryRegion","website","status","notes","source","category","mainProducts"] {
                 if let Some(value) = row.get(key) { party[key] = value.clone(); }

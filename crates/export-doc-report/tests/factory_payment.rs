@@ -101,18 +101,24 @@ fn one_to_four_goods_print_identically_on_two_a4_copies() {
 }
 
 #[test]
-fn existing_single_goods_remain_available_to_editable_template_fields() {
+fn goods_array_projects_editable_template_fields() {
     let data = ReportData::payment(
         &ApiPaymentDto {
-            goods_name: "既有货物".into(),
-            quantity: "12.5".into(),
-            quantity_unit: "箱".into(),
+            goods_items: Some(vec![ApiPaymentGoodsItem {
+                goods_name: "付款货物".into(),
+                quantity: "12.5".into(),
+                quantity_unit: "箱".into(),
+                ..Default::default()
+            }]),
             ..Default::default()
         },
         json!({}),
     )
     .unwrap();
-    assert_eq!(data.text("Payment.Goods1.GoodsName"), "既有货物");
+    assert_eq!(data.text("Payment.Goods1.GoodsName"), "付款货物");
+    assert_eq!(data.text("Payment.goodsName"), "付款货物");
+    assert_eq!(data.text("Payment.quantity"), "12.5");
+    assert_eq!(data.text("Payment.quantityUnit"), "箱");
     assert_eq!(data.text("Payment.Goods1.QuantityText"), "12.5箱");
     assert!(data.text("Payment.Goods2.GoodsName").is_empty());
 }

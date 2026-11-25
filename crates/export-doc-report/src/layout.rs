@@ -398,6 +398,7 @@ fn pages_data(
     let width = design.page.width_hundredth_mm as f32 / 100.;
     let height = design.page.height_hundredth_mm as f32 / 100.;
     export_doc_domain::designer::page::validate(&design.page).map_err(invalid)?;
+    export_doc_domain::template::validate_flow_pagination(design).map_err(invalid)?;
     let elements: Vec<_> = design
         .layers
         .iter()
@@ -427,6 +428,9 @@ fn pages_data(
                     }
                 )
         })
+        .filter(
+            |element| matches!(&element.kind, Kind::Flow { block, .. } if block.output_enabled()),
+        )
         .collect();
     let tables: Vec<_> = elements
         .iter()

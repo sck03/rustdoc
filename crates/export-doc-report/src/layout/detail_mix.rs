@@ -1,6 +1,6 @@
 use super::flow;
 use crate::{ReportData, Result, error::invalid};
-use export_doc_domain::designer::{Element, Kind, ReportBlock};
+use export_doc_domain::designer::Element;
 
 pub(super) fn render_preceding(
     svg: &mut String,
@@ -12,7 +12,6 @@ pub(super) fn render_preceding(
     ordered.sort_by_key(|element| (element.y_hundredth_mm, element.z_index));
     let mut previous_bottom = None;
     for element in ordered {
-        reject_page_break(element, "前")?;
         let bottom =
             element.y_hundredth_mm as f32 / 100. + element.height_hundredth_mm as f32 / 100.;
         if bottom > detail_top {
@@ -43,7 +42,6 @@ pub(super) fn render_following(
     ordered.sort_by_key(|element| (element.y_hundredth_mm, element.z_index));
     let mut previous_bottom = None;
     for element in ordered {
-        reject_page_break(element, "后")?;
         let top = element.y_hundredth_mm as f32 / 100.;
         let bottom = top + element.height_hundredth_mm as f32 / 100.;
         if top < detail_bottom {
@@ -65,21 +63,6 @@ pub(super) fn render_following(
         }
         flow::render(svg, element, data)?;
         previous_bottom = Some(bottom);
-    }
-    Ok(())
-}
-
-fn reject_page_break(element: &Element, position: &str) -> Result<()> {
-    if matches!(
-        &element.kind,
-        Kind::Flow {
-            block: ReportBlock::PageBreak(_),
-            ..
-        }
-    ) {
-        return Err(invalid(format!(
-            "明细表{position}的普通 Flow 分页符暂不支持。"
-        )));
     }
     Ok(())
 }

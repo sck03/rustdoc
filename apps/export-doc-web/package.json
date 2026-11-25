@@ -29,6 +29,7 @@
     "test:business-features-ui": "node ../../scripts/test_business_features_ui.mjs && node ../../scripts/test_supplier_lifecycle_ui.mjs && node ../../scripts/test_supplier_overview_ui.mjs",
     "test:payment-printing-ui": "node ../../scripts/test_payment_printing_ui.mjs",
     "test:payment-query-lifecycle-ui": "node ../../scripts/test_payment_query_lifecycle_ui.mjs",
+    "test:directory-import-organization-ui": "node ../../scripts/test_directory_import_and_organization_ui.mjs",
     "test:crm-export-lifecycle-ui": "node ../../scripts/test_crm_export_lifecycle_ui.mjs",
     "test:sales-opportunity-lifecycle-ui": "node ../../scripts/test_sales_opportunity_lifecycle_ui.mjs",
     "test:invoice-report-ui": "node ../../scripts/test_invoice_report_ui.mjs",

@@ -41,7 +41,7 @@ export function ReportDesignerV3FlowProperties({
     case "DetailTable":
       return <DetailTableProperties block={block} widthMm={widthMm} fieldGroups={fieldGroups} onCommit={asFlowCommit(onCommit, "DetailTable")} />;
     case "PageBreak":
-      return <div className="report-designer-v3-flow-properties-note">分页符会在打印时开始新页；可在画布中移动其位置。</div>;
+      return <div className="report-designer-v3-flow-properties-note">普通正文从此处开始新页。商品明细表使用自动分页，不与独立分页符混用。</div>;
   }
 }
 

@@ -336,7 +336,7 @@ export function pasteV3Elements(
   preferredLayerId?: string,
 ): ReportDesignerV3DocumentState {
   if (elements.length === 0) return state;
-  if (getV3ProductLayoutIssue([...state.schema.layers.flatMap(layer => layer.elements), ...elements])) return state;
+  if (getV3ProductLayoutIssue([...state.schema.layers.filter(layer => layer.visible).flatMap(layer => layer.elements), ...elements])) return state;
   const requestedCount = elements.length;
   if (countV3Elements(state.schema) + requestedCount > REPORT_DESIGNER_V3_MAX_TOTAL_ELEMENTS) return state;
   const fallbackLayer = state.schema.layers.find((l) => l.id === preferredLayerId && l.visible && !l.locked)

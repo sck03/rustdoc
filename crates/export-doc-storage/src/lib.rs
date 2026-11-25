@@ -11,6 +11,7 @@ pub use postgres::tools::{
 mod audit_query;
 mod business_query;
 mod dashboard_query;
+pub use dashboard_query::DashboardCounts;
 mod party_query;
 pub use audit_query::AuditQuery;
 mod crm_query;
@@ -388,8 +389,10 @@ impl Connection {
     }
 }
 delegate! {
-    scan_dashboard(scope:&DataScope<'_>,fields:&[(&str,&str)],before:Option<i64>)->Vec<Value>;
+    scan_dashboard(scope:&DataScope<'_>,fields:&[(&str,&str)],before:Option<i64>,window:Option<(&str,&str)>,status:&str,limit:i64)->Vec<Value>;
+    dashboard_counts(scope:&DataScope<'_>)->DashboardCounts;
     party_candidates(kind:&str,company:&str,keys:&[(&str,String)])->Vec<Value>;
+    existing_party_names(kind:&str,scope:&DataScope<'_>,names:&[String])->Vec<String>;
     sole_exporter_name(scope:&DataScope<'_>)->Option<String>;
     insert_file(file:&FileWrite<'_>)->();
     file_info(record:i64,kind:&str)->Option<FileInfo>;

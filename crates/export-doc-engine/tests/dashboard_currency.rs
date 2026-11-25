@@ -77,6 +77,11 @@ fn dashboard_keeps_original_currencies_separate_without_an_exchange_rate() {
         (today, "USD", "USD-NOW"),
         (today, "CNY", "CNY-NOW"),
         (previous, "USD", "USD-BEFORE"),
+        (
+            previous.checked_sub_months(chrono::Months::new(1)).unwrap(),
+            "EUR",
+            "OLD-EUR",
+        ),
     ] {
         let mut invoice = InvoiceDraft::demo(&date.to_string(), number)
             .build()
@@ -94,6 +99,10 @@ fn dashboard_keeps_original_currencies_separate_without_an_exchange_rate() {
     export_doc_contracts::validation::response(GET_DASHBOARD.id, &result).unwrap();
     assert!(result.get("monthlyExportAmount").is_none());
     assert!(result.get("exportAmountCurrency").is_none());
+    assert_eq!(result["totalActiveCount"], 4);
+    assert_eq!(result["draftCount"], 4);
+    assert_eq!(result["monthlyInvoiceCount"], 2);
+    assert_eq!(result["recentInvoices"].as_array().unwrap().len(), 4);
     let amounts = result["exportAmountsByCurrency"].as_array().unwrap();
     assert_eq!(amounts.len(), 2);
     let usd = amounts.iter().find(|row| row["currency"] == "USD").unwrap();

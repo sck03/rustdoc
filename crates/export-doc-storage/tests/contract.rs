@@ -337,6 +337,16 @@ fn sqlite_transactions_blobs_and_backup_use_one_database() {
     test_workspace::remove(&root).unwrap();
 }
 
+#[test]
+fn sqlite_business_query_projections_and_counts() {
+    let root = test_workspace::create("storage-query-tests");
+    {
+        let connection = Connection::sqlite(&root.join("data.db")).unwrap();
+        business_query::exercise(&connection);
+    }
+    test_workspace::remove(&root).unwrap();
+}
+
 #[cfg(windows)]
 #[test]
 fn test_directory_cleanup_retries_transient_handles_and_reports_persistent_locks() {

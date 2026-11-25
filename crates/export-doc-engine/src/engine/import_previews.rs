@@ -22,7 +22,7 @@ fn limits(kind: &str) -> (usize, usize) {
     }
 }
 
-#[cfg(any(feature = "excel", test))]
+#[cfg(test)]
 pub fn save(
     tx: &Connection,
     actor: &Actor,
