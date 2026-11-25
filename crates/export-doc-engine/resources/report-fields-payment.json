@@ -18,6 +18,7 @@
     {"reportType":"PaymentVoucher","category":"付款报销","label":"付款日期（年月日）","value":"{{ Payment.PaymentDateText }}"},
     {"reportType":"PaymentVoucher","category":"付款报销","label":"开户银行及账号","value":"{{ Payment.BankAccountText }}"},
     {"reportType":"PaymentVoucher","category":"付款货物明细","label":"货物 1 品名","value":"{{ Payment.Goods1.GoodsName }}"},
+    {"reportType":"PaymentVoucher","category":"付款货物明细","label":"货物项数","value":"{{ Payment.GoodsCount }}"},
     {"reportType":"PaymentVoucher","category":"付款货物明细","label":"货物 1 数量","value":"{{ Payment.Goods1.Quantity }}"},
     {"reportType":"PaymentVoucher","category":"付款货物明细","label":"货物 1 单位","value":"{{ Payment.Goods1.QuantityUnit }}"},
     {"reportType":"PaymentVoucher","category":"付款货物明细","label":"货物 1 数量及单位","value":"{{ Payment.Goods1.QuantityText }}"},

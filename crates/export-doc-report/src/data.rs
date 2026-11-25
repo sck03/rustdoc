@@ -144,6 +144,7 @@ impl ReportData {
             .map_err(|cause| invalid(cause.to_string()))?;
         let goods = export_doc_domain::payment::goods_items(payment);
         let mut value = serde_json::to_value(payment)?;
+        value["GoodsCount"] = json!(goods.len());
         value["PaymentDateText"] = json!(
             payment
                 .payment_date

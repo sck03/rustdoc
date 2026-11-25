@@ -3,6 +3,27 @@ use export_doc_report::{Builtin, ReportData, render_builtin};
 use serde_json::json;
 use std::sync::atomic::AtomicBool;
 
+fn positions(svg: &str, text: &str) -> Vec<(f32, f32)> {
+    svg.split("<text ")
+        .filter_map(|part| {
+            let (attributes, content) = part.split_once('>')?;
+            if content.split("</text>").next()? != text {
+                return None;
+            }
+            let coordinate = |name: &str| -> Option<f32> {
+                attributes
+                    .split(&format!("{name}=\""))
+                    .nth(1)?
+                    .split('"')
+                    .next()?
+                    .parse()
+                    .ok()
+            };
+            Some((coordinate("x")?, coordinate("y")?))
+        })
+        .collect()
+}
+
 #[test]
 fn one_to_four_goods_print_identically_on_two_a4_copies() {
     for count in 1..=4 {
@@ -10,6 +31,8 @@ fn one_to_four_goods_print_identically_on_two_a4_copies() {
             payment_date: Some("2026-11-25".into()),
             payer_name: "样例贸易有限公司".into(),
             invoice_no: "FACTORY-2026-001".into(),
+            bank_name: "样例银行支行".into(),
+            account_no: "TEST-ACCOUNT-001".into(),
             goods_items: Some(
                 (1..=count)
                     .map(|i| ApiPaymentGoodsItem {
@@ -39,6 +62,41 @@ fn one_to_four_goods_print_identically_on_two_a4_copies() {
         assert!(!page.svg.contains("NO."));
         assert!(!page.svg.contains("#ffff00"));
         assert!(page.svg.contains('②') && page.svg.contains('③'));
+        let invoice = positions(&page.svg, "FACTORY-2026-001");
+        for i in 1..=count {
+            let names = positions(&page.svg, &format!("货物{i}"));
+            let quantities = positions(&page.svg, &format!("{i}.125件"));
+            for copy in 0..2 {
+                assert!((names[copy].1 - quantities[copy].1).abs() < 0.1);
+                if count == 1 {
+                    assert!(
+                        (names[copy].1 - invoice[copy].1).abs() < 0.1,
+                        "single item must share the merged invoice region's vertical center"
+                    );
+                }
+            }
+        }
+        let bank = positions(&page.svg, "样例银行支行");
+        let account = positions(&page.svg, "TEST-ACCOUNT-001");
+        let label = positions(&page.svg, "开户银行帐号：");
+        for copy in 0..2 {
+            assert!(bank[copy].0 > label[copy].0);
+            assert!((bank[copy].0 - account[copy].0).abs() < 0.1);
+            assert!((account[copy].1 - bank[copy].1 - 7.).abs() < 0.1);
+        }
+        for labels in [["L/C", "D/P"].as_slice(), ["13%", "9%", "0%"].as_slice()] {
+            let expected = if labels.len() == 2 { 18. } else { 12. };
+            for copy in 0..2 {
+                let rows: Vec<_> = labels
+                    .iter()
+                    .map(|value| positions(&page.svg, value)[copy].1)
+                    .collect();
+                assert!(
+                    rows.windows(2)
+                        .all(|row| (row[1] - row[0] - expected).abs() < 0.1)
+                );
+            }
+        }
     }
 }
 
