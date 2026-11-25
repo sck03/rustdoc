@@ -137,7 +137,7 @@ fn expanded_bank_area_keeps_long_names_and_accounts_on_their_own_lines() {
     );
     assert_eq!(positions(svg, account_no).len(), 2);
     let label = positions(svg, "开户银行帐号：");
-    let amount = positions(svg, "小写：￥232151.04");
+    let amount = positions(svg, "小写：");
     for copy in 0..2 {
         assert!((label[copy].0 - amount[copy].0).abs() < 0.1);
         assert!(
@@ -147,8 +147,100 @@ fn expanded_bank_area_keeps_long_names_and_accounts_on_their_own_lines() {
     }
     payment.bank_name = "中".repeat(20);
     let data = ReportData::payment(&payment, json!({})).unwrap();
-    assert!(
-        render_builtin(Builtin::FactoryPayment, &data, &AtomicBool::new(false)).is_err(),
-        "overlong names must fail clearly instead of being cut off or overwriting the account"
-    );
+    let document = render_builtin(Builtin::FactoryPayment, &data, &AtomicBool::new(false)).unwrap();
+    assert_eq!(positions(&document.pages[0].svg, &"中".repeat(19)).len(), 2);
+    assert_eq!(positions(&document.pages[0].svg, "中").len(), 2);
+}
+
+#[test]
+fn long_bank_and_payee_names_wrap_to_two_lines_with_consistent_typography() {
+    let bank_name = "中国工商银行股份有限公司宁波市海曙区外贸综合服务支行";
+    let payee_name = "宁波市海曙区布利杰国际进出口贸易发展有限责任公司";
+    let account_no = "1234567890123456789012";
+    let mut payment = ApiPaymentDto {
+        bank_name: bank_name.into(),
+        payee_name: payee_name.into(),
+        account_no: account_no.into(),
+        cny_amount: "232151.04".parse().unwrap(),
+        ..Default::default()
+    };
+    let data = ReportData::payment(&payment, json!({})).unwrap();
+    let document = render_builtin(Builtin::FactoryPayment, &data, &AtomicBool::new(false)).unwrap();
+    assert_eq!(document.pages.len(), 1);
+    let svg = &document.pages[0].svg;
+    let account = positions(svg, account_no);
+    for name in [bank_name, payee_name] {
+        let first: String = name.chars().take(19).collect();
+        let second: String = name.chars().skip(19).collect();
+        let tops = positions(svg, &first);
+        let bottoms = positions(svg, &second);
+        assert_eq!(tops.len(), 2, "each copy must contain the first line");
+        assert_eq!(
+            bottoms.len(),
+            2,
+            "each copy must contain the rest of the name"
+        );
+        for copy in 0..2 {
+            assert!((bottoms[copy].1 - tops[copy].1 - 8. * 25.4 / 72. * 1.35).abs() < 0.1);
+            if name == bank_name {
+                assert!(bottoms[copy].1 < account[copy].1 - 3.);
+            } else {
+                assert!(bottoms[copy].1 < 102. + copy as f32 * 140. - 1.);
+            }
+        }
+        for line in [&first, &second] {
+            assert_typography(svg, line, 8., true);
+        }
+    }
+    for label in ["货源单位名称：", "开户银行帐号：", "小写："] {
+        assert_typography(svg, label, 7.5, false);
+    }
+    for field in [account_no, "￥232151.04"] {
+        assert_typography(svg, field, 8., true);
+    }
+    for bank in [true, false] {
+        payment.bank_name = bank_name.into();
+        payment.payee_name = payee_name.into();
+        if bank {
+            payment.bank_name = "中".repeat(39);
+        } else {
+            payment.payee_name = "中".repeat(39);
+        }
+        let data = ReportData::payment(&payment, json!({})).unwrap();
+        assert!(
+            render_builtin(Builtin::FactoryPayment, &data, &AtomicBool::new(false)).is_err(),
+            "a third line must fail clearly instead of overlapping the account or amount"
+        );
+    }
+}
+
+fn assert_typography(svg: &str, text: &str, pt: f32, bold: bool) {
+    let attributes: Vec<_> = svg
+        .split("<text ")
+        .filter_map(|part| {
+            let (attributes, content) = part.split_once('>')?;
+            (content.split("</text>").next()? == text).then_some(attributes)
+        })
+        .collect();
+    assert_eq!(attributes.len(), 2, "both copies must include {text}");
+    for attributes in attributes {
+        let size: f32 = attributes
+            .split("font-size=\"")
+            .nth(1)
+            .unwrap()
+            .split('"')
+            .next()
+            .unwrap()
+            .parse()
+            .unwrap();
+        assert!((size - pt * 25.4 / 72.).abs() < 0.001);
+        assert!(attributes.contains(if bold {
+            "font-weight=\"700\""
+        } else {
+            "font-weight=\"400\""
+        }));
+        if bold {
+            assert!(attributes.contains("font-family=\"Noto Sans CJK SC\""));
+        }
+    }
 }
