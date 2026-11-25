@@ -125,9 +125,7 @@ pub(crate) trait Adapter: Send {
         job_output_bytes() -> u64 => "存储适配器不支持任务容量查询。";
         explain_statement(_statement: &str, _values: &[String]) -> Value => "存储适配器不支持查询计划。";
         blob_info(_record_id: i64, _kind: &str) -> Option<BlobInfo> => "存储适配器不支持文件元数据查询。";
-        backup(_path: &Path) -> () => "该数据库应使用对应的数据库备份模块。";
-        verify_backup(_path: &Path) -> () => "该数据库应使用对应的数据库备份模块。";
-        restore(_path: &Path) -> () => "该数据库应使用对应的数据库恢复模块。";
+        backup(_path: &Path, _capacity: &mut dyn FnMut(u64) -> Result<()>) -> () => "该数据库应使用对应的数据库备份模块。";
     }
 
     fn explain_query(&self, query: &QueryPlan<'_>) -> Result<Value> {

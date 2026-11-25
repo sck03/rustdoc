@@ -71,22 +71,6 @@ impl Sqlite {
         Self::validate(&connection)?;
         Ok(connection)
     }
-    pub fn prepare_restore_file(source: &Path, destination: &Path) -> Result<()> {
-        let source = Self::read_verified(source)?;
-        // The caller supplies a managed scratch path; never overwrite a backup or business file.
-        drop(
-            std::fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(destination)?,
-        );
-        {
-            let mut target = SqliteConnection::open(destination)?;
-            copy(&source, &mut target)?;
-        }
-        Self::open(destination)?.checkpoint()?;
-        Ok(())
-    }
     pub fn verify_file(path: &Path) -> Result<()> {
         Self::read_verified(path).map(|_| ())
     }
@@ -700,30 +684,32 @@ impl Adapter for Sqlite {
         )?;
         Ok(())
     }
-    fn backup(&self, path: &Path) -> Result<()> {
+    fn backup(&self, path: &Path, capacity: &mut dyn FnMut(u64) -> Result<()>) -> Result<()> {
         let source = self.connection.borrow();
         let mut target = Self::configure(SqliteConnection::open(path)?)?;
-        copy(&source, &mut target)?;
+        copy_with_capacity(&source, &mut target, capacity)?;
         Self::validate(&target)
     }
-    fn restore(&self, path: &Path) -> Result<()> {
-        let source = Self::read_verified(path)?;
-        let mut destination = self.connection.borrow_mut();
-        copy(&source, &mut destination)?;
-        Self::validate(&destination)
-    }
-    fn verify_backup(&self, path: &Path) -> Result<()> {
-        Self::verify_file(path)
-    }
 }
-fn copy(source: &SqliteConnection, destination: &mut SqliteConnection) -> Result<()> {
+fn copy_with_capacity(
+    source: &SqliteConnection,
+    destination: &mut SqliteConnection,
+    capacity: &mut dyn FnMut(u64) -> Result<()>,
+) -> Result<()> {
     let backup = Backup::new(source, destination)?;
-    let deadline = Instant::now() + Duration::from_secs(120);
+    let deadline = Instant::now() + Duration::from_secs(24 * 60 * 60);
     loop {
         operation::check()?;
         if Instant::now() > deadline {
             return Err(Error::new(ErrorKind::Timeout, "数据库备份 / 恢复超时。"));
         }
+        let pages: u32 = source.query_row("PRAGMA page_count", [], |row| row.get(0))?;
+        let page_size: u32 = source.query_row("PRAGMA page_size", [], |row| row.get(0))?;
+        capacity(
+            u64::from(pages)
+                .checked_mul(u64::from(page_size))
+                .ok_or_else(|| Error::unavailable("数据库快照容量溢出。"))?,
+        )?;
         match backup.step(256)? {
             StepResult::Done => break,
             StepResult::More => {}

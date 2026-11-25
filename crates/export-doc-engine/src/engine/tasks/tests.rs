@@ -186,8 +186,16 @@ fn malformed_output_fails_without_publishing_or_panicking() {
 fn queries_filter_status_and_text_without_disclosing_another_users_jobs() {
     let fixture = Fixture::new();
     let (_store, jobs) = fixture.open();
-    jobs.completed(&fixture.actor, "Export", "发票任务", "导出完成")
+    let completed = jobs
+        .start(&fixture.actor, GET_JOB, "Export", "发票任务", |_| {
+            Ok(TaskOutput::file(
+                "done.txt".into(),
+                "text/plain",
+                b"done".to_vec(),
+            ))
+        })
         .unwrap();
+    wait(&jobs, &fixture.actor, completed["jobId"].as_str().unwrap());
     let started = jobs
         .start(&fixture.actor, GET_JOB, "Export", "错误任务", |_| {
             Err(unavailable("字体缺失"))

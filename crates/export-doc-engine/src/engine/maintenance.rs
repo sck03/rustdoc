@@ -8,10 +8,7 @@ use crate::{
     paths::{self, RuntimePaths},
 };
 use serde_json::{Value, json};
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{fs, path::PathBuf};
 
 pub(super) fn acquire(lock: &std::sync::RwLock<()>) -> Result<std::sync::RwLockWriteGuard<'_, ()>> {
     wait(|| lock.try_write())
@@ -134,7 +131,7 @@ fn create_verified(store: &Store, paths: &RuntimePaths) -> Result<PathBuf> {
     ));
     let result = (|| {
         paths::ensure_safe_absolute(&temporary).map_err(invalid)?;
-        store.connection()?.backup(&temporary)?;
+        super::team_backup::snapshot::backup_sqlite(store, paths, &temporary)?;
         let snapshot = export_doc_storage::Connection::sqlite(&temporary)?;
         super::file_store::incremental::capture(store, &temporary, &target, |cursor| {
             Ok(snapshot.file_objects(cursor, 200, false)?)
@@ -149,49 +146,8 @@ fn create_verified(store: &Store, paths: &RuntimePaths) -> Result<PathBuf> {
     }
     result
 }
-pub fn restore(store: &Store, paths: &RuntimePaths, actor: &Actor, body: &Value) -> Result<()> {
-    auth::authorize(actor, "system.backup", "manage")?;
-    let _backup = super::team_backup::package::lock(paths)?;
-    let name = body["backupFileName"].as_str().unwrap_or("");
-    if !paths::valid_file_name(name)
-        || Path::new(name)
-            .extension()
-            .is_none_or(|extension| extension != "sqlite3")
-    {
-        return Err(invalid("备份文件名无效。"));
-    }
-    if body["confirmationText"] != "RESTORE" {
-        return Err(invalid("请输入 RESTORE 确认覆盖当前数据库。"));
-    }
-    let source_path = root(paths)?.join(name);
-    paths::ensure_safe_absolute(&source_path).map_err(invalid)?;
-    store.connection()?.verify_backup(&source_path)?;
-    super::file_store::incremental::restore(&store.files, &source_path)?;
-    let working = paths
-        .cache_root
-        .join("DatabaseRestore")
-        .join(paths::nonce().map_err(unavailable)?);
-    paths::ensure_safe_absolute(&working).map_err(unavailable)?;
-    crate::secrets::private_directory(&working).map_err(unavailable)?;
-    let result: Result<()> = (|| {
-        let snapshot = working.join("restore.sqlite3");
-        export_doc_storage::prepare_sqlite_restore(&source_path, &snapshot)?;
-        let backup = export_doc_storage::Connection::sqlite(&snapshot)?;
-        store
-            .files
-            .verify_inventory(|cursor| Ok(backup.file_objects(cursor, 200, false)?))?;
-        drop(backup);
-        // Upgrade the snapshot first; an incompatible backup cannot replace the running database.
-        create_verified(store, paths)?;
-        let connection = store.connection()?;
-        connection.restore(&snapshot)?;
-        connection.checkpoint()?;
-        Ok(())
-    })();
-    let cleanup = fs::remove_dir_all(&working);
-    result?;
-    cleanup?;
-    Ok(())
+pub fn restore(service: &super::NativeService, actor: &Actor, body: &Value) -> Result<Value> {
+    super::team_backup::snapshot::stage_sqlite(service, actor, body)
 }
 
 pub fn cleanup(store: &Store, paths: &RuntimePaths, actor: &Actor, body: &Value) -> Result<Value> {

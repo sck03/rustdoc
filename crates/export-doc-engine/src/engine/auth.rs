@@ -116,13 +116,6 @@ pub(super) fn validate_new_password(password: &str) -> Result<()> {
 }
 
 impl Sessions {
-    pub fn clear(&self) -> Result<()> {
-        self.values
-            .lock()
-            .map_err(|_| unavailable("会话状态异常。"))?
-            .clear();
-        Ok(())
-    }
     pub fn login(
         &self,
         store: &Store,

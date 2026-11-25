@@ -40,6 +40,7 @@ use super::s3_transport as s3;
 pub(in crate::engine) mod scheduled;
 mod scratch;
 mod sealed;
+pub mod snapshot;
 mod tickets;
 mod transfer;
 pub(super) use tickets::Tickets;
@@ -49,6 +50,7 @@ mod tests;
 
 pub const OPERATIONS: &[Operation] = &[
     GET_BACKUP_PLAN,
+    LIST_RECOVERY_ARCHIVES,
     SAVE_BACKUP_PLAN,
     RUN_BACKUP_PLAN,
     TEST_BACKUP_REPLICA,
@@ -227,6 +229,7 @@ pub fn handle(
 ) -> Result<Value> {
     match operation {
         GET_BACKUP_PLAN => scheduled::status(service, actor),
+        LIST_RECOVERY_ARCHIVES => scheduled::archives(service, actor, query),
         SAVE_BACKUP_PLAN => scheduled::save(service, actor, body),
         RUN_BACKUP_PLAN => scheduled::run_now(service, actor),
         TEST_BACKUP_REPLICA => scheduled::test_replica(service, actor),

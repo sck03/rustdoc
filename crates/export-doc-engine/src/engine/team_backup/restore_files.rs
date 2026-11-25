@@ -20,6 +20,18 @@ pub(super) fn install(
     paths: &RuntimePaths,
     staging: &Path,
     sqlite: bool,
+    inventory: impl FnMut(&str) -> Result<Vec<export_doc_storage::FileObject>>,
+) -> Result<()> {
+    install_selected(paths, staging, sqlite, false, inventory)
+}
+pub(super) fn install_database(paths: &RuntimePaths, staging: &Path) -> Result<()> {
+    install_selected(paths, staging, true, true, |_| Ok(vec![]))
+}
+fn install_selected(
+    paths: &RuntimePaths,
+    staging: &Path,
+    sqlite: bool,
+    database_only: bool,
     mut inventory: impl FnMut(&str) -> Result<Vec<export_doc_storage::FileObject>>,
 ) -> Result<()> {
     let journal = staging.join("install-journal.json");
@@ -37,6 +49,9 @@ pub(super) fn install(
             Some("Configuration/file-storage.json"),
         ),
     ];
+    if database_only {
+        targets.clear();
+    }
     if sqlite {
         targets.extend([
             (package::SQLITE, Some(package::SQLITE)),
@@ -173,7 +188,7 @@ fn remove(path: &Path) -> Result<()> {
     }
     Ok(())
 }
-fn copy(
+pub(super) fn copy(
     source: &Path,
     target: &Path,
     space: &std::sync::Arc<crate::temporary_space::Budget>,

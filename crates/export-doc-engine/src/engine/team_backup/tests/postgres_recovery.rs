@@ -100,7 +100,7 @@ fn postgres_migration_and_physical_restore_preserve_roles_and_reject_live_instan
         .status,
         Some(400)
     );
-    super::super::upload(
+    let staged = super::super::upload(
         &service,
         &actor,
         STAGE_SERVER_MIGRATION_RESTORE,
@@ -110,6 +110,7 @@ fn postgres_migration_and_physical_restore_preserve_roles_and_reject_live_instan
         &output.content,
     )
     .unwrap();
+    wait(&service, &actor, &staged);
     assert!(postgres::apply_pending(&paths, &maintenance, "native_owner", &app).is_err());
     service.close().unwrap();
     drop(service);
@@ -119,6 +120,25 @@ fn postgres_migration_and_physical_restore_preserve_roles_and_reject_live_instan
         service.store.settings("restore-test").unwrap().unwrap()["value"],
         "before"
     );
+    let broken = postgres::postgres_root(&paths)
+        .unwrap()
+        .join("truncated.dump");
+    fs::write(&broken, b"PGDMP").unwrap();
+    let invalid_job = postgres::restore(&service, &actor, &[], &json!({"backupFileName":"truncated.dump","adminPassword":"Admin-2026-password","confirmationText":"RESTORE DATABASE"})).unwrap();
+    let deadline = Instant::now() + Duration::from_secs(30);
+    loop {
+        let state = service
+            .jobs
+            .get(&actor, invalid_job["jobId"].as_str().unwrap())
+            .unwrap();
+        if state["status"] == "Failed" {
+            break;
+        }
+        assert_ne!(state["status"], "Succeeded");
+        assert!(Instant::now() < deadline);
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    assert!(!postgres::has_pending(&paths).unwrap());
     let backup = postgres::create_backup(&service, &actor).unwrap();
     wait(&service, &actor, &backup);
     let listed = postgres::list(&service, &actor).unwrap();
@@ -129,7 +149,8 @@ fn postgres_migration_and_physical_restore_preserve_roles_and_reject_live_instan
         .unwrap()
         .set_settings("restore-test", 2, &json!({"value":"second-change"}))
         .unwrap();
-    postgres::restore(&service,&actor,&[],&json!({"backupFileName":name,"adminPassword":"Admin-2026-password","confirmationText":"RESTORE DATABASE"})).unwrap();
+    let restoring = postgres::restore(&service,&actor,&[],&json!({"backupFileName":name,"adminPassword":"Admin-2026-password","confirmationText":"RESTORE DATABASE"})).unwrap();
+    wait(&service, &actor, &restoring);
     assert_eq!(
         migration::status(&service, &actor).unwrap()["pendingRestore"],
         true

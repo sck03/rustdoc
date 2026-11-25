@@ -143,3 +143,51 @@ fn line(reader: &mut impl BufRead) -> Result<String> {
     bytes.pop();
     String::from_utf8(bytes).map_err(|_| unavailable("备份对象清单编码无效。"))
 }
+
+/// Stage exactly the snapshot inventory; later garbage collection cannot remove recovery bytes.
+pub(in crate::engine) fn stage(
+    snapshot: &Path,
+    target: &Path,
+    space: &std::sync::Arc<crate::temporary_space::Budget>,
+) -> Result<()> {
+    let source_root = repository(snapshot)?;
+    let target_root = repository(target)?;
+    inventory(snapshot, |object| {
+        let source = object_path(&source_root, &object)?;
+        verify(&mut fs::File::open(&source)?, &object)?;
+        copy_staged(&source, &object_path(&target_root, &object)?, space)
+    })?;
+    copy_staged(
+        &snapshot.with_extension("objects.jsonl"),
+        &target.with_extension("objects.jsonl"),
+        space,
+    )
+}
+fn copy_staged(
+    source: &Path,
+    target: &Path,
+    space: &std::sync::Arc<crate::temporary_space::Budget>,
+) -> Result<()> {
+    crate::secrets::private_directory(target.parent().unwrap()).map_err(unavailable)?;
+    paths::atomic_write_with(target, |out| {
+        let result: Result<()> = (|| {
+            backup_io::copy_and_hash(
+                &mut fs::File::open(source)?,
+                &mut space
+                    .at(target.parent().unwrap().to_path_buf())
+                    .writer(out)?,
+                u64::MAX,
+            )?;
+            Ok(())
+        })();
+        result.map_err(|e| e.to_string())
+    })
+    .map_err(unavailable)
+}
+
+pub(in crate::engine) fn verify_staged(snapshot: &Path) -> Result<()> {
+    let root = repository(snapshot)?;
+    inventory(snapshot, |object| {
+        verify(&mut fs::File::open(object_path(&root, &object)?)?, &object)
+    })
+}

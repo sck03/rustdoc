@@ -69,6 +69,9 @@ pub(in crate::engine) fn stage_restore(
                     package::SQLITE
                 },
             )?;
+            if pg {
+                prepared.verify_postgres(&paths)?;
+            }
             Ok(prepared.into_task(
                 _gate,
                 "stage-recovery-archive",

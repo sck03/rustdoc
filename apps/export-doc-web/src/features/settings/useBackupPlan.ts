@@ -16,6 +16,13 @@ export function useBackupPlan(client: ExportDocManagerApiClient, canManage: bool
   onSettingsSaved?: (status: ApiBackupPlanStatus, previousRevision: number) => void) {
   const queryClient = useQueryClient();
   const run = useAbortableOperation(client);
+  const [archivePage, setArchivePage] = useState(1);
+  const archiveQuery = useQuery({
+    queryKey: [...queryKeys.recoveryArchives(), archivePage],
+    queryFn: ({ signal }) => client.listRecoveryArchives({ page: archivePage, pageSize: 20 }, { signal }),
+    enabled: canManage,
+  });
+  useEffect(() => { if (archiveQuery.data && archiveQuery.data.page !== archivePage) setArchivePage(archiveQuery.data.page); }, [archiveQuery.data, archivePage]);
   const [draft, setDraft] = useState<ApiBackupPlanSaveRequest | null>(null);
   const [baseline, setBaseline] = useState<ApiBackupPlanStatus | null>(null);
   const [confirmation, setConfirmation] = useState("");
@@ -49,6 +56,7 @@ export function useBackupPlan(client: ExportDocManagerApiClient, canManage: bool
   useEffect(() => {
     if (job.data && isTerminalJob(job.data.status)) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.backupPlan() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.recoveryArchives() });
       void queryClient.invalidateQueries({ queryKey: queryKeys.serverMigrationStatus() });
       void queryClient.invalidateQueries({ queryKey: queryKeys.disasterRecoveryStatus() });
     }
@@ -98,6 +106,7 @@ export function useBackupPlan(client: ExportDocManagerApiClient, canManage: bool
   });
   const busy = save.isPending || start.isPending || cancel.isPending || download.isPending;
   return {
+    archiveQuery, archives: archiveQuery.data?.items ?? [], archivePage, setArchivePage,
     query, status: query.data, draft, dirty, confirmation, setConfirmation, message, success, busy, activeJob, job: job.data, jobId,
     jobError: job.isError ? readApiError(job.error) : null,
     jobFetching: job.isFetching,
@@ -119,7 +128,7 @@ export function useBackupPlan(client: ExportDocManagerApiClient, canManage: bool
       try { await run(async signal => {
         if (!await confirmDiscardChanges("重新加载灾备设置")) return;
         signal.throwIfAborted();
-        const result = await query.refetch();
+        const [result] = await Promise.all([query.refetch(), archiveQuery.refetch()]);
         signal.throwIfAborted();
         if (result.data && !result.isError) { apply(result.data); setMessage(null); setSuccess(null); }
       }); } catch (error) { fail(error); }

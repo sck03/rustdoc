@@ -266,11 +266,14 @@ HTTP 保持 16 个执行名额，另有 16 个公平等待名额，最多等待 
 ### 备份、迁移与恢复
 
 - “日常灾备”默认关闭，可手工执行或按业务时区每天／每周生成完整加密包。“异机副本”选择 WebDAV／S3 并测试写入、回读和删除。新包及副本成功后执行受管保留策略，副本失败保留本地包和旧备份。内建为完整快照，增量和 WAL/PITR 由数据库运维另行配置。
+- SQLite 普通备份和恢复返回后台任务；恢复校验及暂存成功后退出重开，启动前完成数据库替换。启动失败时可通过桌面程序 `--import-recovery` 或 `--restore-sqlite-pending` 离线恢复，参数与保密要求见[恢复指南](../docs/服务器备份迁移与恢复指南.md)。
+- 归档使用 `ListRecoveryArchives` 分页，计划状态不携带归档数组；归档异常逐份呈现，损坏归档拒绝下载与恢复。
 - 桌面 `.edmrecovery` 灾备包包含 SQLite 快照、Security 主密钥、DataRoot/Templates 和 `FileObjects.pack`；从本机明确选择的文件校验并暂存后，退出重开即可恢复。启动先取得实例锁，校验暂存内容，保存原文件并记录替换日志；失败停止启动，保留恢复目录。
 - PostgreSQL API 沿用“物理备份”名称，实际为 `pg_dump` custom-format `.dump`。完整包另含主密钥、用户模板及 `FileObjects.pack`。本地数据库快照配套 `.objects.jsonl` 清单与邻接 `Objects/` 仓库，不可只搬运 dump。完整包仅接受 ZIP64／v2 认证分块格式，上传下载及摘要使用固定缓冲和受管磁盘，不设置固定总容量额度；v1 包明确拒绝，不自动转换或覆盖。尚无完整包分卷，磁盘余量、存储协议及 24 小时任务时限仍适用。
 - 服务器在界面完成密码/确认及暂存后，停止正常 API，使用同一个 AppRoot/DataRoot 执行 `ExportDocManager.Server --app-root <AppRoot> --data-root <DataRoot> --restore-pending`。维护进程需提供 `EXPORTDOCMANAGER_POSTGRES_CONNECTION`、独立 `EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_CONNECTION` 和 NOLOGIN 所有者 `EXPORTDOCMANAGER_POSTGRES_OWNER`；两种连接须指向同一数据库，均可使用对应 `_FILE`。命令完成即退出，再以业务连接启动 API。
 - 新镜像部署依次执行 `docker compose stop application`、`docker compose run --rm --no-deps restore`、`docker compose up -d --no-deps --wait application`；每条成功后再执行下一条。旧源码入口继续使用 `scripts/run-native-docker.ps1 -RestorePending -NoPause` 及原 RuntimeRoot。普通 API 不持维护密钥，失败保留停止状态、待恢复标记及安全副本。
 - 服务端现有完整包可在网页按编号暂存恢复；外部大包可用 `--import-migration <绝对包路径> --package-password-file <私有密码文件>`，在 API 停止后通过独立维护锁导入并恢复。命令保持原 AppRoot／DataRoot 和维护连接。
+- 单独 dump 的上传／本地恢复及迁移包上传先返回校验任务，任务成功才允许执行停服务维护；受控 `pg_restore` 完整读取预检失败不发布标记。`pg_dump` 输出直接接入共享磁盘余量预算。
 - 恢复先生成安全 dump，再以 `pg_restore --single-transaction --no-owner --no-privileges --role <NOLOGIN-owner>` 执行，存储层验证 schema 并重新授予业务账号必要表/序列权限。失败保留标记和安全备份；不得删除标记冒充恢复完成。
 - 主密钥、暂存目录与恢复前副本使用共同的 Windows 私有 ACL／Unix 0700 目录边界。环境变量提供主密钥的部署明确拒绝独立密钥包操作，须由管理员安排密钥迁移。
 - 网页包随附 `Tools/PostgreSQL` 客户端和许可；版本、来源及 Windows SHA-256 在 `eng/native-runtime-packages.json`。Linux 客户端采用官方 bookworm 资源以避免在 Ubuntu 24.04 上引入更高 glibc 要求；容器使用 trixie 资源。macOS 构建机先安装 PostgreSQL 18 Homebrew formula，版本须与中央清单一致。

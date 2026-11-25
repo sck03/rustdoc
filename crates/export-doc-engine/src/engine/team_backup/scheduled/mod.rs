@@ -173,3 +173,12 @@ pub(in crate::engine) fn download(
         .consume_download(super::header(parameters, "token"))?;
     repository::download(&service.paths, &id)
 }
+
+pub(in crate::engine) fn archives(
+    service: &NativeService,
+    actor: &Actor,
+    query: &[(&str, String)],
+) -> Result<Value> {
+    administrator(actor)?;
+    repository::page(&service.paths, query)
+}

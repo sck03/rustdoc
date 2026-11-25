@@ -204,7 +204,7 @@ export function usePostgreSqlMaintenance(
         { signal },
       );
       signal.throwIfAborted();
-      return client.stageServerMigrationRestore(
+      const job = await client.stageServerMigrationRestore(
         {
           body: migrationRestoreFile as File,
           "X-ExportDocManager-Sensitive-Operation-Ticket": authorization.ticket,
@@ -216,6 +216,7 @@ export function usePostgreSqlMaintenance(
         },
         { signal, timeoutMs: 24 * 60 * 60 * 1000 },
       );
+      return waitForJobCompletion(client, job, { signal, timeoutMessage: "迁移校验仍在进行，请到文件任务查看，成功后再停止服务。" });
     },
     onSuccess: (response) => {
       setMigrationAdminPassword("");
@@ -223,7 +224,7 @@ export function usePostgreSqlMaintenance(
       setMigrationRestoreConfirmation("");
       setMigrationRestoreFile(null);
       setMessage(null);
-      setSuccessMessage(response.message || "服务器迁移已暂存，请部署管理员停止应用并执行恢复维护命令。");
+      setSuccessMessage(response.detailText || "服务器迁移已暂存，请部署管理员停止应用并执行恢复维护命令。");
     },
     refreshKeys: () => [queryKeys.serverMigrationStatus()],
     onError: (error) => {
@@ -235,8 +236,8 @@ export function usePostgreSqlMaintenance(
   });
 
   const databaseRestoreMutation = useScopedMutation(scope, client, {
-    mutationFn: (_input: void, signal) =>
-      client.restorePostgreSqlPhysicalBackup(
+    mutationFn: async (_input: void, signal) => {
+      const job = await client.restorePostgreSqlPhysicalBackup(
         {
           body: {
             backupFileName: selectedBackup,
@@ -245,12 +246,14 @@ export function usePostgreSqlMaintenance(
           },
         },
         { signal, timeoutMs: 24 * 60 * 60 * 1000 },
-      ),
+      );
+      return waitForJobCompletion(client, job, { signal, timeoutMessage: "恢复校验仍在进行，请到文件任务查看，成功后再停止服务。" });
+    },
     onSuccess: (response) => {
       setDatabaseAdminPassword("");
       setDatabaseRestoreConfirmation("");
       setMessage(null);
-      setSuccessMessage(response.message || "PostgreSQL 数据库恢复已暂存，请部署管理员停止应用并执行恢复维护命令。");
+      setSuccessMessage(response.detailText || "PostgreSQL 数据库恢复已暂存，请部署管理员停止应用并执行恢复维护命令。");
     },
     refreshKeys: () => [queryKeys.serverMigrationStatus()],
     onError: (error) => {
@@ -285,7 +288,7 @@ export function usePostgreSqlMaintenance(
         { signal },
       );
       signal.throwIfAborted();
-      return client.uploadAndRestorePostgreSqlPhysicalBackup(
+      const job = await client.uploadAndRestorePostgreSqlPhysicalBackup(
         {
           body: databaseUploadFile as File,
           "X-ExportDocManager-Sensitive-Operation-Ticket": authorization.ticket,
@@ -296,6 +299,7 @@ export function usePostgreSqlMaintenance(
         },
         { signal, timeoutMs: 24 * 60 * 60 * 1000 },
       );
+      return waitForJobCompletion(client, job, { signal, timeoutMessage: "恢复校验仍在进行，请到文件任务查看，成功后再停止服务。" });
     },
     onSuccess: (response) => {
       setDatabaseAdminPassword("");
@@ -303,7 +307,7 @@ export function usePostgreSqlMaintenance(
       setDatabaseRestoreConfirmation("");
       setMessage(null);
       setSuccessMessage(
-        response.message || "上传的 PostgreSQL 数据库恢复已暂存，请部署管理员停止应用并执行恢复维护命令。",
+        response.detailText || "上传的 PostgreSQL 数据库恢复已暂存，请部署管理员停止应用并执行恢复维护命令。",
       );
     },
     refreshKeys: () => [queryKeys.serverMigrationStatus()],

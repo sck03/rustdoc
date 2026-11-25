@@ -78,7 +78,7 @@ pub(super) fn write(paths: &RuntimePaths, archive: &Archive) -> Result<()> {
         &serde_json::to_vec(archive)?,
     )
 }
-pub(super) fn read(paths: &RuntimePaths, id: &str) -> Result<Archive> {
+fn read_metadata(paths: &RuntimePaths, id: &str, repository_id: &str) -> Result<Archive> {
     let path = meta_path(paths, id)?;
     if !path.try_exists()? {
         return Err(error(404, "计划备份不存在。"));
@@ -86,7 +86,7 @@ pub(super) fn read(paths: &RuntimePaths, id: &str) -> Result<Archive> {
     let archive: Archive =
         serde_json::from_value(read_json(&path)?).map_err(|_| unavailable("计划备份清单无效。"))?;
     if archive.id != id
-        || archive.repository != identity(paths)?
+        || archive.repository != repository_id
         || !crate::paths::valid_file_name(&archive.file_name)
         || ![format!("{id}.edmmigration"), format!("{id}.edmrecovery")].contains(&archive.file_name)
         || archive.sha256.len() != 64
@@ -94,6 +94,9 @@ pub(super) fn read(paths: &RuntimePaths, id: &str) -> Result<Archive> {
     {
         return Err(unavailable("计划备份清单与仓库不匹配。"));
     }
+    Ok(archive)
+}
+fn verify_file(paths: &RuntimePaths, archive: &Archive) -> Result<()> {
     let file = root(paths).join(&archive.file_name);
     crate::paths::ensure_safe_absolute(&file).map_err(invalid)?;
     if !archive.deleting {
@@ -103,6 +106,11 @@ pub(super) fn read(paths: &RuntimePaths, id: &str) -> Result<Archive> {
             return Err(unavailable("已登记备份文件大小或类型已改变。"));
         }
     }
+    Ok(())
+}
+pub(super) fn read(paths: &RuntimePaths, id: &str) -> Result<Archive> {
+    let archive = read_metadata(paths, id, &identity(paths)?)?;
+    verify_file(paths, &archive)?;
     Ok(archive)
 }
 pub(super) fn list(paths: &RuntimePaths) -> Result<Vec<Archive>> {
@@ -184,4 +192,63 @@ pub(super) fn prune(
         fs::remove_file(meta_path(paths, &archive.id)?)?;
     }
     Ok(())
+}
+
+pub(super) fn page(paths: &RuntimePaths, query: &[(&str, String)]) -> Result<Value> {
+    fn number(query: &[(&str, String)], key: &str, default: usize, max: usize) -> Result<usize> {
+        query
+            .iter()
+            .find(|(name, _)| *name == key)
+            .map_or(Ok(default), |(_, value)| {
+                value
+                    .parse::<usize>()
+                    .ok()
+                    .filter(|n| (1..=max).contains(n))
+                    .ok_or_else(|| invalid("备份分页参数无效。"))
+            })
+    }
+    let requested = number(query, "page", 1, 1_000_000)?;
+    let size = number(query, "pageSize", 20, 100)?;
+    let directory = root(paths);
+    crate::paths::ensure_safe_absolute(&directory).map_err(invalid)?;
+    let mut entries = Vec::new();
+    if directory.try_exists()? {
+        let repository_id = identity(paths)?;
+        for entry in fs::read_dir(&directory)? {
+            crate::operation::check()?;
+            let entry = entry?;
+            let name = entry.file_name();
+            let Some(id) = name
+                .to_str()
+                .and_then(|name| name.strip_suffix(".backup.json"))
+            else {
+                continue;
+            };
+            let item = match read_metadata(paths, id, &repository_id) {
+                Ok(archive) if archive.deleting => continue,
+                Ok(archive) => {
+                    let error = verify_file(paths, &archive).err();
+                    json!({"id":archive.id,"fileName":archive.file_name,"createdAt":archive.created_at,"sizeBytes":archive.size_bytes,"replicaStatus":archive.replica_status,"message":archive.message,"available":error.is_none(),"integrityMessage":error.map(|e| e.message).unwrap_or_default()})
+                }
+                Err(_) => {
+                    json!({"id":id,"fileName":name.to_string_lossy(),"createdAt":chrono::DateTime::<chrono::Utc>::UNIX_EPOCH,"sizeBytes":0,"replicaStatus":"Unknown","message":"","available":false,"integrityMessage":"备份清单损坏，请检查备份目录。"})
+                }
+            };
+            entries.push(item);
+        }
+    }
+    entries.sort_by(|left, right| {
+        right["createdAt"]
+            .as_str()
+            .cmp(&left["createdAt"].as_str())
+            .then_with(|| left["id"].as_str().cmp(&right["id"].as_str()))
+    });
+    let total = entries.len();
+    let page = requested.min(total.div_ceil(size).max(1));
+    let items: Vec<_> = entries
+        .into_iter()
+        .skip((page - 1) * size)
+        .take(size)
+        .collect();
+    Ok(json!({"items":items,"page":page,"pageSize":size,"totalCount":total}))
 }

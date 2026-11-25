@@ -520,6 +520,7 @@ const operationDomains: Record<string, Domain> = {
   listPurchaseRequest: "office",
   listPurchaseRequestWorkflowCandidates: "office",
   listQueriedInvoices: "query",
+  listRecoveryArchives: "disasterRecovery",
   listReportTemplates: "reports",
   listResponsibilities: "organization",
   listRoomHandlingServices: "office",

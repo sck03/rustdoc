@@ -160,3 +160,20 @@ pub(crate) fn digest_file(path: &Path) -> Result<(u64, String)> {
         MAX_FILE_BYTES,
     )
 }
+
+/// Own request input across task admission; cancellation or a failed task closes and removes it.
+pub(in crate::engine) fn stage_input(
+    paths: &crate::paths::RuntimePaths,
+    mut content: impl std::io::Read,
+) -> Result<std::fs::File> {
+    let mut file =
+        crate::paths::anonymous_file(&paths.cache_root).map_err(super::error::unavailable)?;
+    copy_and_hash(
+        &mut content,
+        &mut paths.disk_space.writer(&mut file)?,
+        MAX_FILE_BYTES,
+    )?;
+    file.sync_all()?;
+    std::io::Seek::rewind(&mut file)?;
+    Ok(file)
+}

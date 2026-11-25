@@ -34,12 +34,10 @@ fn fresh_baseline_reopens_and_backups_round_trip() {
     let backup = database.0.with_file_name("backup.db");
     {
         let db = Connection::sqlite(&database.0).unwrap();
-        db.backup(&backup).unwrap();
-        db.verify_backup(&backup).unwrap();
+        db.backup(&backup, &mut |_| Ok(())).unwrap();
+        export_doc_storage::verify_sqlite_backup(&backup).unwrap();
     }
-    let snapshot = database.0.with_file_name("restore.db");
-    export_doc_storage::prepare_sqlite_restore(&backup, &snapshot).unwrap();
-    for file in [&database.0, &snapshot] {
+    for file in [&database.0, &backup] {
         let db = Connection::sqlite(file).unwrap();
         assert_eq!(
             db.settings("preserved").unwrap().unwrap()["amount"],
@@ -74,4 +72,24 @@ fn old_future_empty_and_incomplete_databases_are_never_reinitialized() {
     fs::write(&database.0, []).unwrap();
     assert!(Connection::sqlite(&database.0).is_err());
     assert_eq!(fs::metadata(&database.0).unwrap().len(), 0);
+}
+
+#[test]
+fn snapshot_checks_capacity_before_copying_and_preserves_source_on_failure() {
+    let database = Database::fresh();
+    let target = database.0.with_file_name("no-space.db");
+    let db = Connection::sqlite(&database.0).unwrap();
+    let mut checked = false;
+    let result = db.backup(&target, &mut |bytes| {
+        assert!(bytes > 0);
+        checked = true;
+        Err(export_doc_storage::Error::unavailable(
+            "injected disk budget exhaustion",
+        ))
+    });
+    assert!(checked && result.is_err());
+    assert_eq!(
+        db.settings("preserved").unwrap().unwrap()["amount"],
+        "123.45"
+    );
 }

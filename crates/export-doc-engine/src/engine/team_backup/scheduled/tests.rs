@@ -219,7 +219,13 @@ fn retention_is_owned_and_replica_failure_keeps_the_local_archive_and_previous_c
     );
     let status = status(&service, &admin()).unwrap();
     assert_eq!(status["lastResult"], "Partial");
-    assert_eq!(status["archives"].as_array().unwrap().len(), 2);
+    assert_eq!(
+        archives(&service, &admin(), &[]).unwrap()["items"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
     assert!(repository::root(&service.paths).join(&first).is_file());
     let mut body = request(&service);
     body["plan"]["replicaMode"] = json!("None");
@@ -277,4 +283,56 @@ fn archive_restore_uses_saved_password_and_preserves_schema_compatible_data() {
         false
     );
     restored.close().unwrap();
+}
+
+#[test]
+fn archive_pages_isolate_missing_and_corrupt_entries_from_plan_status() {
+    let workspace = Workspace::new();
+    let service = open_service(&workspace);
+    configure(&service);
+    let repository_id = repository::ensure(&service.paths).unwrap();
+    for index in 0..22 {
+        let id = format!("{index:032x}");
+        let file_name = format!("{id}.edmrecovery");
+        fs::write(
+            repository::root(&service.paths).join(&file_name),
+            b"fixture",
+        )
+        .unwrap();
+        repository::write(
+            &service.paths,
+            &repository::Archive {
+                id,
+                repository: repository_id.clone(),
+                file_name,
+                created_at: Utc::now() - chrono::Duration::days(index),
+                size_bytes: 7,
+                sha256: "a".repeat(64),
+                replica_status: "NotConfigured".into(),
+                replica_target: String::new(),
+                message: String::new(),
+                deleting: false,
+            },
+        )
+        .unwrap();
+    }
+    let first = archives(&service, &admin(), &[]).unwrap();
+    assert_eq!(first["totalCount"], 22);
+    assert_eq!(first["items"].as_array().unwrap().len(), 20);
+    let last_id = format!("{:032x}", 21);
+    fs::remove_file(repository::root(&service.paths).join(format!("{last_id}.edmrecovery")))
+        .unwrap();
+    assert!(status(&service, &admin()).is_ok());
+    let second = archives(&service, &admin(), &[("page", "2".into())]).unwrap();
+    assert_eq!(second["items"].as_array().unwrap().len(), 2);
+    assert_eq!(second["items"][1]["available"], false);
+    assert!(repository::read(&service.paths, &last_id).is_err());
+    fs::write(
+        repository::root(&service.paths).join(format!("{last_id}.backup.json")),
+        b"broken",
+    )
+    .unwrap();
+    assert_eq!(archives(&service, &admin(), &[]).unwrap()["totalCount"], 22);
+    assert!(status(&service, &admin()).is_ok());
+    service.close().unwrap();
 }

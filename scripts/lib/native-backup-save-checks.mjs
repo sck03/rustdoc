@@ -17,7 +17,7 @@ export async function verifyDesktopBackupSave({run,request,token,cdp,output,data
   await call('SaveBackupPlan',{expectedRevision:status.revision,expectedSettingsRevision:status.settingsRevision,plan:status.plan,webDav:status.webDav,webDavPassword:null,s3SecretAccessKey:null,s3SessionToken:null,encryptionPassword:'Desktop-Test-Backup-2026'});
   const job=await call('RunBackupPlan');
   await wait(async()=>{const current=await call('GetJob',undefined,{jobId:job.jobId});assert(!['Failed','Canceled'].includes(current.status),JSON.stringify(current));return current.status==='Succeeded';});
-  const archive=(await call('GetBackupPlan')).archives[0];
+  const archive=(await call('ListRecoveryArchives')).items[0];
   const manifest=JSON.parse(fs.readFileSync(path.join(dataRoot,'Backups/ScheduledRecovery',`${archive.id}.backup.json`),'utf8'));
   const destination=path.join(output,'saved-desktop.edmrecovery');
   // Supply the user's selection at the native-dialog boundary; keep the real React,

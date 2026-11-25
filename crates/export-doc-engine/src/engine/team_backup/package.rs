@@ -165,22 +165,48 @@ fn collect(root: &Path, directory: &Path, sources: &mut Vec<(String, PathBuf)>) 
     }
     Ok(())
 }
+#[cfg(feature = "postgres")]
 pub(super) fn stage(
-    space: &std::sync::Arc<crate::temporary_space::Budget>,
+    paths: &RuntimePaths,
     marker: &Path,
     magic: &[u8],
     password: &str,
     content: impl Read,
     database: &str,
 ) -> Result<()> {
-    let prepared = prepare(space, marker, magic, password, content, database)?;
+    let prepared = prepare(
+        &paths.disk_space,
+        marker,
+        magic,
+        password,
+        content,
+        database,
+    )?;
+    if database == POSTGRES {
+        prepared.verify_postgres(paths)?;
+    }
     sealed::atomic_write(marker, &prepared.marker_content(None)?)
+}
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
+pub(super) enum SnapshotRestore {
+    Sqlite {
+        sha256: String,
+    },
+    Postgres {
+        file_name: Option<String>,
+        sha256: String,
+    },
 }
 pub(in crate::engine) struct PreparedRestore {
     staging: PathBuf,
+    snapshot: Option<SnapshotRestore>,
     pub(in crate::engine) marker: PathBuf,
 }
 impl PreparedRestore {
+    pub(super) fn verify_postgres(&self, paths: &RuntimePaths) -> Result<()> {
+        super::postgres::verify_dump(paths, &self.staging.join(POSTGRES))
+    }
     pub(super) fn into_task(
         self,
         lock: fs::File,
@@ -206,8 +232,43 @@ impl PreparedRestore {
     }
     pub(in crate::engine) fn marker_content(&self, job: Option<&str>) -> Result<Vec<u8>> {
         serde_json::to_vec(&serde_json::json!({"stagingDirectoryName":self.staging.file_name().unwrap().to_string_lossy(),
-            "scheduledAtUtc":chrono::Utc::now().to_rfc3339(),"jobId":job})).map_err(Into::into)
+            "scheduledAtUtc":chrono::Utc::now().to_rfc3339(),"jobId":job,"snapshot":self.snapshot})).map_err(Into::into)
     }
+}
+pub(super) fn prepare_snapshot(
+    marker: &Path,
+    prepare: impl FnOnce(&Path) -> Result<SnapshotRestore>,
+) -> Result<PreparedRestore> {
+    if marker.try_exists()? {
+        return Err(error(409, "已有恢复等待处理，不能覆盖。"));
+    }
+    let root = marker.parent().ok_or_else(|| invalid("恢复目录无效。"))?;
+    let staging = super::scratch::create(root, "pending-")?;
+    let mut prepared = PreparedRestore {
+        staging,
+        marker: marker.into(),
+        snapshot: None,
+    };
+    prepared.snapshot = Some(prepare(&prepared.staging)?);
+    Ok(prepared)
+}
+pub(super) fn snapshot(marker: &Path) -> Result<Option<SnapshotRestore>> {
+    serde_json::from_value(super::scratch::read_json(marker)?["snapshot"].clone())
+        .map_err(|_| invalid("数据库恢复标记无效。"))
+}
+pub(super) fn staging_directory(marker: &Path) -> Result<PathBuf> {
+    paths::ensure_safe_absolute(marker).map_err(invalid)?;
+    let value = super::scratch::read_json(marker)?;
+    let name = value["stagingDirectoryName"]
+        .as_str()
+        .filter(|name| name.starts_with("pending-") && paths::valid_file_name(name))
+        .ok_or_else(|| invalid("恢复暂存目录无效。"))?;
+    let staging = marker
+        .parent()
+        .ok_or_else(|| invalid("恢复目录无效。"))?
+        .join(name);
+    paths::ensure_safe_absolute(&staging).map_err(invalid)?;
+    Ok(staging)
 }
 impl Drop for PreparedRestore {
     fn drop(&mut self) {
@@ -262,6 +323,7 @@ pub(super) fn prepare(
         crate::operation::check()?;
         Ok(PreparedRestore {
             staging: staging.clone(),
+            snapshot: None,
             marker: marker.to_path_buf(),
         })
     })();
@@ -386,13 +448,7 @@ pub(super) fn staged(
     if !marker.try_exists()? {
         return Ok(None);
     }
-    let value = super::scratch::read_json(marker)?;
-    let name = value["stagingDirectoryName"]
-        .as_str()
-        .filter(|name| name.starts_with("pending-") && paths::valid_file_name(name))
-        .ok_or_else(|| invalid("恢复暂存目录无效。"))?;
-    let staging = marker.parent().unwrap().join(name);
-    paths::ensure_safe_absolute(&staging).map_err(invalid)?;
+    let staging = staging_directory(marker)?;
     let manifest = read_manifest(&staging)?;
     validate_manifest(&manifest, database)?;
     let mut entries = Vec::with_capacity(manifest.files.len());
@@ -442,6 +498,7 @@ mod tests {
             let marker = directory.join(".pending-restore.json");
             let prepared = PreparedRestore {
                 staging: staging.clone(),
+                snapshot: None,
                 marker: marker.clone(),
             };
             assert!(!marker.exists());

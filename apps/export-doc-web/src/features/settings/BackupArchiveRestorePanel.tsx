@@ -21,6 +21,7 @@ export function BackupArchiveRestorePanel({ client, controller: c, disabled, pos
     onSuccess: (job) => { c.trackJob(job.jobId); setPassword(""); setAdminPassword(""); setConfirmation(""); setMessage(null); },
     onError: (error) => { setMessage(readApiError(error)); setPassword(""); setAdminPassword(""); },
   });
+  useEffect(() => { if (!c.archives.some((archive) => archive.id === id && archive.available)) setId(""); }, [c.archives, id]);
   const confirm = postgres ? "MIGRATE" : "RECOVER";
   const busy = disabled || c.activeJob || restore.isPending;
   return <section className="form-section" aria-label="从本地完整备份恢复">
@@ -28,7 +29,7 @@ export function BackupArchiveRestorePanel({ client, controller: c, disabled, pos
     <p className="section-description">直接使用服务端已保存的完整包，无需下载后再上传。先校验密码、完整性和版本，再安排维护恢复。</p>
     {message && <InlineNotice tone="error">{message}</InlineNotice>}
     <fieldset className="settings-fieldset" disabled={busy}><div className="field-grid">
-      <label><span>选择完整备份</span><select value={id} onChange={(event) => setId(event.target.value)}><option value="">请选择备份</option>{c.status?.archives.map((archive) => <option key={archive.id} value={archive.id}>{formatRuntimeDate(archive.createdAt)} · {formatBytes(archive.sizeBytes)}</option>)}</select></label>
+      <label><span>选择完整备份</span><select value={id} onChange={(event) => setId(event.target.value)}><option value="">请选择备份</option>{c.archives.map((archive) => <option key={archive.id} value={archive.id} disabled={!archive.available}>{formatRuntimeDate(archive.createdAt)} · {formatBytes(archive.sizeBytes)}</option>)}</select></label>
       <label><span>所选备份的密码</span><input type="password" autoComplete="off" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
       {postgres && <label><span>管理员当前密码</span><input type="password" autoComplete="current-password" value={adminPassword} onChange={(event) => setAdminPassword(event.target.value)} /></label>}
       <label><span>恢复确认文本</span><input value={confirmation} placeholder={confirm} onChange={(event) => setConfirmation(event.target.value)} /></label>

@@ -95,14 +95,14 @@ async function stopApi() {
   if (log) await new Promise(resolve => log.end(resolve));
   log = undefined;
 }
-async function operation(name, { parameters = {}, body, headers = {} } = {}) {
+async function operation(name, { parameters = {}, body, raw, headers = {} } = {}) {
   const endpoint = operations.get(name);
   assert(endpoint, 'Missing generated operation: ' + name);
   const route = endpoint.route.replace(/\{([^}]+)\}/gu, (_, key) => encodeURIComponent(parameters[key] ?? ''));
   const response = await fetch(new URL(route, origin), {
     method: endpoint.method, signal: AbortSignal.timeout(35000),
     headers: { ...(access ? { authorization: 'Bearer ' + access } : {}), 'content-type': 'application/json', ...headers },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: raw ?? (body === undefined ? undefined : JSON.stringify(body)),
   });
   if (!response.ok) throw new Error(name + ': ' + response.status + ' ' + await response.text());
   return response;
@@ -177,8 +177,9 @@ try {
   assert.equal(scheduledStatus.plan.enabled, false);
   assert.equal(scheduledStatus.lastResult, 'Succeeded');
   assert.equal(scheduledStatus.s3Available, true);
-  assert.equal(scheduledStatus.archives.length, 1);
-  const archive = scheduledStatus.archives[0];
+  const archivePage = await (await operation("ListRecoveryArchives")).json();
+  assert.equal(archivePage.totalCount, 1);
+  const archive = archivePage.items[0];
   const issued = await operation('CreateRecoveryArchiveDownloadTicket', { parameters: { id: archive.id } });
   const archiveCookie = issued.headers.get('set-cookie')?.split(';')[0];
   const archiveTicket = await issued.json();
@@ -209,14 +210,33 @@ try {
   const dump = path.join(root, 'database.dump');
   await (await downloaded).saveAs(dump);
   assert.equal(fs.readFileSync(dump).subarray(0, 5).toString(), 'PGDMP');
+  const invalidTicket = await (await operation('AuthorizeServerMigrationOperation', { body: { action: 'restore-database', adminPassword: password } })).json();
+  const invalidRestore = await operation('UploadAndRestorePostgreSqlPhysicalBackup', {
+    headers: { 'X-ExportDocManager-Sensitive-Operation-Ticket': invalidTicket.ticket, 'X-ExportDocManager-PostgreSql-Backup-File-Name': 'truncated.dump', 'X-ExportDocManager-Restore-Confirmation': 'RESTORE DATABASE', 'content-type': 'application/octet-stream' },
+    raw: Buffer.from('PGDMP'),
+  });
+  const invalidJob = await invalidRestore.json();
+  assert(invalidJob.jobId);
+  let failed;
+  const failureDeadline = Date.now() + 30000;
+  while (Date.now() < failureDeadline) {
+    failed = await (await operation('GetJob', { parameters: { jobId: invalidJob.jobId } })).json();
+    if (failed.status === 'Failed') break;
+    assert.notEqual(failed.status, 'Succeeded');
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  assert.equal(failed.status, 'Failed');
+  assert.equal((await (await operation('GetServerMigrationStatus')).json()).pendingRestore, false);
   await createUnit('After database backup');
   await page.locator('details[aria-label="恢复数据库"] > summary').click();
   await recovery.locator('input[type=file]').setInputFiles(dump);
   await recovery.getByLabel('管理员当前密码').fill(password);
   await recovery.getByLabel('恢复确认文本', { exact: true }).fill('RESTORE DATABASE');
   await recovery.getByRole('button', { name: '恢复上传文件', exact: true }).click();
-  await page.getByText('恢复已暂存。停止服务后运行 --restore-pending 维护命令，再启动服务。', { exact: true }).waitFor();
+  await page.getByRole('region', { name: '后台任务状态', exact: true }).getByText('恢复已暂存。停止服务后运行 --restore-pending 维护命令，再启动服务。', { exact: true }).waitFor();
   assert(await page.locator('details[aria-label="服务器维护步骤"]').evaluate(element => element.open));
+  assert((await page.locator('details[aria-label="服务器维护步骤"]').innerText()).includes('仅支持 schema 18，不自动升级旧库'));
+  assert.equal(await page.getByText('恢复已暂存。停止服务后运行 --restore-pending 维护命令，再启动服务。', { exact: true }).count(), 1);
   await page.getByText(/docker compose run --rm --no-deps restore/u).waitFor();
   assert(await backup.getByRole('button', { name: '创建备份', exact: true }).isDisabled());
   await page.screenshot({ path: path.join(root, 'database-restore-pending.png'), fullPage: true });
@@ -277,13 +297,13 @@ try {
     await migration.getByLabel('恢复确认文本', { exact: true }).fill('MIGRATE');
     const response = page.waitForResponse(r => new URL(r.url()).pathname === operations.get('StageServerMigrationRestore').route && r.request().method() === 'POST');
     await migration.getByRole('button', { name: '安排完整恢复', exact: true }).click();
-    assert.equal((await response).status(), candidate === legacyPassword ? 200 : 400);
+    assert.equal((await response).status(), 202);
     if (candidate !== legacyPassword) {
       await page.getByText(/包密码错误/u).waitFor();
       assert.equal((await (await operation('GetServerMigrationStatus')).json()).pendingRestore, false);
     }
   }
-  await page.getByText('恢复已暂存。停止服务后运行 --restore-pending 维护命令，再启动服务。', { exact: true }).waitFor();
+  await page.getByRole('region', { name: '后台任务状态', exact: true }).getByText('恢复已暂存。停止服务后运行 --restore-pending 维护命令，再启动服务。', { exact: true }).waitFor();
   await page.screenshot({ path: path.join(root, 'migration-restore-pending.png'), fullPage: true });
   password = sourcePassword;
   await restoreOffline();
@@ -294,7 +314,7 @@ try {
   await page.screenshot({ path: path.join(root, 'restored-maintenance.png'), fullPage: true });
   fs.writeFileSync(path.join(root, 'result.json'), JSON.stringify({
     succeeded: true, database: 'PostgreSQL 18', platform: process.platform,
-    checks: ['secret-file startup', 'browser bootstrap', 'opt-in scheduled plan', 'real complete archive', 'archive cookie binding', 'server-side archive restore', 'dump create/download/upload', 'both pending states',
+    checks: ['secret-file startup', 'browser bootstrap', 'opt-in scheduled plan', 'real complete archive', 'archive cookie binding', 'server-side archive restore', 'dump create/download/upload', 'truncated dump rejected without pending marker', 'schema18 maintenance guidance', 'both pending states',
       'live-instance rejection', 'fail-closed startup', 'offline restore and idempotency', 'browser migration creation',
       'wrong password rejection', 'valid existing password', 'MIGRATE confirmation', 'cross-database and DataRoot migration',
       'original administrator restored', 'database/key/template recovery'],

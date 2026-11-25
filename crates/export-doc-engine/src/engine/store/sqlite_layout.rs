@@ -47,7 +47,7 @@ fn lock(path: &Path) -> Result<File> {
     Ok(file)
 }
 
-pub(super) fn prepare(paths: &RuntimePaths) -> Result<File> {
+pub(in crate::engine) fn prepare(paths: &RuntimePaths) -> Result<File> {
     let locks = paths.data_root.join("Locks");
     directory(&locks)?;
     let instance = lock(&locks.join("native-instance.lock"))?;

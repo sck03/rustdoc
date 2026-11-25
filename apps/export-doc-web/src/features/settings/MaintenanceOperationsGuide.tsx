@@ -21,8 +21,8 @@ export function MaintenanceOperationsGuide({ pending }: { pending: boolean }) {
       <h3>升级：先备份，再更新镜像，最后核对</h3>
       <ol>
         <li>在网页“完整迁移与换机”中创建并下载完整迁移包，另外保管部署配置及包密码。</li>
-        <li>部署管理员在原目录取得新镜像，先停止旧服务，再启动新版并自动升级数据库。</li>
-        <li>等待自动数据库升级和服务就绪，再核对版本、登录、附件及 PDF。升级程序时不使用恢复参数；数据库已升级后不能随意换回旧程序。</li>
+        <li>确认新版支持当前数据库模型，再取得镜像、停止旧服务并启动新版。当前仅支持 schema 18，不自动升级旧库。</li>
+        <li>服务就绪后核对版本、登录、附件及 PDF。程序更新不使用恢复参数；数据库模型不匹配时保留原数据并停止部署。</li>
       </ol>
       <pre className="settings-helper-text">{"docker compose pull\ndocker compose down\ndocker compose up -d --wait"}</pre>
       <p>逐条确认成功，拉取失败时原服务继续运行。数据与配置使用原目录，停止时保留数据库卷。</p>

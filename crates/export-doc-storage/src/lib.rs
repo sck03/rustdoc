@@ -108,9 +108,7 @@ pub fn validate_schema_version(version: i64) -> Result<()> {
 pub fn verify_sqlite_backup(path: &Path) -> Result<()> {
     sqlite::Sqlite::verify_file(path)
 }
-pub fn prepare_sqlite_restore(source: &Path, destination: &Path) -> Result<()> {
-    sqlite::Sqlite::prepare_restore_file(source, destination)
-}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorKind {
     Conflict,
@@ -369,14 +367,6 @@ impl Connection {
         }
         result
     }
-    pub fn restore(&self, path: &Path) -> Result<()> {
-        self.health()?;
-        let result = self.adapter.restore(path);
-        if result.is_err() {
-            self.failed.set(true);
-        }
-        result
-    }
 }
 macro_rules! delegate{
     ($($name:ident($($arg:ident:$ty:ty),*)->$result:ty;)+)=>{
@@ -543,6 +533,5 @@ delegate! {
     blob_info(record_id:i64,kind:&str)->Option<BlobInfo>;
     delete_blobs(record_id:i64)->();
     delete_blob(record_id:i64,kind:&str)->();
-    backup(path:&Path)->();
-    verify_backup(path:&Path)->();
+    backup(path:&Path,capacity:&mut dyn FnMut(u64)->Result<()>)->();
 }

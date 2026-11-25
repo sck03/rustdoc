@@ -180,7 +180,11 @@ fn recovery_pack_verifies_every_database_object_and_detects_missing_content() {
     record(&store, &prepared).unwrap();
     let pack = root.0.join("objects.pack");
     let snapshot_path = root.0.join("snapshot.sqlite3");
-    store.connection().unwrap().backup(&snapshot_path).unwrap();
+    store
+        .connection()
+        .unwrap()
+        .backup(&snapshot_path, &mut |_| Ok(()))
+        .unwrap();
     let snapshot = export_doc_storage::Connection::sqlite_read_only(&snapshot_path).unwrap();
     let later = store.files.prepare(b"added after snapshot").unwrap();
     record(&store, &later).unwrap();
@@ -218,7 +222,11 @@ fn incremental_snapshots_reuse_objects_and_restore_after_primary_collection() {
     let backups = root.0.join("Backups");
     fs::create_dir_all(&backups).unwrap();
     let first = backups.join("first.sqlite3");
-    store.connection().unwrap().backup(&first).unwrap();
+    store
+        .connection()
+        .unwrap()
+        .backup(&first, &mut |_| Ok(()))
+        .unwrap();
     let snapshot = export_doc_storage::Connection::sqlite(&first).unwrap();
     incremental::capture(&store, &first, &first, |cursor| {
         Ok(snapshot.file_objects(cursor, 200, false)?)
@@ -228,9 +236,17 @@ fn incremental_snapshots_reuse_objects_and_restore_after_primary_collection() {
         .join("Objects")
         .join(&object.digest[..2])
         .join(&object.digest);
+    let staged = root.0.join("Staging/snapshot.sqlite3");
+    fs::create_dir_all(staged.parent().unwrap()).unwrap();
+    fs::copy(&first, &staged).unwrap();
+    incremental::stage(&first, &staged, &root.paths().disk_space).unwrap();
     let modified = fs::metadata(&copy).unwrap().modified().unwrap();
     let second = backups.join("second.sqlite3");
-    store.connection().unwrap().backup(&second).unwrap();
+    store
+        .connection()
+        .unwrap()
+        .backup(&second, &mut |_| Ok(()))
+        .unwrap();
     incremental::capture(&store, &second, &second, |cursor| {
         Ok(snapshot.file_objects(cursor, 200, false)?)
     })
@@ -248,6 +264,10 @@ fn incremental_snapshots_reuse_objects_and_restore_after_primary_collection() {
     assert!(store.files.open_object(&object).is_ok());
     fs::write(&copy, b"tampered").unwrap();
     assert!(incremental::restore(&store.files, &second).is_err());
+    incremental::verify_staged(&staged).unwrap();
+    store.files.reconcile(&store).unwrap();
+    incremental::restore(&store.files, &staged).unwrap();
+    assert!(store.files.open_object(&object).is_ok());
     drop(snapshot);
 }
 
@@ -297,7 +317,11 @@ fn backup_collection_preserves_all_recovery_points_and_fails_closed_on_bad_inven
     let cache = root.0.join("Cache");
     let save = |name: &str| {
         let snapshot = backups.join(name);
-        store.connection().unwrap().backup(&snapshot).unwrap();
+        store
+            .connection()
+            .unwrap()
+            .backup(&snapshot, &mut |_| Ok(()))
+            .unwrap();
         let database = export_doc_storage::Connection::sqlite(&snapshot).unwrap();
         incremental::capture(&store, &snapshot, &snapshot, |cursor| {
             Ok(database.file_objects(cursor, 200, false)?)

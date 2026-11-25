@@ -73,7 +73,7 @@ pub(super) fn create_package(
             package::private_directory(&working)?;
             let result = (|| {
                 let snapshot = working.join("snapshot.sqlite3");
-                store.connection()?.backup(&snapshot)?;
+                super::snapshot::backup_sqlite(&store, &paths, &snapshot)?;
                 let package = package::create(
                     &store,
                     &paths,
@@ -168,6 +168,13 @@ pub fn apply_pending(paths: &RuntimePaths) -> Result<()> {
         Ok(row["status"] == "Succeeded")
     })? {
         return Ok(());
+    }
+    match package::snapshot(&marker)? {
+        Some(package::SnapshotRestore::Sqlite { sha256 }) => {
+            return super::snapshot::apply_sqlite(paths, &marker, &sha256);
+        }
+        Some(_) => return Err(invalid("恢复数据库类型不匹配。")),
+        None => {}
     }
     let Some(staging) = package::staged(&marker, package::SQLITE, &paths.disk_space)? else {
         return Ok(());

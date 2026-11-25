@@ -200,3 +200,5 @@ Tauri 使用 MIT／Apache-2.0 双许可路径，具体传递组件以生成 noti
 桌面构建／运行入口为 `scripts/build-native.ps1`／`run-native.ps1`。网页发布包可通过 `--setup-web` 准备配置并自动识别相邻 Web 目录；新版 Docker 镜像通过 `--print-compose` 输出独立部署配置，无需克隆源码。`package-native-web-server.ps1` 与 `run-native-docker.ps1` 继续用于构建、已有部署及开发验证。实际结果按平台记录在当前批次进度中。
 
 2026-11-09：独立申报沿用 Storage records 和唯一 Excel 解析器，Domain 负责默认值/字段锁定，Engine sources 负责授权快照，React 页面和 hook 分离。该批次数据库基线为 15（同日客户端目录调整后为 schema 16；当前为 schema 18）、交接包 5.0；详见[独立申报与联调记录](./archive/2026-11/2026-11-09独立申报与联调记录.md)。
+
+2026-11-25 备份恢复重构：数据库快照和完整灾备共用任务提交、恢复标记和安装回滚边界。Storage 仅提供容量回调，Engine 注入运行根磁盘预算；受控进程提供流式输出，PostgreSQL 工具适配不复制进程管理。React 分离计划状态与归档分页，沿用共享控件和设计令牌。桌面离线恢复由组合根转交 Engine，不依赖当前数据库登录、旧 schema 兼容链或第二套恢复器。实施及针对性验证见[本次记录](./archive/2026-11/2026-11-25备份恢复重构与空间清理.md)。

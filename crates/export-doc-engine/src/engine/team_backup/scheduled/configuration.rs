@@ -49,16 +49,13 @@ pub(in crate::engine) fn status(service: &NativeService, actor: &Actor) -> Resul
             _ => {}
         }
     }
-    let archives = repository::list(&service.paths)?.into_iter().filter(|entry| !entry.deleting).take(20)
-        .map(|entry| json!({"id": entry.id, "fileName": entry.file_name, "createdAt": entry.created_at,
-            "sizeBytes": entry.size_bytes, "replicaStatus": entry.replica_status, "message": entry.message})).collect::<Vec<_>>();
     Ok(
         json!({"revision": saved.revision, "settingsRevision": settings["revision"], "plan": saved.plan,
         "webDav": webdav(&settings), "webDavPasswordSet": protected["/webDav/password"].as_str().is_some_and(|value| !value.is_empty()),
         "s3SecretAccessKeySet": !saved.s3_secret.is_empty(), "s3SessionTokenSet": !saved.s3_token.is_empty(), "s3Available": cfg!(feature = "s3-backup"),
         "encryptionPasswordSet": !saved.password.is_empty(), "timeZone": service.clock.now().map_err(invalid)?.time_zone,
         "nextRunAt": scheduler::next_run(service, &saved.plan)?, "runningJobId": running, "lastRunAt": state["lastRunAt"],
-        "lastResult": state["lastResult"].as_str().unwrap_or("NotRun"), "lastError": state["lastError"].as_str().unwrap_or(""), "archives": archives}),
+        "lastResult": state["lastResult"].as_str().unwrap_or("NotRun"), "lastError": state["lastError"].as_str().unwrap_or("")}),
     )
 }
 pub(in crate::engine) fn save(

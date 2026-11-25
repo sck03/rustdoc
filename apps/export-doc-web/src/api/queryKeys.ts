@@ -7,6 +7,7 @@ export const queryKeys = {
   backups: () => ["backups"] as const,
   fileStorage: () => ["file-storage"] as const,
   fileStoragePolicy: () => ["file-storage-policy"] as const,
+  recoveryArchives: () => ["recovery-archives"] as const,
   backupPlan: () => ["scheduled-recovery-plan"] as const,
   auditLogs: (
     pageNumber: number,

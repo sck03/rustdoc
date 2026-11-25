@@ -129,8 +129,7 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     }, { signal }),
     onSuccess: (job) => {
       setMessage(null);
-      setSuccessMessage("数据库已恢复，请重新登录。");
-      void client.getCurrentUser().catch(() => undefined);
+      setSuccessMessage("数据库恢复校验任务已加入“文件任务”；成功后退出并重新打开程序。");
       setLastCreatedJobId(job.jobId);
       setRestoreConfirmation("");
     },

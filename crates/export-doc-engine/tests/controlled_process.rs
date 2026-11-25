@@ -119,3 +119,48 @@ fn cancellation_and_timeout_release_a_blocked_input_writer() {
     assert_eq!(error.status, Some(504));
     assert!(started.elapsed() < Duration::from_secs(5));
 }
+
+#[test]
+fn streamed_output_is_not_retained_and_writer_failure_releases_the_child() {
+    struct CountingWriter(usize);
+    impl Write for CountingWriter {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            assert!(bytes.len() <= 64 * 1024);
+            self.0 += bytes.len();
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut writer = CountingWriter(0);
+    let output = controlled_process::run_to_writer(
+        &mut child("overflow"),
+        &mut writer,
+        Duration::from_secs(10),
+    )
+    .unwrap();
+    assert!(output.status.success());
+    assert!(output.stdout.is_empty());
+    assert!(writer.0 >= 200 * 16384);
+
+    struct FullDisk;
+    impl Write for FullDisk {
+        fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::other("simulated disk budget exhausted"))
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let started = Instant::now();
+    let error = controlled_process::run_to_writer(
+        &mut child("overflow"),
+        FullDisk,
+        Duration::from_secs(10),
+    )
+    .err()
+    .unwrap();
+    assert_eq!(error.status, Some(503));
+    assert!(started.elapsed() < Duration::from_secs(5));
+}

@@ -57,7 +57,7 @@ const saveInvoice=(name,input,init)=>{
 };
 window.__finishInvoiceSave=(index=0)=>window.__invoiceSaves[index].resolve();
 const conflict=()=>new ApiError(409,'Conflict',JSON.stringify({code:'ConcurrencyConflict',message:'数据已被其他用户更新，请重新加载最新设置后再保存。'}));
-let backupPlan={revision:0,plan:{enabled:false,frequency:'Daily',time:'02:00',weekday:1,retentionCount:14,retentionDays:0,replicaMode:'None',verifyReplica:true,s3:{endpoint:'',region:'us-east-1',bucket:'',prefix:'ExportDocManager',accessKeyId:'',addressing:'virtualHost'}},encryptionPasswordSet:false,webDavPasswordSet:false,s3SecretAccessKeySet:false,s3SessionTokenSet:false,s3Available:true,timeZone:'Asia/Shanghai',nextRunAt:null,runningJobId:null,lastRunAt:null,lastResult:'NotRun',lastError:'',archives:[]};
+let backupPlan={revision:0,plan:{enabled:false,frequency:'Daily',time:'02:00',weekday:1,retentionCount:14,retentionDays:0,replicaMode:'None',verifyReplica:true,s3:{endpoint:'',region:'us-east-1',bucket:'',prefix:'ExportDocManager',accessKeyId:'',addressing:'virtualHost'}},encryptionPasswordSet:false,webDavPasswordSet:false,s3SecretAccessKeySet:false,s3SessionTokenSet:false,s3Available:true,timeZone:'Asia/Shanghai',nextRunAt:null,runningJobId:null,lastRunAt:null,lastResult:'NotRun',lastError:''};
 const backupStatus=()=>({...backupPlan,settingsRevision:settings.revision,webDav:{enabled:settings.webDav.enabled,url:settings.webDav.url,userName:settings.webDav.userName||''}});
 const savePayment=(name,input)=>{
   if(name==='updatePayment'&&input.body.rowVersion!==payment.rowVersion)return Promise.reject(conflict());
@@ -65,6 +65,7 @@ const savePayment=(name,input)=>{
 };
 const client={
   getBackupPlan:()=>record('getBackupPlan',{},backupStatus()),
+  listRecoveryArchives:input=>record('listRecoveryArchives',input,{items:[],page:1,pageSize:input.pageSize,totalCount:0}),
   saveBackupPlan:input=>{
     const body=input.body;if(body.expectedRevision!==backupPlan.revision||body.expectedSettingsRevision!==settings.revision)return Promise.reject(conflict());
     backupPlan={...backupPlan,revision:backupPlan.revision+1,plan:structuredClone(body.plan),encryptionPasswordSet:backupPlan.encryptionPasswordSet||Boolean(body.encryptionPassword),s3SecretAccessKeySet:body.s3SecretAccessKey===null?backupPlan.s3SecretAccessKeySet:Boolean(body.s3SecretAccessKey),s3SessionTokenSet:body.s3SessionToken===null?backupPlan.s3SessionTokenSet:Boolean(body.s3SessionToken),webDavPasswordSet:body.webDavPassword===null?backupPlan.webDavPasswordSet:Boolean(body.webDavPassword)};

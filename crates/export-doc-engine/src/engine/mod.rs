@@ -106,6 +106,7 @@ mod store;
 mod supplier_overview;
 pub mod tasks;
 mod team_backup;
+pub use team_backup::snapshot::command as sqlite_recovery_command;
 #[cfg(test)]
 pub(crate) mod test_support;
 mod units;

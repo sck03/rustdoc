@@ -67,6 +67,13 @@ fn main() {
         }
         return;
     }
+    if let Some(result) = export_doc_engine::engine::sqlite_recovery_command(&args) {
+        if let Err(error) = result {
+            eprintln!("{error}");
+            std::process::exit(1);
+        }
+        return;
+    }
     install_panic_log_hook();
     #[cfg(windows)]
     match windows_prerequisites::ensure_available() {

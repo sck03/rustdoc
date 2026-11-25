@@ -132,9 +132,31 @@ pub fn run(
 /// Killing the process closes the pipe before scoped writers are joined.
 pub fn run_reader(
     command: &mut Command,
-    mut input: impl Read + Send,
+    input: impl Read + Send,
     output_limit: usize,
     timeout: Duration,
+) -> Result<Output, ApiError> {
+    run_piped(command, input, timeout, move |stdout| {
+        read(stdout, output_limit, true)
+    })
+}
+/// Stream tool output into a caller-owned budgeted writer; errors terminate its process tree.
+pub fn run_to_writer(
+    command: &mut Command,
+    mut output: impl std::io::Write + Send,
+    timeout: Duration,
+) -> Result<Output, ApiError> {
+    run_piped(command, std::io::empty(), timeout, move |mut stdout| {
+        std::io::copy(&mut stdout, &mut output)?;
+        output.flush()?;
+        Ok(Vec::new())
+    })
+}
+fn run_piped(
+    command: &mut Command,
+    mut input: impl Read + Send,
+    timeout: Duration,
+    read_output: impl FnOnce(std::process::ChildStdout) -> std::io::Result<Vec<u8>> + Send,
 ) -> Result<Output, ApiError> {
     let mut process = Process::spawn(command, true)?;
     let mut stdin = process
@@ -158,7 +180,7 @@ pub fn run_reader(
         let writer = threads.spawn(move || std::io::copy(&mut input, &mut stdin));
         let (sender, receiver) = mpsc::channel();
         let reader = threads.spawn(move || {
-            let _ = sender.send(read(stdout, output_limit, true));
+            let _ = sender.send(read_output(stdout));
         });
         let diagnostics = threads.spawn(move || read(stderr, 8192, false));
         let deadline = Instant::now() + timeout;

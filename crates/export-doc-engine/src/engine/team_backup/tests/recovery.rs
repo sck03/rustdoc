@@ -107,6 +107,21 @@ fn disaster_package_download_restore_and_restart_preserve_data_keys_and_template
         false
     );
     restored.close().unwrap();
+    drop(restored);
+    fs::write(paths.sqlite_database_path(), b"damaged SQLite database").unwrap();
+    assert!(Store::open(&paths).is_err());
+    super::super::snapshot::import_sqlite(&paths, &path, "wrong-password").unwrap_err();
+    assert_eq!(
+        fs::read(paths.sqlite_database_path()).unwrap(),
+        b"damaged SQLite database"
+    );
+    super::super::snapshot::import_sqlite(&paths, &path, " package password ").unwrap();
+    let recovered = open_service(&workspace);
+    assert_eq!(
+        recovered.store.settings("recovery-test").unwrap().unwrap()["value"],
+        "original"
+    );
+    recovered.close().unwrap();
 }
 
 #[test]
@@ -172,4 +187,48 @@ fn unsupported_root_layout_cannot_override_the_managed_database() {
         fs::read(paths.sqlite_database_path()).unwrap(),
         b"another database"
     );
+}
+
+#[test]
+fn database_snapshot_stages_without_replacing_live_accounts_and_restores_after_shutdown() {
+    let workspace = Workspace::new();
+    let paths = workspace.paths();
+    let service = open_service(&workspace);
+    service
+        .store
+        .connection()
+        .unwrap()
+        .set_settings("snapshot-test", 1, &json!({"value":"before"}))
+        .unwrap();
+    let source = crate::engine::maintenance::create(&service.store, &paths, &admin()).unwrap();
+    service
+        .store
+        .connection()
+        .unwrap()
+        .set_settings("snapshot-test", 2, &json!({"value":"after"}))
+        .unwrap();
+    let account = crate::engine::accounts::save(&service.store, &admin(), 0, json!({"username":"later-admin","fullName":"恢复管理员","role":"Admin","companyScope":"DEFAULT","departmentId":"GENERAL","isActive":true,"resetPassword":"Snapshot-Test-2026"})).unwrap()["user"].clone();
+    let later = auth::current_actor(&service.store, account["id"].as_i64().unwrap()).unwrap();
+    let job = super::super::snapshot::stage_sqlite(&service, &later, &json!({"backupFileName":source.file_name().unwrap().to_str().unwrap(),"confirmationText":"RESTORE"})).unwrap();
+    wait(&service, &job);
+    assert_eq!(
+        service.store.settings("snapshot-test").unwrap().unwrap()["value"],
+        "after"
+    );
+    assert!(Store::open(&paths).is_err());
+    service.close().unwrap();
+    drop(service);
+    let restored = open_service(&workspace);
+    assert_eq!(
+        restored.store.settings("snapshot-test").unwrap().unwrap()["value"],
+        "before"
+    );
+    assert!(!disaster::marker(&paths).unwrap().exists());
+    assert_eq!(
+        auth::current_actor(&restored.store, later.id)
+            .unwrap_err()
+            .status,
+        Some(404)
+    );
+    restored.close().unwrap();
 }

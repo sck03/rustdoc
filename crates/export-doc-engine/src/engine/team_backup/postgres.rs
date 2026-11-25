@@ -17,7 +17,7 @@ use crate::{
 use serde_json::{Value, json};
 use std::{
     fs,
-    io::{Read, Write},
+    io::Read,
     path::{Path, PathBuf},
     process::Command,
     time::Duration,
@@ -31,6 +31,7 @@ const RESTART_MARKER: &str = ".pending-restore.json";
 const BACKUP_TIMEOUT: Duration = Duration::from_secs(crate::engine::backup_io::TIMEOUT_SECONDS);
 #[cfg(feature = "postgres")]
 const RESTORE_TIMEOUT: Duration = Duration::from_secs(crate::engine::backup_io::TIMEOUT_SECONDS);
+#[cfg(feature = "postgres")]
 const OUTPUT_LIMIT: usize = 64 * 1024 * 1024;
 const MAX_IDENTIFIER_BYTES: usize = 63;
 const MAX_OLD_OWNER_ROLES: usize = 100;
@@ -178,7 +179,7 @@ fn backup_name(prefix: &str) -> Result<String> {
     ))
 }
 
-fn run(command: &mut Command, timeout: Duration) -> Result<Output> {
+fn prepare_command(command: &mut Command) -> Result<()> {
     if cfg!(target_os = "linux") {
         if let Some(root) = Path::new(command.get_program())
             .parent()
@@ -189,6 +190,11 @@ fn run(command: &mut Command, timeout: Duration) -> Result<Output> {
             command.env("LD_LIBRARY_PATH", libraries);
         }
     }
+    Ok(())
+}
+#[cfg(feature = "postgres")]
+fn run(command: &mut Command, timeout: Duration) -> Result<Output> {
+    prepare_command(command)?;
     controlled_process::run(command, Vec::new(), OUTPUT_LIMIT, timeout)
 }
 
@@ -299,21 +305,7 @@ pub(super) fn create_backup(service: &NativeService, actor: &Actor) -> Result<Va
             let temporary = root.join(format!(".{name}.tmp"));
             let result = (|| {
                 crate::paths::ensure_safe_absolute(&temporary).map_err(invalid)?;
-                let mut command = Command::new(&pg_dump);
-                endpoint.apply(&mut command);
-                command
-                    .args(["--format", "custom"])
-                    .args(["--file", &temporary.to_string_lossy()])
-                    .arg("--dbname")
-                    .arg(&endpoint.database);
-                let output = run(&mut command, BACKUP_TIMEOUT)?;
-                if !output.status.success() {
-                    return Err(unavailable(format!(
-                        "pg_dump 执行失败（{}）：{}",
-                        output.status,
-                        output.stderr.trim()
-                    )));
-                }
+                recovery::dump(&endpoint, &pg_dump, &temporary, &paths.disk_space)?;
                 crate::paths::ensure_safe_absolute(&target).map_err(invalid)?;
                 crate::engine::file_store::incremental::capture(
                     &store,
@@ -474,64 +466,72 @@ pub(in crate::engine) fn prepare_download(
     crate::engine::backup_io::Download::open(&path, None)
 }
 
-/// 写入暂存恢复标记（物理备份与服务器迁移共用）。
-pub(super) fn stage_restore_marker(service: &NativeService, file_name: &str) -> Result<()> {
-    ensure_no_pending(&service.paths)?;
-    let path = super::managed_file(&postgres_root(&service.paths)?, file_name, "dump")?;
-    verify_dump(&path)?;
-    let (_, digest) = crate::engine::backup_io::digest_file(&path)?;
-    let marker = json!({
-        "restoreId": crate::paths::nonce().map_err(unavailable)?,
-        "sourceFileName": file_name,
-        "sha256": digest,
-        "scheduledAtUtc": chrono::Utc::now().to_rfc3339(),
-    });
-    managed_write(
-        &restart_marker(&service.paths)?,
-        serde_json::to_vec(&marker)?.as_slice(),
-    )
-}
-
-/// 暂存恢复的统一响应（物理备份与服务器迁移共用）。
-pub(super) fn restore_response(
-    paths: &RuntimePaths,
-    file_name: &str,
-    message: &str,
-    storage_policy: &str,
-) -> Result<Value> {
-    let mut response = contracts::initial(contracts::schema("ApiServerMigrationRestoreResponse"));
-    response["success"] = json!(true);
-    response["restartRequired"] = json!(true);
-    response["automaticRestartScheduled"] = json!(false);
-    response["message"] = json!(message);
-    response["packageFileName"] = json!(file_name);
-    response["safetyBackupRoot"] = json!(postgres_root(paths)?);
-    response["storagePolicy"] = json!(storage_policy);
-    Ok(response)
-}
-
 /// 登记暂存恢复并返回统一响应。
 pub(super) fn schedule_restore(
     service: &NativeService,
     actor: &Actor,
     backup_path: &Path,
+    upload: Option<fs::File>,
 ) -> Result<Value> {
     let file_name = backup_path
         .file_name()
         .and_then(|name| name.to_str())
         .ok_or_else(|| invalid("备份文件名无效。"))?;
-    stage_restore_marker(service, file_name)?;
-    super::audit(
-        &service.store,
+    let (store, paths, owner, file_name) = (
+        service.store.clone(),
+        service.paths.clone(),
+        actor.id,
+        file_name.to_owned(),
+    );
+    let operation = if upload.is_some() {
+        UPLOAD_AND_RESTORE_POSTGRE_SQL_PHYSICAL_BACKUP
+    } else {
+        RESTORE_POSTGRE_SQL_PHYSICAL_BACKUP
+    };
+    service.jobs.start_backup(
         actor,
-        "restore-postgresql-backup",
-        &format!("{file_name} 已登记暂存恢复，等待重启执行"),
-    )?;
-    restore_response(
-        &service.paths,
-        file_name,
-        "备份已暂存。停止服务后运行 --restore-pending 维护命令，再启动服务。",
-        PG_STORAGE_POLICY,
+        operation,
+        "PostgreSqlRestore",
+        "校验并暂存数据库恢复",
+        move |_| {
+            let lock = super::package::lock(&paths)?;
+            ensure_no_pending(&paths)?;
+            let current = auth::current_actor(&store, owner)?;
+            auth::authorize_operation(&current, operation, &[])?;
+            let prepared = super::package::prepare_snapshot(&restart_marker(&paths)?, |staging| {
+                let uploaded = upload.is_some();
+                let source = if let Some(mut input) = upload {
+                    let target = staging.join(super::package::POSTGRES);
+                    super::package::private_directory(target.parent().unwrap())?;
+                    let mut output = fs::OpenOptions::new()
+                        .create_new(true)
+                        .write(true)
+                        .open(&target)?;
+                    crate::engine::backup_io::copy_and_hash(
+                        &mut input,
+                        &mut paths
+                            .disk_space
+                            .at(staging.to_path_buf())
+                            .writer(&mut output)?,
+                        crate::engine::backup_io::MAX_FILE_BYTES,
+                    )?;
+                    output.sync_all()?;
+                    target
+                } else {
+                    super::managed_file(&postgres_root(&paths)?, &file_name, "dump")?
+                };
+                verify_dump(&paths, &source)?;
+                Ok(super::package::SnapshotRestore::Postgres {
+                    file_name: (!uploaded).then_some(file_name),
+                    sha256: crate::engine::backup_io::digest_file(&source)?.1,
+                })
+            })?;
+            Ok(prepared.into_task(
+                lock,
+                "restore-postgresql-backup",
+                "恢复已暂存。停止服务后运行 --restore-pending 维护命令，再启动服务。",
+            ))
+        },
     )
 }
 
@@ -556,11 +556,10 @@ pub(super) fn restore(
         return Err(invalid("请选择要恢复的 PostgreSQL 备份。"));
     }
     let backup_path = super::managed_file(&postgres_root(&service.paths)?, &file_name, "dump")?;
-    let _gate = super::package::lock(&service.paths)?;
     if !backup_path.is_file() {
         return Err(error(404, "未找到指定的 PostgreSQL 备份。"));
     }
-    schedule_restore(service, actor, &backup_path)
+    schedule_restore(service, actor, &backup_path, None)
 }
 
 pub(super) fn upload_and_restore(
@@ -573,37 +572,24 @@ pub(super) fn upload_and_restore(
     auth::authorize(actor, "system.backup", "manage")?;
     require_ready(service)?;
     super::confirmation(parameters, super::CONFIRM_RESTORE_DATABASE)?;
-    let _gate = super::package::lock(&service.paths)?;
     ensure_no_pending(&service.paths)?;
     super::managed_file(&postgres_root(&service.paths)?, file_name, "dump")?;
-    let staged = postgres_root(&service.paths)?.join(backup_name("uploaded")?);
-    let result = (|| {
-        let mut file = fs::OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .open(&staged)?;
-        crate::engine::backup_io::copy_and_hash(
-            &mut content,
-            &mut file,
-            crate::engine::backup_io::MAX_FILE_BYTES,
-        )?;
-        file.flush()?;
-        file.sync_all()?;
-        drop(file);
-        verify_dump(&staged)?;
-        schedule_restore(service, actor, &staged)
-    })();
-    if result.is_err() && !restart_marker(&service.paths)?.try_exists()? {
-        let _ = fs::remove_file(&staged);
-    }
-    result
+    let input = crate::engine::backup_io::stage_input(&service.paths, &mut content)?;
+    schedule_restore(service, actor, Path::new(file_name), Some(input))
 }
 
-fn verify_dump(path: &Path) -> Result<()> {
-    let mut header = [0; 5];
-    let mut file = fs::File::open(path)?;
-    if file.read(&mut header)? != 5 || &header != b"PGDMP" {
-        return Err(invalid("请选择 PostgreSQL custom-format 备份。"));
+pub(super) fn verify_dump(paths: &RuntimePaths, path: &Path) -> Result<()> {
+    crate::paths::ensure_safe_absolute(path).map_err(invalid)?;
+    let mut command = Command::new(Tools::resolve(paths).pg_restore);
+    prepare_command(&mut command)?;
+    // Reading every archive block catches truncation beyond the table of contents.
+    // The generated SQL is discarded without execution or memory accumulation.
+    command.args(["--file", "-"]).arg(path);
+    let output = controlled_process::run_to_writer(&mut command, std::io::sink(), BACKUP_TIMEOUT)?;
+    if !output.status.success() {
+        return Err(invalid(
+            "PostgreSQL 备份校验失败，请选择完整且有效的 custom-format 备份。",
+        ));
     }
     Ok(())
 }

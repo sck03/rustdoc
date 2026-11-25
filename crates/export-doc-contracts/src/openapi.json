@@ -1381,12 +1381,6 @@
       "ApiBackupPlanStatus": {
         "type": "object",
         "properties": {
-          "archives": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ApiRecoveryArchive"
-            }
-          },
           "encryptionPasswordSet": {
             "type": "boolean"
           },
@@ -1456,7 +1450,6 @@
           "lastRunAt",
           "lastResult",
           "lastError",
-          "archives",
           "settingsRevision",
           "webDav",
           "webDavPasswordSet",
@@ -13108,6 +13101,9 @@
       "ApiRecoveryArchive": {
         "type": "object",
         "properties": {
+          "available": {
+            "type": "boolean"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -13116,6 +13112,9 @@
             "type": "string"
           },
           "id": {
+            "type": "string"
+          },
+          "integrityMessage": {
             "type": "string"
           },
           "message": {
@@ -13130,12 +13129,41 @@
           }
         },
         "required": [
+          "available",
+          "integrityMessage",
           "id",
           "fileName",
           "createdAt",
           "sizeBytes",
           "replicaStatus",
           "message"
+        ],
+        "additionalProperties": false
+      },
+      "ApiRecoveryArchiveList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiRecoveryArchive"
+            }
+          },
+          "page": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer"
+          },
+          "totalCount": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "totalCount"
         ],
         "additionalProperties": false
       },
@@ -14944,41 +14972,6 @@
           "password",
           "adminPassword",
           "confirmationText"
-        ]
-      },
-      "ApiServerMigrationRestoreResponse": {
-        "type": "object",
-        "properties": {
-          "automaticRestartScheduled": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string"
-          },
-          "packageFileName": {
-            "type": "string"
-          },
-          "restartRequired": {
-            "type": "boolean"
-          },
-          "safetyBackupRoot": {
-            "type": "string"
-          },
-          "storagePolicy": {
-            "type": "string"
-          },
-          "success": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "success",
-          "restartRequired",
-          "automaticRestartScheduled",
-          "message",
-          "packageFileName",
-          "safetyBackupRoot",
-          "storagePolicy"
         ]
       },
       "ApiServerMigrationStatusResponse": {
@@ -46770,6 +46763,91 @@
           {
             "BearerAuth": [],
             "DesktopAccess": []
+          }
+        ]
+      }
+    },
+    "/api/disaster-recovery/archives": {
+      "get": {
+        "x-exportdoc-json-response-limit-bytes": 67108864,
+        "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
+        "tags": [
+          "ExportDocManager.Api"
+        ],
+        "operationId": "ListRecoveryArchives",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiRecoveryArchiveList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "503": {
+            "description": "Service Unavailable"
+          }
+        },
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": false,
+          "access": {
+            "match": "All",
+            "resources": [
+              {
+                "resourceKey": "system.backup",
+                "actions": [
+                  "manage"
+                ],
+                "administratorOnly": true
+              },
+              {
+                "resourceKey": "system.disaster-recovery",
+                "actions": [
+                  "manage"
+                ],
+                "administratorOnly": true
+              }
+            ]
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
           }
         ]
       }
@@ -112657,19 +112735,19 @@
     "/api/postgresql-maintenance/backups/restore": {
       "post": {
         "x-exportdoc-json-response-limit-bytes": 67108864,
-        "x-exportdoc-timeout-seconds": 86400,
+        "x-exportdoc-timeout-seconds": 30,
         "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
         "operationId": "RestorePostgreSqlPhysicalBackup",
         "responses": {
-          "200": {
-            "description": "OK",
+          "202": {
+            "description": "Accepted",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiServerMigrationRestoreResponse"
+                  "$ref": "#/components/schemas/BackgroundJobSnapshot"
                 }
               }
             }
@@ -112688,6 +112766,9 @@
           },
           "409": {
             "description": "Conflict"
+          },
+          "429": {
+            "description": "Too Many Requests"
           },
           "503": {
             "description": "Service Unavailable"
@@ -112738,12 +112819,12 @@
         ],
         "operationId": "UploadAndRestorePostgreSqlPhysicalBackup",
         "responses": {
-          "200": {
-            "description": "OK",
+          "202": {
+            "description": "Accepted",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiServerMigrationRestoreResponse"
+                  "$ref": "#/components/schemas/BackgroundJobSnapshot"
                 }
               }
             }
@@ -112762,6 +112843,9 @@
           },
           "413": {
             "description": "Payload Too Large"
+          },
+          "429": {
+            "description": "Too Many Requests"
           },
           "503": {
             "description": "Service Unavailable"
@@ -117575,12 +117659,12 @@
         ],
         "operationId": "StageServerMigrationRestore",
         "responses": {
-          "200": {
-            "description": "OK",
+          "202": {
+            "description": "Accepted",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiServerMigrationRestoreResponse"
+                  "$ref": "#/components/schemas/BackgroundJobSnapshot"
                 }
               }
             }
@@ -117599,6 +117683,9 @@
           },
           "413": {
             "description": "Payload Too Large"
+          },
+          "429": {
+            "description": "Too Many Requests"
           },
           "503": {
             "description": "Service Unavailable"

@@ -28,6 +28,7 @@ pub(super) fn create(parent: &Path, prefix: &str) -> Result<PathBuf> {
 pub(super) fn recover(paths: &RuntimePaths) -> Result<()> {
     for root in [
         paths.data_root.join("DisasterRecovery"),
+        paths.data_root.join("Backups/PostgreSQL"),
         paths.data_root.join("Backups/ServerMigration"),
         paths.data_root.join("Backups/ScheduledRecovery"),
     ] {
@@ -81,7 +82,9 @@ fn recover_root(root: &Path) -> Result<()> {
         }
         // Installation journals retain the pre-restore database/key/templates for
         // rollback and operator recovery, even after the pending marker is removed.
-        if directory.join("install-journal.json").try_exists()? {
+        if directory.join("install-journal.json").try_exists()?
+            || directory.join("before-restore.dump").try_exists()?
+        {
             continue;
         }
         let owner = read_json(&directory.join(OWNER))?;
@@ -97,6 +100,7 @@ fn recover_root(root: &Path) -> Result<()> {
             "sealed-package.bin",
             "manifest.json",
             super::package::SQLITE,
+            "Database/exportdoc-native.objects.jsonl",
             super::package::POSTGRES,
             super::package::KEY,
             super::package::OBJECTS,
@@ -135,7 +139,9 @@ fn validate_tree(root: &Path, directory: &Path, known: &HashSet<String>) -> Resu
             .collect::<Vec<_>>()
             .join("/");
         let kind = entry.file_type()?;
-        let object = name.strip_prefix("Files/objects/");
+        let object = name
+            .strip_prefix("Files/objects/")
+            .or_else(|| name.strip_prefix("Database/Objects/"));
         let object_file = object.is_some_and(|name| {
             let Some((prefix, digest)) = name.split_once('/') else {
                 return false;
@@ -148,6 +154,7 @@ fn validate_tree(root: &Path, directory: &Path, known: &HashSet<String>) -> Resu
                     .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
         });
         let object_directory = name == "Files/objects"
+            || name == "Database/Objects"
             || object
                 .is_some_and(|name| name.len() == 2 && name.bytes().all(|b| b.is_ascii_hexdigit()));
         if kind.is_dir()

@@ -13,7 +13,7 @@ use serde_json::{Value, json};
 use std::{fs::File, time::Duration};
 use unicode_normalization::UnicodeNormalization;
 mod record_policy;
-mod sqlite_layout;
+pub(in crate::engine) mod sqlite_layout;
 
 pub struct Store {
     pub(crate) files: super::file_store::FileStore,

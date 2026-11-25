@@ -321,17 +321,19 @@ fn sqlite_transactions_blobs_and_backup_use_one_database() {
         connection
             .set_settings("settings", 1, &json!({"revision":1,"name":"保存前"}))
             .unwrap();
-        connection.backup(&root.join("backup.db")).unwrap();
+        connection
+            .backup(&root.join("backup.db"), &mut |_| Ok(()))
+            .unwrap();
         connection
             .set_settings("settings", 2, &json!({"revision":2,"name":"保存后"}))
             .unwrap();
-        connection.restore(&root.join("backup.db")).unwrap();
+        let snapshot = Connection::sqlite_read_only(&root.join("backup.db")).unwrap();
         assert_eq!(
-            connection.settings("settings").unwrap().unwrap()["name"],
+            snapshot.settings("settings").unwrap().unwrap()["name"],
             "保存前"
         );
         let missing = root.join("missing.db");
-        assert!(connection.verify_backup(&missing).is_err());
+        assert!(export_doc_storage::verify_sqlite_backup(&missing).is_err());
         assert!(!missing.exists());
     }
     test_workspace::remove(&root).unwrap();

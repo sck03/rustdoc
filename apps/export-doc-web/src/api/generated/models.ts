@@ -317,7 +317,6 @@ export interface ApiBackupPlanSaveRequest {
 }
 
 export interface ApiBackupPlanStatus {
-  archives: ApiRecoveryArchive[];
   encryptionPasswordSet: boolean;
   lastError: string;
   lastResult: string;
@@ -2827,12 +2826,21 @@ export interface ApiQueryInvoiceRowDto {
 }
 
 export interface ApiRecoveryArchive {
+  available: boolean;
   createdAt: string;
   fileName: string;
   id: string;
+  integrityMessage: string;
   message: string;
   replicaStatus: string;
   sizeBytes: number;
+}
+
+export interface ApiRecoveryArchiveList {
+  items: ApiRecoveryArchive[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
 }
 
 export interface ApiRecoveryArchiveRestoreRequest {
@@ -3221,16 +3229,6 @@ export interface ApiServerMigrationCreateRequest {
   adminPassword: string;
   confirmationText: string;
   password: string;
-}
-
-export interface ApiServerMigrationRestoreResponse {
-  automaticRestartScheduled: boolean;
-  message: string;
-  packageFileName: string;
-  restartRequired: boolean;
-  safetyBackupRoot: string;
-  storagePolicy: string;
-  success: boolean;
 }
 
 export interface ApiServerMigrationStatusResponse {
@@ -9943,6 +9941,11 @@ export interface ListQueriedInvoicesRequest {
   styleName?: string;
   styleNo?: string;
   pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface ListRecoveryArchivesRequest {
+  page?: number;
   pageSize?: number;
 }
 

@@ -73,30 +73,19 @@ impl NativeService {
                 maintenance::cleanup(&self.store, &self.paths, actor, &body_value)
             }
             CREATE_DATABASE_BACKUP => {
-                let path = maintenance::create(&self.store, &self.paths, actor)?;
-                self.jobs.completed(
-                    actor,
+                let (store, paths, actor) = (self.store.clone(), self.paths.clone(), actor.clone());
+                self.jobs.start_backup(
+                    &actor.clone(),
+                    CREATE_DATABASE_BACKUP,
                     "DatabaseBackup",
                     "数据库备份",
-                    &format!("备份已保存：{}", path.display()),
+                    move |_| {
+                        let path = maintenance::create(&store, &paths, &actor)?;
+                        tasks::TaskOutput::managed_file(path, "数据库备份已完成。".into())
+                    },
                 )
             }
-            RESTORE_DATABASE_BACKUP => {
-                self.jobs.ensure_idle()?;
-                maintenance::restore(&self.store, &self.paths, actor, &body_value)?;
-                self.sessions.clear()?;
-                self.jobs.recover()?;
-                self.backup_scheduler.refresh(self)?;
-                #[cfg(feature = "exchange-rates")]
-                self.exchange_scheduler.refresh(self)?;
-                let job = self.jobs.completed(
-                    actor,
-                    "DatabaseRestore",
-                    "数据库恢复",
-                    "恢复完成，请重新登录",
-                )?;
-                Ok(job)
-            }
+            RESTORE_DATABASE_BACKUP => maintenance::restore(self, actor, &body_value),
             ANALYZE_INVOICE_PROFIT => {
                 auth::authorize(actor, "document.invoices", "view")?;
                 workflows::profit(&body_value)

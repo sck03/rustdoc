@@ -145,10 +145,10 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("authorityDisabledModules",a(s())),("startsAt",s()),("endsAt",s()),
         ("oaAssignedOnly",b()),("operations",a(s()).description("Business operation and data-scope descriptions for the current identity."))
     ]).required(vec!["name","templateId","templateVersion","accountDisabledModules","identityDisabledModules","schemeDisabledModules","authorityDisabledModules","startsAt","endsAt","oaAssignedOnly","operations"])),
-    ("ApiRecoveryArchive",o(vec![
+    ("ApiRecoveryArchive",o(vec![("available",b()),("integrityMessage",s()),
         ("id",s()),("fileName",s()),("createdAt",s().format("date-time")),
         ("sizeBytes",i().format("int64")),("replicaStatus",s()),("message",s())
-    ]).required(vec!["id","fileName","createdAt","sizeBytes","replicaStatus","message"]).additional(Additional::Allowed(false))),
+    ]).required(vec!["available","integrityMessage","id","fileName","createdAt","sizeBytes","replicaStatus","message"]).additional(Additional::Allowed(false))),
     ("ApiDashboardCurrencyAmount",o(vec![("currency",s()),("monthlyAmount",decimal()),("previousMonthlyAmount",decimal())]).required(vec!["currency","monthlyAmount","previousMonthlyAmount"])),
     ("IdentityEffectivePeriod",o(vec![("startsOn",s().format("date")),("endsOn",Schema::default().kind(Types::Many(vec![Primitive::String,Primitive::Null])).default_value(serde_json::json!(null)).format("date"))]).required(vec!["startsOn"]).additional(Additional::Allowed(false))),
     ("IdentityAssignment",o(vec![

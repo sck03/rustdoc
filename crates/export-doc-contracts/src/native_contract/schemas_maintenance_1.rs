@@ -32,11 +32,6 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("storagePolicy",s())
     ]).required(vec!["success","message","planRoot","restoreScriptPath","ownershipSqlPath","backupFilePath","storagePolicy"])),
     ("ApiServerMigrationCreateRequest",o(vec![("password",s()),("adminPassword",s()),("confirmationText",s())]).required(vec!["password","adminPassword","confirmationText"])),
-    ("ApiServerMigrationRestoreResponse",o(vec![
-        ("success",b()),("restartRequired",b()),("automaticRestartScheduled",b()),
-        ("message",s()),("packageFileName",s()),("safetyBackupRoot",s()),
-        ("storagePolicy",s())
-    ]).required(vec!["success","restartRequired","automaticRestartScheduled","message","packageFileName","safetyBackupRoot","storagePolicy"])),
     ("ApiServerMigrationStatusResponse",o(vec![
         ("supported",b()),("postgreSqlConfigured",b()),("toolsReady",b()),
         ("pendingRestore",b()),("packageRoot",s()),("message",s()),
@@ -64,12 +59,13 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ]).required(vec!["expectedRevision","expectedSettingsRevision","plan","webDav","webDavPassword","s3SecretAccessKey","s3SessionToken","encryptionPassword"]).additional(Additional::Allowed(false))),
     ("ApiRecoveryArchiveSaveRequest",o(vec![("destinationPath",s().min_length(1).max_length(4096))]).required(vec!["destinationPath"]).additional(Additional::Allowed(false))),
     ("ApiRecoveryArchiveRestoreRequest",o(vec![("password",s().max_length(1024)),("adminPassword",s().max_length(1024)),("confirmationText",s().enumeration(Enumeration::Values(vec![serde_json::json!("MIGRATE"),serde_json::json!("RECOVER")])))]).required(vec!["password","adminPassword","confirmationText"]).additional(Additional::Allowed(false))),
+    ("ApiRecoveryArchiveList",o(vec![("items",a(r("ApiRecoveryArchive"))),("page",i()),("pageSize",i()),("totalCount",i())]).required(vec!["items","page","pageSize","totalCount"]).additional(Additional::Allowed(false))),
     ("ApiBackupPlanStatus",o(vec![
         ("revision",i().format("int64")),("plan",r("ApiBackupPlan")),("encryptionPasswordSet",b()),
         ("timeZone",s()),("nextRunAt",Schema::default().kind(Types::Many(vec![Primitive::String,Primitive::Null])).format("date-time")),("runningJobId",Schema::default().kind(Types::Many(vec![Primitive::String,Primitive::Null]))),
         ("lastRunAt",Schema::default().kind(Types::Many(vec![Primitive::String,Primitive::Null])).format("date-time")),("lastResult",s()),("lastError",s()),
-        ("archives",a(r("ApiRecoveryArchive"))),("settingsRevision",i().format("int64")),("webDav",r("ApiBackupWebDavSettings")),
+        ("settingsRevision",i().format("int64")),("webDav",r("ApiBackupWebDavSettings")),
         ("webDavPasswordSet",b()),("s3SecretAccessKeySet",b()),("s3SessionTokenSet",b()),
         ("s3Available",b())
-    ]).required(vec!["revision","plan","encryptionPasswordSet","timeZone","nextRunAt","runningJobId","lastRunAt","lastResult","lastError","archives","settingsRevision","webDav","webDavPasswordSet","s3SecretAccessKeySet","s3SessionTokenSet","s3Available"]).additional(Additional::Allowed(false))),
+    ]).required(vec!["revision","plan","encryptionPasswordSet","timeZone","nextRunAt","runningJobId","lastRunAt","lastResult","lastError","settingsRevision","webDav","webDavPasswordSet","s3SecretAccessKeySet","s3SessionTokenSet","s3Available"]).additional(Additional::Allowed(false))),
 ] }

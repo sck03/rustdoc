@@ -27,10 +27,21 @@ pub(crate) fn dump_to(
     protector: &crate::secrets::Protector,
     tool: &Path,
     target: &Path,
+    space: &std::sync::Arc<crate::temporary_space::Budget>,
 ) -> Result<()> {
-    dump(&Endpoint::read_parts(store, protector)?, tool, target)
+    dump(
+        &Endpoint::read_parts(store, protector)?,
+        tool,
+        target,
+        space,
+    )
 }
-fn dump(endpoint: &Endpoint, tool: &Path, target: &Path) -> Result<()> {
+pub(super) fn dump(
+    endpoint: &Endpoint,
+    tool: &Path,
+    target: &Path,
+    space: &std::sync::Arc<crate::temporary_space::Budget>,
+) -> Result<()> {
     crate::paths::ensure_safe_absolute(target).map_err(invalid)?;
     crate::paths::ensure_safe_absolute(tool).map_err(invalid)?;
     let temporary = target.with_extension(format!(
@@ -40,20 +51,30 @@ fn dump(endpoint: &Endpoint, tool: &Path, target: &Path) -> Result<()> {
     crate::paths::ensure_safe_absolute(&temporary).map_err(invalid)?;
     let mut command = Command::new(tool);
     endpoint.apply(&mut command);
-    let output = run(
-        command
-            .args([
-                "--format",
-                "custom",
-                "--no-owner",
-                "--no-privileges",
-                "--dbname",
-                &endpoint.database,
-            ])
-            .arg("--file")
-            .arg(&temporary),
-        BACKUP_TIMEOUT,
-    );
+    command.args([
+        "--format",
+        "custom",
+        "--no-owner",
+        "--no-privileges",
+        "--dbname",
+        &endpoint.database,
+    ]);
+    prepare_command(&mut command)?;
+    let output: Result<Output> = (|| {
+        let mut file = fs::OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&temporary)?;
+        let result = controlled_process::run_to_writer(
+            &mut command,
+            space
+                .at(temporary.parent().unwrap().to_path_buf())
+                .writer(&mut file)?,
+            BACKUP_TIMEOUT,
+        )?;
+        file.sync_all()?;
+        Ok(result)
+    })();
     let output = match output {
         Ok(output) => output,
         Err(cause) => {
@@ -133,12 +154,14 @@ pub fn apply_pending(
             return Ok(());
         }
         let mut lease = export_doc_storage::PostgresMaintenanceLease::acquire(maintenance, owner)?;
-        if migration_marker.try_exists()?
-            && !package::confirm_task_marker(&paths.cache_root, &migration_marker, |job| {
-                Ok(lease.recovery_job_succeeded(job)?)
-            })?
-        {
-            return Ok(());
+        for marker in [&migration_marker, &physical_marker] {
+            if marker.try_exists()?
+                && !package::confirm_task_marker(&paths.cache_root, marker, |job| {
+                    Ok(lease.recovery_job_succeeded(job)?)
+                })?
+            {
+                return Ok(());
+            }
         }
         let migrated = package::staged(&migration_marker, package::POSTGRES, &paths.disk_space)?;
         let (marker, source, staging) = if let Some(staging) = migrated.as_ref() {
@@ -148,25 +171,21 @@ pub fn apply_pending(
                 staging.clone(),
             )
         } else if physical_marker.try_exists()? {
-            let value: Value = serde_json::from_slice(&fs::read(&physical_marker)?)
-                .map_err(|_| invalid("恢复标记无效。"))?;
-            let name = value["sourceFileName"]
-                .as_str()
-                .ok_or_else(|| invalid("恢复文件名缺失。"))?;
-            let source = super::super::managed_file(&postgres_root(paths)?, name, "dump")?;
-            let (_, hash) = crate::engine::backup_io::digest_file(&source)?;
-            if value["sha256"] != hash {
+            let Some(package::SnapshotRestore::Postgres { file_name, sha256 }) =
+                package::snapshot(&physical_marker)?
+            else {
+                return Err(invalid("数据库恢复标记无效。"));
+            };
+            let staging = package::staging_directory(&physical_marker)?;
+            let source = if let Some(name) = file_name {
+                super::super::managed_file(&postgres_root(paths)?, &name, "dump")?
+            } else {
+                staging.join(package::POSTGRES)
+            };
+            if crate::engine::backup_io::digest_file(&source)?.1 != sha256 {
                 return Err(invalid("备份文件已变化，恢复已拒绝。"));
             }
-            let id = value["restoreId"]
-                .as_str()
-                .filter(|id| crate::paths::valid_file_name(id))
-                .ok_or_else(|| invalid("恢复标识无效。"))?;
-            (
-                physical_marker,
-                source,
-                postgres_root(paths)?.join(format!("safety-{id}")),
-            )
+            (physical_marker, source, staging)
         } else {
             return Ok(());
         };
@@ -190,7 +209,7 @@ pub fn apply_pending(
         package::private_directory(&staging)?;
         let safety = staging.join("before-restore.dump");
         if !safety.try_exists()? {
-            dump(&endpoint, &tools.pg_dump, &safety)?;
+            dump(&endpoint, &tools.pg_dump, &safety, &paths.disk_space)?;
         }
         // Recover an interrupted filesystem install before trying the same plan again.
         if staging.join("install-journal.json").try_exists()? {

@@ -393,16 +393,6 @@ impl Jobs {
         Ok(snapshot)
     }
 
-    pub fn completed(&self, actor: &Actor, kind: &str, title: &str, detail: &str) -> Result<Value> {
-        self.health()?;
-        retention::prune(&self.store, self.retention, chrono::Utc::now())?;
-        let job = persistence::create_completed(&self.store, actor, kind, title, detail)?;
-        let id = job["jobId"]
-            .as_str()
-            .ok_or_else(|| unavailable("任务编号缺失。"))?;
-        self.get(actor, id)
-    }
-
     pub fn get(&self, actor: &Actor, id: &str) -> Result<Value> {
         self.health()?;
         let _completion = self.completion.read()?;

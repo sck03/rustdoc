@@ -55,9 +55,15 @@ pub(super) fn start(
                             "snapshot.sqlite3"
                         });
                         if let Some(tool) = &tool {
-                            postgres::dump_to(&store, &protector, tool, &snapshot)?;
+                            postgres::dump_to(
+                                &store,
+                                &protector,
+                                tool,
+                                &snapshot,
+                                &paths.disk_space,
+                            )?;
                         } else {
-                            store.connection()?.backup(&snapshot)?;
+                            super::super::snapshot::backup_sqlite(&store, &paths, &snapshot)?;
                         }
                         let package = package::create(
                             &store,

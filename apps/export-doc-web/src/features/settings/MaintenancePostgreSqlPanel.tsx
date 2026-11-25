@@ -84,7 +84,7 @@ export function PostgreSqlMaintenancePanel({
           {message}
         </InlineNotice>
       ) : null}
-      {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
+      {successMessage && successMessage !== migrationStatus?.message ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
       <MaintenanceBackgroundTaskStatusPanel status={migrationStatus} />
       <MaintenanceOperationsGuide pending={Boolean(migrationStatus?.pendingRestore)} />
       {view !== "migration" && (

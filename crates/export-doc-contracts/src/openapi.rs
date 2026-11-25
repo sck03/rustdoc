@@ -10,6 +10,9 @@ mod account_security;
 #[path = "contract_audit_fixes.rs"]
 mod audit_fixes;
 #[cfg(test)]
+#[path = "../tests/fixtures/backup_recovery.rs"]
+mod backup_recovery;
+#[cfg(test)]
 #[path = "contract_browser_downloads.rs"]
 mod browser_downloads;
 #[cfg(test)]
@@ -299,6 +302,7 @@ mod tests {
                     .is_some()
             );
         }
+        backup_recovery::apply(&mut baseline);
         if let Some(change) = difference("contract", &document(), &baseline) {
             panic!("undeclared contract change: {change}");
         }

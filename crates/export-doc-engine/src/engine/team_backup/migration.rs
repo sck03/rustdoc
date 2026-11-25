@@ -31,7 +31,7 @@ pub fn stage_file(
     postgres::ensure_no_pending(paths)?;
     let _lease = export_doc_storage::PostgresMaintenanceLease::acquire(maintenance, owner)?;
     package::stage(
-        &paths.disk_space,
+        paths,
         &marker_path(paths)?,
         MAGIC,
         password,
@@ -138,7 +138,7 @@ pub(super) fn create_package(
             package::private_directory(&working)?;
             let result = (|| {
                 let dump = working.join("database.dump");
-                postgres::dump_to(&store, &protector, &tools.pg_dump, &dump)?;
+                postgres::dump_to(&store, &protector, &tools.pg_dump, &dump, &paths.disk_space)?;
                 let package = package::create(
                     &store,
                     &paths,
@@ -186,32 +186,36 @@ pub(super) fn stage_restore_upload(
     postgres::require_ready(service)?;
     super::confirmation(parameters, "MIGRATE")?;
     super::managed_file(&root(&service.paths)?, file_name, "edmmigration")?;
-    let password = parameters
-        .iter()
-        .find(|(key, _)| *key == super::MIGRATION_PASSWORD_HEADER)
-        .map(|(_, value)| value.as_str())
-        .unwrap_or("");
-    super::validate_package_password(password)?;
-    let _gate = package::lock(&service.paths)?;
-    postgres::ensure_no_pending(&service.paths)?;
-    package::stage(
-        &service.paths.disk_space,
-        &marker_path(&service.paths)?,
-        MAGIC,
-        password,
-        content,
-        package::POSTGRES,
-    )?;
-    super::audit(
-        &service.store,
+    let password = zeroize::Zeroizing::new(
+        super::header(parameters, super::MIGRATION_PASSWORD_HEADER).to_owned(),
+    );
+    super::validate_package_password(&password)?;
+    let input = crate::engine::backup_io::stage_input(&service.paths, content)?;
+    let (store, paths, owner) = (service.store.clone(), service.paths.clone(), actor.id);
+    service.jobs.start_backup(
         actor,
-        "restore-server-migration",
-        "迁移包已校验并暂存",
-    )?;
-    postgres::restore_response(
-        &service.paths,
-        file_name,
-        "迁移已暂存。停止服务后运行 --restore-pending 维护命令，再启动服务。",
-        MIGRATION_STORAGE_POLICY,
+        STAGE_SERVER_MIGRATION_RESTORE,
+        "ServerMigrationRestore",
+        "校验并暂存服务器迁移",
+        move |_| {
+            let actor = auth::current_actor(&store, owner)?;
+            auth::authorize_operation(&actor, STAGE_SERVER_MIGRATION_RESTORE, &[])?;
+            let lock = package::lock(&paths)?;
+            postgres::ensure_no_pending(&paths)?;
+            let prepared = package::prepare(
+                &paths.disk_space,
+                &marker_path(&paths)?,
+                MAGIC,
+                &password,
+                input,
+                package::POSTGRES,
+            )?;
+            prepared.verify_postgres(&paths)?;
+            Ok(prepared.into_task(
+                lock,
+                "restore-server-migration",
+                "恢复已暂存。停止服务后运行 --restore-pending 维护命令，再启动服务。",
+            ))
+        },
     )
 }

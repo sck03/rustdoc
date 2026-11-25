@@ -14,7 +14,7 @@ export function MaintenanceBackgroundTaskStatusPanel({ status }: { status: ApiSe
         : "info";
   return (
     <section className="form-section maintenance-background-task-status-panel" aria-label="后台任务状态">
-      <div className="section-header"><div><h3>后台任务状态</h3><p className="section-description">备份在后台执行。恢复暂存后，须停止应用并执行恢复维护命令；普通重启不会自动办理。</p></div></div>
+      <div className="section-header"><h3>后台任务状态</h3></div>
       <InlineNotice tone={tone}>
         {status.message}
         {status.restorePhase ? ` 当前阶段：${formatRestorePhase(status.restorePhase)}。` : ""}
