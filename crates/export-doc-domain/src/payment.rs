@@ -1,5 +1,8 @@
 //! Payment validation and exact expense calculations shared by every host.
-use crate::{business_date::is_valid as valid_date, generated_api::ApiPaymentDto};
+use crate::{
+    business_date::is_valid as valid_date,
+    generated_api::{ApiPaymentDto, ApiPaymentGoodsItem},
+};
 use rust_decimal::Decimal;
 
 pub const EXPENSE_FIELDS: &[(&str, &str)] = &[
@@ -65,6 +68,45 @@ pub fn expense_total(value: &ApiPaymentDto) -> Result<Decimal, FieldError> {
         })
 }
 
+/// One ordered set of goods belongs to the payment, independently of invoice items.
+pub fn goods_items(value: &ApiPaymentDto) -> Vec<ApiPaymentGoodsItem> {
+    if let Some(items) = value.goods_items.as_ref().filter(|items| !items.is_empty()) {
+        return items.clone();
+    }
+    if [&value.goods_name, &value.quantity, &value.quantity_unit]
+        .iter()
+        .all(|v| v.trim().is_empty())
+    {
+        return vec![];
+    }
+    vec![ApiPaymentGoodsItem {
+        goods_name: value.goods_name.clone(),
+        quantity: value.quantity.clone(),
+        quantity_unit: value.quantity_unit.clone(),
+        ..Default::default()
+    }]
+}
+
+pub fn normalize_goods(value: &mut ApiPaymentDto) {
+    value.goods_items = Some(
+        goods_items(value)
+            .into_iter()
+            .filter_map(|mut item| {
+                item.goods_name = item.goods_name.trim().into();
+                item.quantity = item.quantity.trim().into();
+                item.quantity_unit = item.quantity_unit.trim().into();
+                (!item.goods_name.is_empty()
+                    || !item.quantity.is_empty()
+                    || !item.quantity_unit.is_empty())
+                .then_some(item)
+            })
+            .collect(),
+    );
+    value.goods_name.clear();
+    value.quantity.clear();
+    value.quantity_unit.clear();
+}
+
 pub fn validate(value: &ApiPaymentDto) -> Result<(), FieldError> {
     for (field, label, date) in [
         ("paymentDate", "付款日期", &value.payment_date),
@@ -82,6 +124,24 @@ pub fn validate(value: &ApiPaymentDto) -> Result<(), FieldError> {
     }
     if value.payee_id < 0 {
         return Err(error("payeeId", "支付对象资料编号不能小于 0。"));
+    }
+    let goods = value.goods_items.as_deref().unwrap_or(&[]);
+    if goods.len() > 4 {
+        return Err(error("goodsItems", "货物明细最多填写 4 项。"));
+    }
+    for (index, item) in goods.iter().enumerate() {
+        for (label, limit, text) in [
+            ("货物品名", 500, &item.goods_name),
+            ("数量", 100, &item.quantity),
+            ("数量单位", 20, &item.quantity_unit),
+        ] {
+            if text.trim().encode_utf16().count() > limit {
+                return Err(error(
+                    "goodsItems",
+                    format!("第 {} 项{label}不能超过 {limit} 个字符。", index + 1),
+                ));
+            }
+        }
     }
     for (field, label, limit, text) in [
         ("invoiceNo", "发票号", 100, &value.invoice_no),
@@ -137,6 +197,65 @@ pub fn validate(value: &ApiPaymentDto) -> Result<(), FieldError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn independent_goods_preserve_order_text_and_existing_single_item() {
+        let mut value = ApiPaymentDto {
+            goods_name: "原付款货物".into(),
+            quantity: "12.5".into(),
+            quantity_unit: "件".into(),
+            goods_items: Some(vec![]),
+            ..Default::default()
+        };
+        normalize_goods(&mut value);
+        assert_eq!(goods_items(&value).len(), 1);
+        assert_eq!(goods_items(&value)[0].quantity, "12.5");
+        assert!(value.goods_name.is_empty());
+        value
+            .goods_items
+            .as_mut()
+            .unwrap()
+            .extend((2..=4).map(|i| ApiPaymentGoodsItem {
+                goods_name: format!("货物{i}"),
+                quantity: "9007199254740993.125".into(),
+                quantity_unit: "箱".into(),
+                ..Default::default()
+            }));
+        validate(&value).unwrap();
+        let saved = serde_json::to_string(&value).unwrap();
+        let read: ApiPaymentDto = serde_json::from_str(&saved).unwrap();
+        assert_eq!(goods_items(&read), goods_items(&value));
+        value
+            .goods_items
+            .as_mut()
+            .unwrap()
+            .push(ApiPaymentGoodsItem::default());
+        assert_eq!(validate(&value).unwrap_err().field, "goodsItems");
+        value.goods_items = Some(vec![ApiPaymentGoodsItem {
+            goods_name: " ".into(),
+            ..Default::default()
+        }]);
+        normalize_goods(&mut value);
+        assert!(
+            goods_items(&value).is_empty(),
+            "removed goods cannot reappear from single fields"
+        );
+    }
+
+    #[test]
+    fn goods_limits_apply_to_each_item() {
+        let mut value = ApiPaymentDto {
+            goods_items: Some(vec![ApiPaymentGoodsItem {
+                quantity_unit: "箱".repeat(21),
+                ..Default::default()
+            }]),
+            ..Default::default()
+        };
+        assert_eq!(validate(&value).unwrap_err().field, "goodsItems");
+        value.goods_items.as_mut().unwrap()[0].quantity_unit.clear();
+        value.goods_items.as_mut().unwrap()[0].goods_name = "😀".repeat(251);
+        assert!(validate(&value).is_err());
+    }
 
     #[test]
     fn optional_business_fields_and_precise_expenses_match_payment_rules() {

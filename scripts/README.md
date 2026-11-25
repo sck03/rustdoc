@@ -196,7 +196,7 @@ Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便�
 
 `npm --prefix apps/export-doc-web run test:filter-typography-ui` 要求先完成 React build 与 `office_review` locked 构建；复用隔离的真实 Rust HTTP/React 宿主，在 390/1024/1440 检查授权导航及流程分区的筛选同行、溢出、透明查找框和实际 Noto 字形，并按 manifest 验证四份完整 WOFF2 的唯一摘要集合。等待主体和可见加载态结束后，为每个桌面路由保存截图。输出写入 `artifacts/frontend-filter-typography-ui`；此回归不替代系统 IME/DPI 或全部业务编辑状态验收。
 
-六份默认报表统一为 `.dtpl`。开发维护源为 `lib/default-report-designs.mjs`，通过 `node scripts/generate_default_dtpl_templates.mjs` 重建容器，再运行 `node scripts/test_report_designer_v3_contract.mjs` 校验设计器读写与尺寸保留。生成源和六份资产同时提交；旧 HTML 仅可作只读版式参考，不进入目录或发布包。
+七份默认业务报表统一为 `.dtpl`，包含竖向 A4 双联工厂付款单。开发维护源为 `lib/default-report-designs.mjs`，通过 `node scripts/generate_default_dtpl_templates.mjs` 重建容器，再运行 `node scripts/test_report_designer_v3_contract.mjs` 校验设计器读写与尺寸保留。生成源和七份资产同时提交；旧 HTML 仅可作只读版式参考，不进入目录或发布包。
 
 ## 网页与 Docker
 

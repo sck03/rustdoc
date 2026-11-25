@@ -38,6 +38,9 @@ mod evolution;
 #[path = "contract_file_storage.rs"]
 mod file_storage;
 #[cfg(test)]
+#[path = "contract_payment_goods.rs"]
+mod payment_goods;
+#[cfg(test)]
 #[path = "contract_precision_stability.rs"]
 mod precision_stability;
 #[cfg(test)]
@@ -271,6 +274,7 @@ mod tests {
         browser_downloads::apply(&mut baseline);
         account_security::apply(&mut baseline);
         custom_oa::expense_categories(&mut baseline);
+        payment_goods::apply(&mut baseline);
         if let Some(change) = difference("contract", &document(), &baseline) {
             panic!("undeclared contract change: {change}");
         }

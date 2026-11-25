@@ -212,6 +212,48 @@ function payment(expense) {
   }
   return d;
 }
+function factoryPayment() {
+  const d = document("PaymentVoucher", false, serif);
+  const center = { align: "Center" };
+  const openRows = { ...border, top: false, bottom: false };
+  const goodsField = (id, path) => binding(id, path, 1, { style: center, border: openRows });
+  const checks = (id, path, options, span = 1, rowSpan = 1, cellBorder = border) => cell(id, "", span, {
+    contentKind: "CheckboxGroup", fieldPath: path, rowSpan, style: center, border: cellBorder,
+    checkboxOptions: options.map((label, i) => ({ id: `${id}-${i}`, label, value: label })),
+  });
+  const copy = (id, offset, stub) => {
+    const e = [
+      grid(`${id}-heading`, 12, 12 + offset, 180, [68,32], [[10, [
+        binding("title", "Payment.FactoryPaymentTitle", 1, { style: { fontSizePt: 15, bold: true, align: "Right", marginRightMm: 0.4 } }),
+        cell("subtitle", "（出口贸易专用）", 1, { style: { fontSizePt: 8, align: "Left", marginLeftMm: 0.4 } }),
+      ]]], 8, serif, false),
+      field(`${id}-date`, "Payment.PaymentDateText", 125, 24 + offset, 67, 6, 9, "Right", true, serif),
+      grid(`${id}-grid`, 12, 32 + offset, 180, [11.5,17,16.5,11.5,11.5,16,16], [
+        [11, [cell("department-label", "业务部门名称", 1, { style: center }), binding("department", "Payment.Department", 3, { style: { ...center, bold: true } }), cell("method-label", "付款方式", 1, { style: center }), checks("method", "Payment.PaymentMethod", ["支票", "汇票", "电汇", "预付"], 2)]],
+        [9, [cell("purpose", "用\n款\n事\n项", 1, { rowSpan: 6, style: center }), cell("goods-label", "货物名称", 1, { style: center }), cell("invoice-label", "出口发票号", 1, { style: center }), cell("quantity-label", "数量", 1, { style: center }), cell("country-label", "出运国别", 1, { style: center }), cell("trade-label", "贸易方式", 1, { style: center }), cell("rebate-label", "退税率", 1, { style: center })]],
+        [9, [goodsField("goods-1", "Payment.Goods1.GoodsName"), binding("invoice", "Payment.InvoiceNo", 1, { rowSpan: 4, style: { ...center, bold: true } }), goodsField("quantity-1", "Payment.Goods1.QuantityText"), binding("country", "Payment.ShipmentCountry", 1, { style: center }), checks("trade-top", "Payment.TradeMethod", ["L/C", "T/T"], 1, 2, openRows), checks("tax-top", "Payment.TaxRebateRate", ["13%", "10%"], 1, 1, openRows)]],
+        [9, [goodsField("goods-2", "Payment.Goods2.GoodsName"), goodsField("quantity-2", "Payment.Goods2.QuantityText"), cell("receipt-label", "收汇日期", 1, { style: center }), checks("tax-middle", "Payment.TaxRebateRate", ["9%", "6%"], 1, 1, openRows)]],
+        [9, [goodsField("goods-3", "Payment.Goods3.GoodsName"), goodsField("quantity-3", "Payment.Goods3.QuantityText"), binding("receipt", "Payment.ReceiptDate", 1, { rowSpan: 2, style: center }), checks("trade-bottom", "Payment.TradeMethod", ["D/P", "远期"], 1, 2, openRows), checks("tax-bottom", "Payment.TaxRebateRate", ["0%", "其他"], 1, 2, openRows)]],
+        [9, [goodsField("goods-4", "Payment.Goods4.GoodsName"), goodsField("quantity-4", "Payment.Goods4.QuantityText")]],
+        [14, [binding("payee", "Payment.PayeeName", 4, { label: "货源单位名称：", labelPosition: "Prefix", style: { bold: true } }), binding("bank", "Payment.BankAccountText", 2, { label: "开户银行账号：", labelPosition: "Prefix", style: { bold: true } })]],
+        [10, [cell("amount-label", "金额（价税合计）", 1, { style: { ...center, fontSizePt: 7, marginLeftMm: 0.3, marginRightMm: 0.3 } }), binding("amount-upper", "cny_amount_upper", 4, { style: { bold: true } }), binding("amount", "Payment.CNYAmount", 2, { label: "小写：￥", labelPosition: "Prefix", style: { bold: true } })]],
+      ], 8, serif),
+      grid(`${id}-signatures`, 12, 117 + offset, 180, [34,32,34], [[8, [cell("department-signature", "部门经理签字："), cell("review-signature", "复核："), cell("manager-signature", "总经理签字：")]]], 9, serif, false),
+      text(`${id}-stub`, stub, 193, 53 + offset, 7, 40, 10, "Center", false, serif),
+    ];
+    // Cell identities remain unique when both editable copies share one document.
+    const labels = ["付款单标题与用途", "付款日期", "工厂付款内容", "签字", id === "finance" ? "财务付款联" : "核算联"];
+    e.forEach((element, index) => { element.label = labels[index]; });
+    for (const element of e) if (element.block?.rows) for (const row of element.block.rows) for (const cell of row.cells) {
+      cell.id = `${id}-${cell.id}`;
+      for (const option of cell.checkboxOptions) option.id = `${id}-${option.id}`;
+    }
+    return e;
+  };
+  d.layers[1].elements = [...copy("finance", 0, "②\n财\n务\n付\n款"), ...copy("accounting", 140, "③\n核\n算")];
+  return d;
+}
+
 export function approvalSheetDesign() {
   const d = document("OaApproval");
   const ink = "#000000";
@@ -275,6 +317,7 @@ export function defaultReportDesigns() {
     ["Templates/Export/customs_declaration_template.dtpl",customs()],
     ["Templates/Internal/payment_voucher_template.dtpl",payment(false)],
     ["Templates/Internal/expense_reimbursement_template.dtpl",payment(true)],
+    ["Templates/Internal/factory_payment_template.dtpl",factoryPayment()],
   ].map(([path, design]) => {
     const bodyTop = Math.min(...design.layers.filter(layer => layer.role === "Body").flatMap(layer => layer.elements.map(element => element.yHundredthMm)));
     for (const layer of design.layers) {

@@ -555,11 +555,16 @@ fn validate(
         }
         "exporters" => super::report_assets::validate_exporter(connection, actor, value)?,
         "payments" => {
-            let payment: crate::generated_api::ApiPaymentDto =
+            let mut payment: crate::generated_api::ApiPaymentDto =
                 serde_json::from_value(value.clone())
                     .map_err(|cause| invalid(format!("付款内容无效：{cause}")))?;
             export_doc_domain::payment::validate(&payment)
                 .map_err(|cause| invalid(cause.to_string()))?;
+            export_doc_domain::payment::normalize_goods(&mut payment);
+            value["goodsItems"] = serde_json::to_value(&payment.goods_items)?;
+            for field in ["goodsName", "quantity", "quantityUnit"] {
+                value[field] = json!("");
+            }
             if payment.payee_id > 0 {
                 let payee = store::get(connection, "payees", payment.payee_id)?;
                 if !auth::visible(actor, "document.reference-data", "view", &payee)

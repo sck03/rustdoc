@@ -211,12 +211,14 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("rowVersion",s().default_value(serde_json::json!("")))
     ]).required(vec!["id","category","name","bankName","rmbAccount","usdAccount","contactPerson","phone","notes","rowVersion"])),
     ("ApiPaymentDraftReportHtmlPreviewRequest",o(vec![("templatePath",s()),("payment",Schema::default().one_of(vec![ty(Primitive::Null),r("ApiPaymentDto")]))]).additional(Additional::Allowed(false))),
+    ("ApiPaymentGoodsItem",o(vec![("goodsName",s().max_length(500)),("quantity",s().max_length(100)),("quantityUnit",s().max_length(20))]).required(vec!["goodsName","quantity","quantityUnit"]).additional(Additional::Allowed(false))),
     ("ApiPaymentDto",object_groups(vec![
         (&["id","payeeId"], Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         (&["ownerUserId"], Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         (&["departmentId","companyScope","invoiceNo","voucherNo","quantityUnit","tradeMethod","taxRebateRate","spare1","spare2","spare3","spare4","spare5","spare6","spare7","spare8","spare9","spare10","department","project","paymentMethod","payeeName","payerName","bankName","accountNo","notes","goodsName","quantity","shipmentCountry","rowVersion"], s()),
         (&["shipmentDate","paymentDate","receiptDate"], Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).format("date")),
         (&["usdAmount","cnyAmount","travelExpense","businessEntertainmentExpense","telephoneExpense","officeExpense","repairExpense","freightMiscExpense","inspectionExpense","otherExpense"], s().default_value(serde_json::json!("0")).format("decimal").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),
+        (&["goodsItems"], a(r("ApiPaymentGoodsItem")).default_value(serde_json::json!([])).max_items(4).description("本次付款独立货物明细，最多四项；已有单行品名、数量和单位在保存时归入明细。")),
     ]).required(vec!["id","departmentId","companyScope","invoiceNo","voucherNo","quantityUnit","tradeMethod","taxRebateRate","spare1","spare2","spare3","spare4","spare5","spare6","spare7","spare8","spare9","spare10","payeeId","department","project","usdAmount","cnyAmount","paymentMethod","payeeName","payerName","bankName","accountNo","notes","goodsName","quantity","shipmentCountry","travelExpense","businessEntertainmentExpense","telephoneExpense","officeExpense","repairExpense","freightMiscExpense","inspectionExpense","otherExpense","rowVersion"]).additional(Additional::Allowed(false))),
     ("ApiPaymentReportHtmlPreviewRequest",o(vec![
         ("templatePath",s()),("content",s()),("previewFormat",s().default_value(serde_json::json!("Svg")).enumeration(Enumeration::Values(vec![serde_json::json!("Svg"),serde_json::json!("PdfPage")]))),

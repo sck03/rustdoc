@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Generates the six built-in .dtpl templates from the canonical V3 shapes.
+// Generates built-in .dtpl templates from the canonical V3 shapes.
 // The generator mirrors the Rust container contract for release assets.
 import fs from "node:fs";
 import path from "node:path";

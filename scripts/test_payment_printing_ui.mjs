@@ -4,6 +4,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
 import { verifyPaymentWorkflow } from './lib/payment-workflow-checks.mjs';
+import { verifyPaymentGoods } from './lib/payment-goods-workflow-checks.mjs';
 import { createPaymentSmokeScene } from './lib/web-runtime-payment-scene.mjs';
 import { authorizedJsonHeaders } from './lib/web-runtime-smoke-common.mjs';
 import { evaluate } from './lib/web-runtime-browser-session.mjs';
@@ -49,6 +50,9 @@ await withOfficeUi('payment-printing-ui', async ({ repo, output, url, invoke, op
   assert.equal(await page.locator('option[value="ExportDocument"]').count(), 0);
   assert.equal(await page.getByLabel('新建模板', { exact: true }).count(), 0, 'Public files stay protected');
   await page.locator('details[aria-label="我的和共享模板"] > summary').click();
+  const factoryTemplate = await page.locator('.template-select-field select option').evaluateAll(options => options.find(option => option.value.endsWith('factory_payment_template.dtpl'))?.value);
+  assert(factoryTemplate, 'Factory payment is a default editable template');
+  await page.locator('.template-select-field select').selectOption(factoryTemplate);
   await page.getByLabel('新模板名称', { exact: true }).fill('我的报销票据');
   const cloning = page.waitForResponse(response => response.url().endsWith('/api/reports/user-templates/clone') && response.request().method() === 'POST');
   await page.getByRole('button', { name: '复制当前模板', exact: true }).click();
@@ -72,6 +76,7 @@ await withOfficeUi('payment-printing-ui', async ({ repo, output, url, invoke, op
   assert.equal((await request('GetPayment', peer.accessToken, { id: payment.id })).status, 403);
   assert.equal((await request('GetPayment', finance.accessToken, { id: payment.id })).status, 200);
   assert.equal((await request('UpdatePayment', finance.accessToken, { id: payment.id }, '', payment)).status, 403);
+  await verifyPaymentGoods({ page, url, invoke, token: owner.accessToken, payment, output });
   await page.goto(`${url}/#/payments/${payment.id}`);
   await page.getByRole('tab', { name: '打印与 PDF', exact: true }).click();
   const preview = page.locator('[aria-label="付款/报销单预览"]');

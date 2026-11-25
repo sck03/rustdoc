@@ -12,15 +12,17 @@ pub enum Builtin {
     Contract,
     CustomsDeclaration,
     PaymentVoucher,
+    FactoryPayment,
     ExpenseReimbursement,
 }
-pub const BUILTINS: [Builtin; 6] = [
+pub const BUILTINS: [Builtin; 7] = [
     Builtin::Invoice,
     Builtin::PackingList,
     Builtin::Contract,
     Builtin::CustomsDeclaration,
     Builtin::PaymentVoucher,
     Builtin::ExpenseReimbursement,
+    Builtin::FactoryPayment,
 ];
 impl Builtin {
     pub fn path(self) -> &'static str {
@@ -30,6 +32,7 @@ impl Builtin {
             Self::Contract => "Templates/Export/contract_template.dtpl",
             Self::CustomsDeclaration => "Templates/Export/customs_declaration_template.dtpl",
             Self::PaymentVoucher => "Templates/Internal/payment_voucher_template.dtpl",
+            Self::FactoryPayment => "Templates/Internal/factory_payment_template.dtpl",
             Self::ExpenseReimbursement => "Templates/Internal/expense_reimbursement_template.dtpl",
         }
     }
@@ -40,11 +43,15 @@ impl Builtin {
             Self::Contract => "售货合同",
             Self::CustomsDeclaration => "出口货物报关单",
             Self::PaymentVoucher => "付款单",
+            Self::FactoryPayment => "工厂付款单",
             Self::ExpenseReimbursement => "费用报销明细单",
         }
     }
     pub fn report_type(self) -> &'static str {
-        if matches!(self, Self::PaymentVoucher | Self::ExpenseReimbursement) {
+        if matches!(
+            self,
+            Self::PaymentVoucher | Self::ExpenseReimbursement | Self::FactoryPayment
+        ) {
             "PaymentVoucher"
         } else {
             "ExportDocument"
@@ -67,6 +74,9 @@ impl Builtin {
             }
             Self::PaymentVoucher => {
                 include_bytes!("../../../../Templates/Internal/payment_voucher_template.dtpl")
+            }
+            Self::FactoryPayment => {
+                include_bytes!("../../../../Templates/Internal/factory_payment_template.dtpl")
             }
             Self::ExpenseReimbursement => {
                 include_bytes!("../../../../Templates/Internal/expense_reimbursement_template.dtpl")

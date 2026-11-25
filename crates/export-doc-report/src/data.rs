@@ -140,9 +140,62 @@ impl ReportData {
     }
 
     pub fn payment(payment: &ApiPaymentDto, payee: Value) -> Result<Self> {
+        export_doc_domain::payment::validate(payment)
+            .map_err(|cause| invalid(cause.to_string()))?;
+        let goods = export_doc_domain::payment::goods_items(payment);
+        let mut value = serde_json::to_value(payment)?;
+        value["PaymentDateText"] = json!(
+            payment
+                .payment_date
+                .as_deref()
+                .map(|date| chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d")
+                    .map(|date| date.format("%Y 年 %-m 月 %-d 日").to_string()))
+                .transpose()
+                .map_err(|_| invalid("付款日期无效。"))?
+                .unwrap_or_default()
+        );
+        value["FactoryPaymentTitle"] = json!(if payment.payer_name.trim().is_empty() {
+            "工厂付款单".into()
+        } else {
+            format!("{}付款单", payment.payer_name.trim())
+        });
+        value["BankAccountText"] = json!(
+            [payment.bank_name.trim(), payment.account_no.trim()]
+                .into_iter()
+                .filter(|text| !text.is_empty())
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+        value["goodsName"] = json!(
+            goods
+                .iter()
+                .map(|item| item.goods_name.as_str())
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+        value["quantity"] = json!(
+            goods
+                .iter()
+                .map(|item| item.quantity.as_str())
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+        value["quantityUnit"] = json!(
+            goods
+                .iter()
+                .map(|item| item.quantity_unit.as_str())
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+        for index in 0..4 {
+            let item = goods.get(index).cloned().unwrap_or_default();
+            value[format!("Goods{}", index + 1)] = json!({"GoodsName":item.goods_name,
+                "Quantity":item.quantity, "QuantityUnit":item.quantity_unit,
+                "QuantityText":format!("{}{}", item.quantity, item.quantity_unit)});
+        }
         Ok(Self {
             report_type: "PaymentVoucher",
-            root: json!({"Payment":payment,"Payee":payee,"cny_amount_upper":chinese_money(payment.cny_amount)?}),
+            root: json!({"Payment":value,"Payee":payee,"cny_amount_upper":chinese_money(payment.cny_amount)?}),
             images: BTreeMap::new(),
         })
     }

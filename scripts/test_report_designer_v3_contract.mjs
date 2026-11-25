@@ -623,6 +623,7 @@ for (const classicPath of [
   "Templates/Export/contract_template.dtpl",
   "Templates/Internal/payment_voucher_template.dtpl",
   "Templates/Internal/expense_reimbursement_template.dtpl",
+  "Templates/Internal/factory_payment_template.dtpl",
 ]) {
   const source = fs.readFileSync(path.join(repoRoot, classicPath));
   assert(source.subarray(0, 11).toString("ascii") === "EXPORTDOCDT", "default template must use the project-owned .dtpl container");

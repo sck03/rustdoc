@@ -25,6 +25,13 @@ function markdown(source) {
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index].trim();
     if (!line) continue;
+    if (line.startsWith("```")) {
+      const code = [];
+      while (++index < lines.length && !lines[index].trim().startsWith("```")) code.push(lines[index]);
+      if (index === lines.length) throw new Error("Manual has an unterminated code block");
+      blocks.push(`<pre><code>${escape(code.join("\n"))}</code></pre>`);
+      continue;
+    }
     const heading = /^(#{1,3})\s+(.+)$/u.exec(line);
     if (heading) { blocks.push(`<h${heading[1].length}>${inline(heading[2])}</h${heading[1].length}>`); continue; }
     if (line.startsWith("|")) {
@@ -56,6 +63,7 @@ h2{font-size:20pt;line-height:1.4;margin:0 0 8mm;padding-bottom:4mm;border-botto
 h3{font-size:13pt}p{margin:0 0 4mm}ol,ul{padding-left:6mm;margin:0 0 5mm}li{padding-left:1mm;margin-bottom:2mm}
 table{border-collapse:collapse;width:100%;font-size:9.5pt;line-height:1.6;margin:5mm 0}th,td{text-align:left;vertical-align:top;border:1px solid #c7d4dc;padding:2.3mm 3mm}th{background:#edf3f6;color:#163d50}tr{break-inside:avoid}thead{display:table-header-group}
 strong{font-weight:700}.cover p:first-of-type{font-size:18pt;color:#427285}.cover{border-top:6px solid #427285;padding-top:8mm}.cover p{max-width:160mm;margin-bottom:7mm}
+pre{font-family:Manual,sans-serif;font-size:8.5pt;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;background:#f3f6f8;border:1px solid #c7d4dc;padding:3mm;break-inside:avoid}code{font-family:inherit}
 figure{margin:5mm 0}img{display:block;width:100%;max-height:207mm;object-fit:contain;object-position:top}figcaption{margin-top:4mm;color:#526877;font-size:9pt}
 `;
 const browser = await require("playwright").chromium.launch({ executablePath: locateChromeForTesting(root), headless: true });
@@ -74,7 +82,9 @@ try {
     ["OA用户手册", "USER", ["request-details.png"]],
     ["项目程序操作说明", "OPERATIONS", ["hs-import-preview.png", "attachment-category.png", "packing-workspace.png", "project-duties.png"]],
   ];
-  for (const [name, label, screenshots] of manuals) {
+  const selected = process.argv[2];
+  if (selected && !manuals.some(([name]) => name === selected)) throw new Error(`Unknown manual: ${selected}`);
+  for (const [name, label, screenshots] of manuals.filter(([name]) => !selected || selected === name)) {
     const source = fs.readFileSync(path.join(sourceRoot, `${name}.md`), "utf8");
     const date = source.match(/版本日期：(\d{4}-\d{2}-\d{2})/u)?.[1];
     if (!date) throw new Error(`${name}: source revision date is required`);
@@ -93,8 +103,10 @@ try {
       await page.goto(pathToFileURL(html).href);
       await page.evaluate(async () => { await document.fonts.ready; await Promise.all([...document.images].map(image => image.decode())); });
       const pdf = path.join(sourceRoot, `${name}.pdf`);
-      await page.pdf({ path: pdf, preferCSSPageSize: true, printBackground: true, tagged: true, outline: true, displayHeaderFooter: true,
+      const stagedPdf = path.join(output, `${name}.rendered.pdf`);
+      await page.pdf({ path: stagedPdf, preferCSSPageSize: true, printBackground: true, tagged: true, outline: true, displayHeaderFooter: true,
         headerTemplate: '<div></div>', footerTemplate: `<div style="font-size:8px;width:100%;margin:0 18mm;color:#607080;display:flex;justify-content:space-between"><span>ExportDocManager / ${label} / ${date}</span><span><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>` });
+      fs.renameSync(stagedPdf, pdf);
       manifest.push({ file: path.relative(root, pdf), bytes: fs.statSync(pdf).size, sourceSha256: createHash("sha256").update(source).digest("hex"), expectedPages: sections.length });
     } finally { await page.close(); }
   }

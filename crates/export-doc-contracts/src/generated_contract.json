@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "493bfd89cb2ee7a032616298fdf0a66910357a603bc0961a2012bbbdf05a2a11",
+  "digest": "ce5fb1f6a461ca35553b61784c9c330a9c370c729fcdf6c46288231327fe6b77",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -103438,6 +103438,15 @@
           "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
           "default": "0"
         },
+        "goodsItems": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ApiPaymentGoodsItem"
+          },
+          "description": "本次付款独立货物明细，最多四项；已有单行品名、数量和单位在保存时归入明细。",
+          "default": [],
+          "maxItems": 4
+        },
         "goodsName": {
           "type": "string"
         },
@@ -103641,6 +103650,29 @@
         "inspectionExpense",
         "otherExpense",
         "rowVersion"
+      ],
+      "additionalProperties": false
+    },
+    "ApiPaymentGoodsItem": {
+      "type": "object",
+      "properties": {
+        "goodsName": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "quantity": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "quantityUnit": {
+          "type": "string",
+          "maxLength": 20
+        }
+      },
+      "required": [
+        "goodsName",
+        "quantity",
+        "quantityUnit"
       ],
       "additionalProperties": false
     },

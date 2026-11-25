@@ -11731,6 +11731,15 @@
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "default": "0"
           },
+          "goodsItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiPaymentGoodsItem"
+            },
+            "description": "本次付款独立货物明细，最多四项；已有单行品名、数量和单位在保存时归入明细。",
+            "default": [],
+            "maxItems": 4
+          },
           "goodsName": {
             "type": "string"
           },
@@ -11934,6 +11943,29 @@
           "inspectionExpense",
           "otherExpense",
           "rowVersion"
+        ],
+        "additionalProperties": false
+      },
+      "ApiPaymentGoodsItem": {
+        "type": "object",
+        "properties": {
+          "goodsName": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "quantity": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "quantityUnit": {
+            "type": "string",
+            "maxLength": 20
+          }
+        },
+        "required": [
+          "goodsName",
+          "quantity",
+          "quantityUnit"
         ],
         "additionalProperties": false
       },

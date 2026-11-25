@@ -235,6 +235,10 @@ fn builtin_dtpl_opens_as_editable_v3_json() {
             "PaymentVoucher",
             "Templates/Internal/expense_reimbursement_template.dtpl",
         ),
+        (
+            "PaymentVoucher",
+            "Templates/Internal/factory_payment_template.dtpl",
+        ),
     ] {
         let builtin_path = workspace.paths().app_root.join(path);
         fs::create_dir_all(builtin_path.parent().unwrap()).unwrap();

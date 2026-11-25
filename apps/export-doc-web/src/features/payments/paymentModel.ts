@@ -1,4 +1,4 @@
-import { ApiPaymentDto } from "../../api/index.ts";
+import { ApiPaymentDto, type ApiPaymentGoodsItem } from "../../api/index.ts";
 import { documentSpareKeys, mapDocumentSpareFields } from "../../ui/documentSpareFields.ts";
 import { sumDecimalStrings } from "../../ui/decimalSum.ts";
 import {
@@ -18,6 +18,16 @@ export const paymentExpenseFields = [
   { field: "otherExpense", label: "其他费用" },
 ] as const;
 export const paymentAmountFields = [{ field: "usdAmount", label: "USD 金额" }, { field: "cnyAmount", label: "CNY 金额" }, ...paymentExpenseFields] as const;
+
+export function paymentGoodsItems(payment: ApiPaymentDto): ApiPaymentGoodsItem[] {
+  if (payment.goodsItems?.length) return payment.goodsItems;
+  const item = { goodsName: payment.goodsName, quantity: payment.quantity, quantityUnit: payment.quantityUnit };
+  return Object.values(item).some(value => value?.trim()) ? [item] : [];
+}
+
+export function paymentGoodsPatch(goodsItems: ApiPaymentGoodsItem[]): Partial<ApiPaymentDto> {
+  return { goodsItems, goodsName: "", quantity: "", quantityUnit: "" };
+}
 
 const paymentTextFields = ["accountNo", "bankName", "companyScope", "department", "departmentId", "goodsName", "invoiceNo", "voucherNo", "tradeMethod", "taxRebateRate", "quantityUnit", "notes", "payeeName", "payerName", "paymentMethod", "project", "quantity", "shipmentCountry"] as const;
 function fieldValues<K extends string>(keys: readonly K[], get: (key: K) => string) {
@@ -49,6 +59,7 @@ export function createEmptyPayment(businessDate: string): ApiPaymentDto {
     paymentDate: today,
     receiptDate: today,
     rowVersion: "",
+    goodsItems: [],
   };
 }
 
@@ -56,6 +67,9 @@ export function normalizePaymentForSave(payment: ApiPaymentDto, id: number): Api
   return {
     ...payment,
     ...fieldValues(paymentTextFields, key => normalizeText(payment[key])),
+    ...paymentGoodsPatch(paymentGoodsItems(payment).map(item => ({ goodsName: normalizeText(item.goodsName),
+      quantity: normalizeText(item.quantity), quantityUnit: normalizeText(item.quantityUnit) }))
+      .filter(item => Object.values(item).some(Boolean))),
     ...Object.fromEntries(paymentAmountFields.map(({field}) => [field, payment[field].trim() || "0"])),
     id,
     ...mapDocumentSpareFields(payment, normalizeText),
@@ -72,6 +86,13 @@ function normalizeOptionalDate(value?: string | null) {
 
 export function validatePaymentDraft(payment: ApiPaymentDto) {
   if ((payment.payeeId ?? 0) < 0) return "支付对象资料编号不能小于 0。";
+  const goods = paymentGoodsItems(payment);
+  if (goods.length > 4) return "货物明细最多填写 4 项。";
+  for (const [index, item] of goods.entries()) {
+    for (const [field, limit, label] of [["goodsName", 500, "货物品名"], ["quantity", 100, "数量"], ["quantityUnit", 20, "数量单位"]] as const) {
+      if (item[field].trim().length > limit) return `第 ${index + 1} 项${label}不能超过 ${limit} 个字符。`;
+    }
+  }
 
   const textLimits: Array<[string | undefined, number, string]> = [
     [payment.invoiceNo, 100, "发票号"],

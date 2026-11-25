@@ -9,6 +9,7 @@ import { CustomOptionMap, getCustomOptions } from "../custom-options/customOptio
 import { DocumentSpareFieldsPanel } from "../../ui/DocumentSpareFieldsPanel.tsx";
 import { CustomOptionSelectField } from "../custom-options/CustomOptionSelectField.tsx";
 import { paymentAmountFields } from "./paymentModel.ts";
+import { PaymentGoodsItemsEditor } from "./PaymentGoodsItemsEditor.tsx";
 
 type PaymentPatch = Partial<ApiPaymentDto>;
 
@@ -183,15 +184,15 @@ export function PaymentBusinessInfoPanel({
       <div className="section-header">
         <h2>付款业务信息</h2>
       </div>
-      <p className="form-field-description">按本次付款填写品名与合计数量，可合并同类货物；这里的内容独立保存，不会改动报关单据及其商品明细。</p>
+      <p className="form-field-description">付款货物独立保存，最多 4 项。</p>
       <div className="field-grid">
         <TextField label="部门" value={payment.department ?? ""} onChange={(value) => onChange({ department: value })} />
         <TextField label="项目" value={payment.project ?? ""} onChange={(value) => onChange({ project: value })} />
         <EditableComboField label="贸易方式" value={payment.tradeMethod} options={["L/C", "T/T", "D/P", "远期"]} onChange={(value) => onChange({ tradeMethod: value })} />
         <EditableComboField label="退税率" value={payment.taxRebateRate} options={["13%", "10%", "9%", "6%", "0%"]} onChange={(value) => onChange({ taxRebateRate: value })} />
-        <TextAreaField className="field-grid-span-2" label="货物品名" value={payment.goodsName ?? ""} onChange={(value) => onChange({ goodsName: value })} />
-        <TextField label="数量" value={payment.quantity ?? ""} onChange={(value) => onChange({ quantity: value })} />
-        <TextField label="数量单位" value={payment.quantityUnit} onChange={(value) => onChange({ quantityUnit: value })} />
+      </div>
+      <PaymentGoodsItemsEditor payment={payment} onChange={onChange} />
+      <div className="field-grid">
         <TextField label="出运国家" value={payment.shipmentCountry ?? ""} onChange={(value) => onChange({ shipmentCountry: value })} />
         <DateField label="出运日期" value={payment.shipmentDate} onChange={(value) => onChange({ shipmentDate: value })} />
         <TextAreaField className="field-grid-span-2" label="备注" value={payment.notes ?? ""} onChange={(value) => onChange({ notes: value })} />

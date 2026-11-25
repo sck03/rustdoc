@@ -2522,6 +2522,7 @@ export interface ApiPaymentDto {
   department: string;
   departmentId: string;
   freightMiscExpense: string;
+  goodsItems?: ApiPaymentGoodsItem[];
   goodsName: string;
   id: number;
   inspectionExpense: string;
@@ -2559,6 +2560,12 @@ export interface ApiPaymentDto {
   travelExpense: string;
   usdAmount: string;
   voucherNo: string;
+}
+
+export interface ApiPaymentGoodsItem {
+  goodsName: string;
+  quantity: string;
+  quantityUnit: string;
 }
 
 export interface ApiPaymentReportHtmlPreviewRequest {
@@ -7357,6 +7364,7 @@ export const ApiPaymentDtoDefaults = {
   businessEntertainmentExpense: "0",
   cnyAmount: "0",
   freightMiscExpense: "0",
+  goodsItems: [],
   inspectionExpense: "0",
   officeExpense: "0",
   otherExpense: "0",

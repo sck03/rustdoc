@@ -1,0 +1,15 @@
+.payment-goods-items {
+  min-width: 0;
+  margin: var(--edm-space-4) 0;
+}
+
+.payment-goods-table {
+  table-layout: fixed;
+  min-width: 560px;
+}
+
+.payment-goods-table th:nth-child(1) { width: 7%; }
+.payment-goods-table th:nth-child(2) { width: 43%; }
+.payment-goods-table th:nth-child(3) { width: 20%; }
+.payment-goods-table th:nth-child(4) { width: 20%; }
+.payment-goods-table th:nth-child(5) { width: 10%; }

@@ -579,9 +579,25 @@ fn crm_supplier_and_payment_records_roundtrip_and_keep_optional_fields() {
         Some(json!({"expectedVersion":supplier["versionNumber"]})),
     );
     assert_eq!(admitted["status"], "合作中");
-    let payment=fixture.create(CREATE_PAYMENT,json!({"invoiceNo":"NATIVE-PAY","cnyAmount":"99999999999999.99","payeeName":"供应商","paymentDate":"2026-09-16","spare10":"保留备用十"}));
+    let payment=fixture.create(CREATE_PAYMENT,json!({"invoiceNo":"NATIVE-PAY","cnyAmount":"99999999999999.99","payeeName":"供应商","paymentDate":"2026-09-16","spare10":"保留备用十","goodsName":"独立付款货物","quantity":"12.5","quantityUnit":"件"}));
     assert_eq!(payment["payment"]["spare10"], "保留备用十");
     assert_eq!(payment["payment"]["cnyAmount"], json!("99999999999999.99"));
+    assert_eq!(
+        payment["payment"]["goodsItems"],
+        json!([{"goodsName":"独立付款货物","quantity":"12.5","quantityUnit":"件"}])
+    );
+    let multiple = fixture.create(
+        CREATE_PAYMENT,
+        json!({"goodsItems":[
+            {"goodsName":"货物甲","quantity":"9007199254740993.125","quantityUnit":"米"},
+            {"goodsName":"货物乙","quantity":"4","quantityUnit":"箱"}
+        ]}),
+    );
+    assert_eq!(
+        multiple["payment"]["goodsItems"][0]["quantity"],
+        "9007199254740993.125"
+    );
+    assert_eq!(multiple["payment"]["goodsItems"][1]["quantityUnit"], "箱");
 }
 #[test]
 fn meeting_bookings_reject_overlaps_but_allow_adjacent_times() {
