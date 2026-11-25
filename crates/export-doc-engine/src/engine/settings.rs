@@ -6,10 +6,9 @@ use super::{
 use crate::{
     contracts,
     generated_api::*,
-    paths::{RuntimePaths, ensure_safe_absolute},
+    paths::{RuntimePaths, resolve_managed_relative},
 };
 use serde_json::{Value, json};
-use std::path::{Component, Path};
 
 pub(super) fn defaults(provider: &str) -> Result<Value> {
     let mut value = contracts::contract()["configuration"]["defaults"].clone();
@@ -45,12 +44,7 @@ pub fn read(store: &Store, actor: &Actor) -> Result<Value> {
     // This operation explicitly exposes sanitized defaults to authenticated
     // clients. Editing still requires the separate administrator permission.
     let mut settings = current(store)?;
-    for pointer in [
-        "/email/password",
-        "/webDav/password",
-        "/system/postgreSqlPassword",
-        "/ai/apiKey",
-    ] {
+    for pointer in ["/email/password", "/webDav/password", "/ai/apiKey"] {
         if let Some(value) = settings.pointer_mut(pointer) {
             *value = json!("");
         }
@@ -58,10 +52,6 @@ pub fn read(store: &Store, actor: &Actor) -> Result<Value> {
     if !actor.admin {
         for pointer in [
             "/system/updaterEndpoint",
-            "/system/postgreSqlHost",
-            "/system/postgreSqlDatabase",
-            "/system/postgreSqlUsername",
-            "/system/postgreSqlAdditionalOptions",
             "/email/smtpHost",
             "/email/userName",
             "/email/fromAddress",
@@ -79,7 +69,6 @@ pub fn read(store: &Store, actor: &Actor) -> Result<Value> {
                 *value = json!("");
             }
         }
-        settings["system"]["postgreSqlPort"] = json!(5432);
         settings["webDav"]["enabled"] = json!(false);
         if let Some(value) = settings.pointer_mut("/singleWindow/customsCooDefaults") {
             *value = contracts::contract()["configuration"]["defaults"]["singleWindow"]["customsCooDefaults"].clone();
@@ -102,6 +91,10 @@ pub(super) fn current_in(tx: &crate::engine::store::Connection) -> Result<Value>
     }
     // These read-only settings describe the already-open database, not a request
     // to switch it. Old template writes must not override the runtime identity.
+    settings["system"] = contracts::dto(
+        contracts::schema("SystemSettings"),
+        settings["system"].take(),
+    );
     apply_database_identity(&mut settings, tx.provider());
     Ok(settings)
 }
@@ -123,13 +116,8 @@ fn validate(value: &Value, paths: &RuntimePaths, provider: &str) -> Result<()> {
     for (path, min, max) in [
         ("/system/itemEntryBlankRowCount", 1, 100),
         ("/system/itemEntrySpareColumnCount", 0, 10),
-        ("/system/backupRetentionDays", 0, 3650),
-        ("/system/auditLogRetentionDays", 0, 3650),
         ("/system/logRetentionDays", 0, 3650),
         ("/system/logRetainedFileCount", 1, 1000),
-        ("/system/logFileSizeLimitMB", 1, 1024),
-        ("/system/postgreSqlAutoBackupDayOfWeek", 0, 6),
-        ("/system/postgreSqlAutoBackupRetentionCount", 0, 10000),
         ("/exchangeRate/cacheDurationMinutes", 1, 1440),
         ("/email/smtpPort", 1, 65535),
     ] {
@@ -169,19 +157,7 @@ fn validate(value: &Value, paths: &RuntimePaths, provider: &str) -> Result<()> {
                         }
                         return Ok(());
                     }
-                    let path = Path::new(text);
-                    if path.is_absolute()
-                        || text.contains(':')
-                        || path
-                            .components()
-                            .any(|part| !matches!(part, Component::Normal(_)))
-                        || text
-                            .split(['/', '\\'])
-                            .any(|part| part == ".." || part == ".")
-                    {
-                        return Err(invalid("配置路径必须是数据目录内的相对路径。"));
-                    }
-                    ensure_safe_absolute(&paths.data_root.join(path)).map_err(invalid)?;
+                    resolve_managed_relative(&paths.data_root, text).map_err(invalid)?;
                 }
             }
             _ => {}

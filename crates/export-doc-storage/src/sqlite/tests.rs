@@ -76,8 +76,8 @@ fn backup_copy_checks_cancellation_before_copying_pages() {
     let result = operation::run(
         Arc::new(AtomicBool::new(true)),
         Instant::now() + Duration::from_secs(5),
-        || copy(&source, &mut destination),
+        || copy_with_capacity(&source, &mut destination, &mut |_| Ok(())),
     );
     assert_eq!(result.unwrap_err().kind, ErrorKind::Timeout);
-    copy(&source, &mut destination).unwrap();
+    copy_with_capacity(&source, &mut destination, &mut |_| Ok(())).unwrap();
 }

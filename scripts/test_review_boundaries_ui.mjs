@@ -48,7 +48,7 @@ function DocumentEmail(){window.package=useInvoiceDocumentPackageWorkspace({clie
 const client={analyzeInvoiceProfit:(r,i)=>deferred('profit',r,i),stageRecoveryArchiveRestore:(r,i)=>deferred('restore',r,i),sendEmail:(r,i)=>deferred('send',r,i),
 getEmailToolStatus:async()=>({isConfigured:true,fromAddress:'review@example.invalid',fromDisplayName:'测试发件人',smtpHost:'example.invalid',smtpPort:465,enableSsl:true}),
 listInvoiceStatusHistory:async request=>{window.historyCalls.push(request);return {items:[{id:request.beforeId?1:2,invoiceId:7,fromStatus:'Draft',toStatus:'Verified',note:request.beforeId?'早期原因':'最近原因',changedByUsername:'历史操作人',changedAt:'2026-11-15T00:00:00Z'}],nextCursor:request.beforeId?null:2};}};
-const controller={activeJob:false,status:{archives:[{id:'one',createdAt:'2026-11-15T00:00:00Z',sizeBytes:100}]},trackJob:id=>window.jobs.push(id)};
+const controller={activeJob:false,archives:[{id:'one',createdAt:'2026-11-15T00:00:00Z',sizeBytes:100,available:true}],trackJob:id=>window.jobs.push(id)};
 function Harness({mode,session}){const [invoice,setInvoice]=useState(()=>createEmptyInvoice('2026-11-15'));
 window.edit=()=>setInvoice(value=>({...value,remarks:(value.remarks||'')+'changed'}));
 return mode==='purge'?<InvoiceDataMaintenancePanel client={session?otherMaintenanceClient:maintenanceClient} canManageSettings={true}/>:

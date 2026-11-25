@@ -34,6 +34,9 @@ try {
     console.log('[regression] ' + name);
     active = spawnProcessTree(process.execPath, [command], { cwd: web, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     active.stdout.pipe(log, { end: false }); active.stderr.pipe(log, { end: false });
+    let failureTail = "";
+    const captureTail = chunk => { failureTail = (failureTail + chunk.toString()).slice(-16 * 1024); };
+    active.stdout.on("data", captureTail); active.stderr.on("data", captureTail);
     let timedOut = false;
     const timer = setTimeout(() => { timedOut = true; void stopProcessTree(active); }, 8 * 60_000);
     const code = await new Promise(resolve => { active.once('error', error => { log.write(String(error)); }); active.once('close', code => resolve(code ?? 1)); });
@@ -42,6 +45,7 @@ try {
     log.end(); await finished(log);
     results.push({ name, passed: code === 0 && !timedOut, timedOut, elapsedMs: Date.now() - started });
     console.log('[regression] ' + name + ': ' + (results.at(-1).passed ? 'passed' : 'FAILED'));
+    if (!results.at(-1).passed) console.error(failureTail);
   }
 } finally {
   await stopProcessTree(active);

@@ -9,7 +9,7 @@ import { readSettingString } from "./SettingsFieldControls.tsx";
 import { singleWindowCustomsCooAplAddPath, singleWindowCustomsCooFetchPlacePath, singleWindowCustomsCooOrgCodePath } from "./settingsConfigurationPaths.ts";
 import { cloneSettings, normalizeSettingText, setNestedValue } from "./settingsValueUtils.ts";
 import type { SettingPatch, SettingsRecord } from "./settingsTypes.ts";
-import { isDesktopBridgeAvailable, selectDirectory } from "../../desktop/desktopBridge.ts";
+import { isDesktopBridgeAvailable, selectDefaultExportDirectory } from "../../desktop/desktopBridge.ts";
 import { filterSettingsCategories, settingsCategories, allSettingsCategories, type SettingsCategoryKey } from "./settingsCategoryCatalog.ts";
 import { readSettingsCategoryFromSearch } from "./settingsNavigationModel.ts";
 import { useConfirmation } from "../../ui/confirmationContext.ts";
@@ -17,9 +17,9 @@ import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { useRouteQuery } from "../../ui/useRouteQuery.ts";
 import { useSettingsMaintenanceActions } from "./useSettingsMaintenanceActions.ts";
 import { useSettingsDraftSync } from "./useSettingsDraftSync.ts";
-import { systemDefaultPatches } from "./settingsDefaults.ts";
+import { defaultPatchesForCategory } from "./settingsDefaults.ts";
 import { findIssuingAuthority, parseIssuingAuthorityCode } from "./settingsIssuingAuthority.ts";
-import { changedSettingsCategories, settingsCategoryForPath } from "./settingsDraftModel.ts";
+import { changedSettingsCategories } from "./settingsDraftModel.ts";
 
 type EmailServerSuggestionDraft = {
   emailAddress: string;
@@ -375,7 +375,7 @@ export function useSettingsWorkspace({
     }
 
     try {
-      const selectedPath = await selectDirectory();
+      const selectedPath = await selectDefaultExportDirectory(readSettingString(settings ?? {}, ["system", "defaultExportDirectory"]));
       if (selectedPath) {
         patchSetting(["system", "defaultExportDirectory"], selectedPath);
       }
@@ -399,11 +399,7 @@ export function useSettingsWorkspace({
       return;
     }
 
-    patchSettings(systemDefaultPatches.filter(({ path }) => settingsCategoryForPath(path) === currentCategory
-      && path[1] !== "databaseProvider"
-      && (path[1] !== "updaterEndpoint" || isDesktopRuntime)
-      && (path[1] !== "sqliteDatabaseFileName" || databaseProvider === "sqlite")
-      && (!path[1]?.startsWith("postgreSql") || databaseProvider === "postgresql")));
+    patchSettings(defaultPatchesForCategory(currentCategory, isDesktopRuntime));
     setSingleWindowAuthorityAutoState({ fetchPlace: "", aplAdd: "" });
     setMessage(null);
     setSuccessMessage(`已恢复“${activeCategoryConfig.label}”的默认值，请检查后保存。`);

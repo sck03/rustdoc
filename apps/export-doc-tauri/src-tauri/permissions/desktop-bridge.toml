@@ -15,6 +15,7 @@ commands.allow = [
   "read_exporter_seal_image_file",
   "select_excel_file",
   "select_directory",
+  "select_default_export_directory",
   "select_report_template_package_file",
   "select_report_template_file",
   "select_save_package_path",

@@ -2,7 +2,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$PostgresBin,
     [ValidateRange(60, 7200)][int]$TimeoutSeconds = 3600,
-    [ValidateSet('All', 'Storage', 'Engine', 'Workflows', 'Capacity', 'Maintenance', 'QueryPerformance')][string]$Scope = 'All',
+    [ValidateSet('All', 'Storage', 'Engine', 'Workflows', 'Capacity', 'Maintenance', 'QueryPerformance', 'AuditStatistics')][string]$Scope = 'All',
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Debug',
     [ValidateRange(200, 100000)][int]$HistoryRows = 10000,
     [ValidateRange(50, 1000)][int]$Rounds = 200
@@ -42,7 +42,7 @@ $environment['EXPORTDOC_TEST_PG_BIN'] = $PostgresBin
 $databaseTargets = @()
 [string[]]$cargoProfile = @()
 if ($Configuration -eq 'Release') { $cargoProfile = @('--release') }
-if ($Scope -in @('All', 'Storage', 'Workflows')) { $databaseTargets += ,@('POSTGRES', 'native_storage') }
+if ($Scope -in @('All', 'Storage', 'Workflows', 'AuditStatistics')) { $databaseTargets += ,@('POSTGRES', 'native_storage') }
 if ($Scope -in @('All', 'Engine', 'Workflows', 'QueryPerformance')) {
     $databaseTargets += ,@('ENGINE', 'native_engine')
 }
@@ -91,6 +91,9 @@ ALTER DEFAULT PRIVILEGES FOR ROLE native_owner IN SCHEMA public GRANT USAGE, SEL
         foreach ($role in @(@('APP', 'native_app'), @('MAINTENANCE', 'native_maintenance'))) {
             $environment["EXPORTDOC_TEST_$($target[0])_$($role[0])"] = "host=127.0.0.1 port=$port user=$($role[1]) password=$password dbname=$($target[1]) sslmode=disable"
         }
+    }
+    if ($Scope -eq 'AuditStatistics') {
+        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments (@('test', '--locked', '-p', 'export-doc-storage', '--features', 'postgres', '--test', 'audit_statistics') + $cargoProfile + @('--', 'postgres_audit', '--ignored', '--test-threads=1')) -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Exact read-only audit statistics on isolated PostgreSQL 18'
     }
     if ($Scope -in @('All', 'Storage', 'Workflows')) {
         Invoke-ExportDocExternal -FilePath 'cargo' -Arguments (@('test', '--locked', '-p', 'export-doc-storage', '--features', 'postgres', '--lib') + $cargoProfile + @('--', 'postgres', '--ignored', '--test-threads=1')) -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Native PostgreSQL constraints and network cancellation'

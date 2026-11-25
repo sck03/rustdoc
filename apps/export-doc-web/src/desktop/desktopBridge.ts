@@ -164,6 +164,17 @@ export async function selectDirectory(defaultDirectory?: string) {
   });
 }
 
+export async function selectDefaultExportDirectory(defaultDirectory?: string) {
+  const invoke = getInvoke();
+  if (!invoke) {
+    return null;
+  }
+
+  return invoke<string | null>("select_default_export_directory", {
+    defaultDirectory: normalizeOptionalPath(defaultDirectory),
+  });
+}
+
 export async function selectReportTemplatePackageFile() {
   return invokeOptionalPath("select_report_template_package_file");
 }

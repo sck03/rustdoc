@@ -71,20 +71,9 @@ fn wait(service: &NativeService, job: Value) -> Value {
     }
 }
 #[test]
-fn inactive_legacy_flags_never_enable_scheduling_and_secrets_remain_protected() {
+fn scheduling_starts_disabled_and_secrets_remain_protected() {
     let workspace = Workspace::new();
     let service = open_service(&workspace);
-    service
-        .store
-        .transaction(|tx| {
-            tx.set_settings(
-                "settings",
-                1,
-                &json!({"revision":1,"system":{"postgreSqlAutoBackupEnabled":true}}),
-            )?;
-            Ok(())
-        })
-        .unwrap();
     assert_eq!(
         status(&service, &admin()).unwrap()["plan"]["enabled"],
         false

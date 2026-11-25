@@ -1,6 +1,22 @@
 //! Audit filtering stays in storage; only the selected events leave the database.
 use crate::{QuerySql, sql};
 use chrono::{DateTime, Utc};
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditStatistics {
+    pub total_events: i64,
+    pub oldest_event: Option<String>,
+}
+
+/// A single read snapshot returns exact totals and the chronologically oldest instant.
+/// No audit bodies are decoded, and invalid timestamps retain the storage error.
+pub(crate) fn statistics(pg: bool) -> String {
+    let (seconds, nanos) = sql::instant_order("occurred_at", pg);
+    format!(
+        "WITH instants AS (SELECT id, occurred_at, {seconds} AS seconds, {nanos} AS nanos FROM audit_logs) SELECT (SELECT COUNT(*) FROM instants WHERE seconds IS NOT NULL AND nanos IS NOT NULL), (SELECT occurred_at FROM instants ORDER BY seconds, nanos, id LIMIT 1)"
+    )
+}
+
 pub struct AuditQuery<'a> {
     pub invoice: &'a str,
     pub entity: &'a str,

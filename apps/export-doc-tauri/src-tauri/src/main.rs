@@ -120,6 +120,7 @@ fn run_tauri_app() -> tauri::Result<()> {
             desktop_file_dialog_commands::read_exporter_seal_image_file,
             desktop_file_dialog_commands::select_excel_file,
             desktop_file_dialog_commands::select_directory,
+            desktop_file_dialog_commands::select_default_export_directory,
             desktop_file_dialog_commands::select_report_template_package_file,
             desktop_file_dialog_commands::select_report_template_file,
             desktop_file_dialog_commands::select_save_package_path,

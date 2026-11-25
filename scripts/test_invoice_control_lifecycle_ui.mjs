@@ -17,7 +17,8 @@ import {QueryClient,QueryClientProvider} from "@tanstack/react-query";import {Me
 import {useInvoiceControlOperations} from ${source("features/invoices/useInvoiceControlOperations.ts")};
 import {useInvoiceSaveMutation} from ${source("features/invoices/useInvoiceSaveMutation.ts")};
 import {createEmptyInvoice} from ${source("features/invoices/invoiceModel.ts")};
-import {ConfirmationProvider,useConfirmation} from ${source("ui/ConfirmationProvider.tsx")};
+import {ConfirmationProvider} from ${source("ui/ConfirmationProvider.tsx")};
+import {useConfirmation} from ${source("ui/confirmationContext.ts")};
 import {useScopedConfirmation} from ${source("ui/useScopedConfirmation.ts")};
 const cache=new QueryClient({defaultOptions:{queries:{retry:false}}});window.cache=cache;window.requests=[];
 const deferred=(kind,request,init)=>new Promise((resolve,reject)=>window.requests.push({kind,request,signal:init.signal,resolve,reject}));

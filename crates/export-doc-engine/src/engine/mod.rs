@@ -353,6 +353,9 @@ impl NativeService {
                         &body_value,
                     ));
                 }
+                if diagnostics::OPERATIONS.contains(&operation) {
+                    respond_json!(diagnostics::handle(self, &actor, operation));
+                }
                 if team_backup::OPERATIONS.contains(&operation) {
                     respond_json!(team_backup::handle(
                         self,

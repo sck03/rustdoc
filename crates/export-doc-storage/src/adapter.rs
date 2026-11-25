@@ -117,6 +117,7 @@ pub(crate) trait Adapter: Send {
     }
     unsupported_operations! {
         query_json(_statement: &str, _values: &[String]) -> Value => "存储适配器不支持专用聚合查询。";
+        audit_statistics() -> AuditStatistics => "存储适配器不支持审计统计。";
         query_audits(_query: &AuditQuery<'_>) -> (i64, Vec<Value>) => "存储适配器不支持审计筛选分页。";
         query_audit_ids(_query: &AuditQuery<'_>) -> Vec<i64> => "存储适配器不支持审计编号扫描。";
         attachment_category_counts(_company: &str) -> std::collections::BTreeMap<i64, i64> => "存储适配器不支持附件分类统计。";

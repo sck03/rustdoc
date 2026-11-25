@@ -13,7 +13,7 @@ mod business_query;
 mod dashboard_query;
 pub use dashboard_query::DashboardCounts;
 mod party_query;
-pub use audit_query::AuditQuery;
+pub use audit_query::{AuditQuery, AuditStatistics};
 mod crm_query;
 pub use crm_query::{CrmFollowUpCounts, CrmList, CrmQuery};
 mod attachment_history;
@@ -453,6 +453,7 @@ delegate! {
     put_command_receipt(receipt:&Value,result:&Value)->();
     append_workflow_operation(entry:&Value)->();
     save_workflow_state(request:i64,revision:i64,progress:&WorkflowProgress<'_>,plan:&Value,active_tasks:&[String])->();
+    audit_statistics()->AuditStatistics;
     query_audits(query:&AuditQuery<'_>)->(i64,Vec<Value>);
     query_audit_ids(query:&AuditQuery<'_>)->Vec<i64>;
     query_ordered_records(query:&GenericQuery<'_>,order:RecordOrder)->(i64,Vec<Value>);

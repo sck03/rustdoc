@@ -57,7 +57,7 @@ export function BusinessAttachmentDetails({ details, categories, busy, editing, 
         <span className="business-records-muted">{fileSizeLabel(version.length)} · {version.uploadedBy} · {date(version.createdAt)}</span></div>
       {version.note && <p>{version.note}</p>}
       <div className="business-records-actions"><button type="button" className="command-button secondary" disabled={busy} onClick={() => onRead(version, false)}>下载原文件</button>
-        {canPreviewAttachment(version.contentType) && <button type="button" className="command-button secondary" disabled={busy} onClick={() => onRead(version, true)}>预览</button>}
+        {canPreviewAttachment(version.contentType, version.length) && <button type="button" className="command-button secondary" disabled={busy} onClick={() => onRead(version, true)}>预览</button>}
         {item.canEdit && !item.isArchived && version.revision !== item.currentRevision && <button type="button" className="command-button secondary" disabled={busy || editing} onClick={() => void update(version.revision, false)}>设为有效版本</button>}</div>
     </li>)}</ol>
     <div className="business-records-actions"><button type="button" className="command-button secondary" disabled={busy || !historyNavigation.revisionBefore} onClick={() => historyNavigation.setRevisionBefore(null)}>最新版本</button><button type="button" className="command-button secondary" disabled={busy || !details.revisionNextCursor} onClick={() => historyNavigation.setRevisionBefore(details.revisionNextCursor ?? null)}>更早版本</button></div>

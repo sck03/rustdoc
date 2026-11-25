@@ -267,6 +267,14 @@ impl Adapter for Postgres {
         Ok(self.client.execute(statement, &parameters)?)
     }
 
+    fn audit_statistics(&self) -> Result<AuditStatistics> {
+        let row = self.client.query_one(&audit_query::statistics(true), &[])?;
+        Ok(AuditStatistics {
+            total_events: row.try_get(0)?,
+            oldest_event: row.try_get(1)?,
+        })
+    }
+
     fn query_audits(&self, query: &AuditQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let (sql, projection) = audit_query::build(query, true);
         let count = if query.count_all {

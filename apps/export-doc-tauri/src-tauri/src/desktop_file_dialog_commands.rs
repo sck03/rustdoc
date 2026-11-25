@@ -191,6 +191,7 @@ pub(crate) async fn select_excel_file(
 #[tauri::command]
 pub(crate) async fn select_directory(
     window: tauri::WebviewWindow,
+    paths: tauri::State<'_, crate::runtime_paths::RuntimePaths>,
     default_directory: Option<String>,
 ) -> Result<Option<String>, String> {
     Ok(apply_default_directory(
@@ -198,11 +199,38 @@ pub(crate) async fn select_directory(
             .set_parent(&window)
             .set_title("选择目录"),
         default_directory,
+        paths.data_root.clone(),
     )
     .await?
     .pick_folder()
     .await
     .map(|file| path_to_string(file.path().to_owned())))
+}
+
+#[tauri::command]
+pub(crate) async fn select_default_export_directory(
+    window: tauri::WebviewWindow,
+    paths: tauri::State<'_, crate::runtime_paths::RuntimePaths>,
+    default_directory: Option<String>,
+) -> Result<Option<String>, String> {
+    let data_root = paths.data_root.clone();
+    let selected = select_directory(
+        window,
+        paths,
+        default_directory
+            .filter(|value| !value.trim().is_empty())
+            .or_else(|| Some(data_root.to_string_lossy().into_owned())),
+    )
+    .await?;
+    let Some(selected) = selected else {
+        return Ok(None);
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        export_doc_engine::paths::managed_relative_directory(&data_root, Path::new(&selected))
+            .map(Some)
+    })
+    .await
+    .map_err(|_| "默认导出目录检查未完成。".to_owned())?
 }
 
 #[tauri::command]
@@ -236,10 +264,11 @@ macro_rules! save_commands {
             #[tauri::command]
             pub(crate) async fn $name(
                 window: tauri::WebviewWindow,
+                paths: tauri::State<'_, crate::runtime_paths::RuntimePaths>,
                 default_file_name: Option<String>,
                 default_directory: Option<String>,
             ) -> Result<Option<String>, String> {
-                save_file(&window, $title, $label, $extensions, default_file_name, default_directory).await
+                save_file(&window, &paths.data_root, $title, $label, $extensions, default_file_name, default_directory).await
             }
         )+
     };
@@ -282,6 +311,7 @@ pub(crate) async fn select_save_file_path(
 
 async fn save_file(
     window: &tauri::WebviewWindow,
+    data_root: &Path,
     title: &str,
     label: &str,
     extensions: &[&str],
@@ -298,11 +328,13 @@ async fn save_file(
     {
         dialog = dialog.set_file_name(file_name);
     }
-    Ok(apply_default_directory(dialog, default_directory)
-        .await?
-        .save_file()
-        .await
-        .map(|file| path_to_string(file.path().to_owned())))
+    Ok(
+        apply_default_directory(dialog, default_directory, data_root.to_path_buf())
+            .await?
+            .save_file()
+            .await
+            .map(|file| path_to_string(file.path().to_owned())),
+    )
 }
 
 async fn pick_file(
@@ -326,9 +358,10 @@ async fn pick_file(
 async fn apply_default_directory(
     dialog: rfd::AsyncFileDialog,
     default_directory: Option<String>,
+    data_root: PathBuf,
 ) -> Result<rfd::AsyncFileDialog, String> {
     let path = tauri::async_runtime::spawn_blocking(move || {
-        resolve_existing_directory_candidate(default_directory)
+        resolve_existing_directory_candidate(&data_root, default_directory)
     })
     .await
     .map_err(|_| "默认目录检查未完成。".to_owned())?;
@@ -339,11 +372,18 @@ async fn apply_default_directory(
     })
 }
 
-fn resolve_existing_directory_candidate(default_directory: Option<String>) -> Option<PathBuf> {
+fn resolve_existing_directory_candidate(
+    data_root: &Path,
+    default_directory: Option<String>,
+) -> Option<PathBuf> {
     let directory = default_directory
         .map(|value| value.trim().to_owned())
         .filter(|value| !value.is_empty())?;
-    let path = PathBuf::from(directory);
+    let path = if Path::new(&directory).is_absolute() {
+        PathBuf::from(directory)
+    } else {
+        export_doc_engine::paths::resolve_managed_relative(data_root, &directory).ok()?
+    };
     fs::metadata(&path)
         .ok()
         .filter(|metadata| metadata.is_dir())
@@ -351,8 +391,11 @@ fn resolve_existing_directory_candidate(default_directory: Option<String>) -> Op
 }
 
 #[cfg(test)]
-pub(crate) fn is_existing_directory_candidate(default_directory: Option<String>) -> bool {
-    resolve_existing_directory_candidate(default_directory).is_some()
+pub(crate) fn is_existing_directory_candidate(
+    data_root: &Path,
+    default_directory: Option<String>,
+) -> bool {
+    resolve_existing_directory_candidate(data_root, default_directory).is_some()
 }
 
 fn path_to_string(path: PathBuf) -> String {

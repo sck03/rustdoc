@@ -78,6 +78,11 @@ export async function runSettingsWorkspaceCases({ open, currentPage, read, click
   assert(await read(page, "document.querySelector('[aria-label=数据库连接]').textContent.includes('SQLite 文件名')"));
   assert.equal(await read(page, "[...document.querySelectorAll('[aria-label=数据库连接] label > span')].some(n=>n.textContent==='服务器')"), false);
   assert(await read(page, "Boolean(document.querySelector('[aria-label=软件更新]'))"));
+  assert.equal(await read(page, "document.querySelector('[aria-label=数据库连接] input')"), null);
+  await reveal("更多"); await clickText(page, "恢复本分类默认"); await clickText(page, "恢复默认值", "[role=dialog] button");
+  const runtimeReset = await save();
+  assert.equal(runtimeReset.settings.system.sqliteDatabaseFileName, "exportdoc-native.db");
+  assert.equal(runtimeReset.settings.system.databaseProvider, "Sqlite");
   await backup("recovery");
   assert.equal(await read(page, "document.querySelector('[aria-label=备份与恢复分类]').textContent.includes('团队库')"), false);
   await waitFor(page, "window.__calls.some(c=>c.name==='listDatabaseBackups')");
@@ -94,9 +99,7 @@ export async function runSettingsWorkspaceCases({ open, currentPage, read, click
   await reveal("更多"); await clickText(page, "恢复本分类默认"); await clickText(page, "恢复默认值", "[role=dialog] button");
   const resetSaved = await save();
   assert.equal(resetSaved.settings.system.databaseProvider, "PostgreSQL");
-  assert.equal(resetSaved.settings.system.postgreSqlHost, "database.example.test");
-  assert.equal(resetSaved.settings.system.postgreSqlAutoBackupSchedule, "Daily");
-  assert.equal(resetSaved.settings.system.postgreSqlAutoBackupTime, "02:00");
+  assert.equal(Object.keys(resetSaved.settings.system).some(key => key.startsWith("postgreSql")), false);
   assert.equal(resetSaved.settings.system.itemEntryBlankRowCount, 20);
   await backup("recovery");
   await waitFor(page, "window.__calls.some(c=>c.name==='listPostgreSqlPhysicalBackups')");

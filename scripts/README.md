@@ -1,5 +1,7 @@
 # 脚本使用说明
 
+2026-11-26 维护契约定向回归：`test-native-postgres.ps1 -PostgresBin <PostgreSQL18/bin> -Scope AuditStatistics` 只建立隔离库并验证六万条审计统计，不运行全业务套件。`test_settings_models.mjs`、`test_business_feature_models.mjs` 和四项已失败的 UI 脚本覆盖设置／预览／CI 修复；回归汇总保留失败退出码，并向 Actions 控制台输出有界错误尾部。实际运行与清理证据见[本批记录](../docs/archive/2026-11/2026-11-26维护契约修复与清理.md)。
+
 2026-11-25 稳定性定向回归：`test_business_time_model.mjs` 已登记到 `test:business-date-refresh`；`test_office_model.mjs` 覆盖日期边界与唯一办理入口，`test_editor_recovery_ui.mjs` 核对共享确认弹窗的草稿恢复，`test_approval_permissions_ui.mjs` 使用现行 `/fulfillment`。Rust 定向执行 `clock::tests`、`pdf::merge::tests`、`controlled_process`、`downloads::tests`、`files` 和 `communication_service`，不要求为本轮运行全工作区套件。资源与清理结果见[本批记录](../docs/archive/2026-11/2026-11-25稳定性资源优化与清理.md)。
 
 2026-11-24 OA 办理责任专项：构建当前 office_review 后运行 `node scripts/test_oa_responsibility_ui.mjs`。隔离 SQLite、真实 HTTP／React 核对全部 13 种内置定义；覆盖未关联办理账号排除、8 类办理节点的具体权限错误、补齐关联后仿真成功、无办理权限的具名审批人被拒绝，以及消耗品跳过归还。不会修改现有业务数据库，未运行 PDF 下载专项。

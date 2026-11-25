@@ -5,8 +5,7 @@ export function settingsCategoryForPath([root, field = ""]: readonly string[]): 
   if (root === "system") {
     if (["documentFieldLabels", "itemEntryBlankRowCount", "itemEntrySpareColumnCount"].includes(field)) return "documents";
     if (field === "defaultTemplateExporterNameCn") return "excel-import";
-    if (field === "backupRetentionDays" || field.startsWith("postgreSqlAutoBackup")) return "backup";
-    if (field === "auditLogRetentionDays" || field.startsWith("log")) return "maintenance";
+    if (field === "logRetentionDays" || field === "logRetainedFileCount") return "maintenance";
     return "runtime";
   }
   if (root === "excelImport" || root === "excelImportSchemes") return "excel-import";

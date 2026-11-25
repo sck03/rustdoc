@@ -34,6 +34,7 @@ const clients=[0,1].map(owner=>new Proxy({}, {get:(_,method)=>(request,options)=
  if(method==='listDatabaseBackups')return Promise.resolve({backups:[],backupRoot:'test'});
  if(method==='getHealth')return Promise.resolve({databaseProviderKey:'sqlite'});
  if(method==='getBackupPlan')return Promise.resolve(backupStatus);
+ if(method==='listRecoveryArchives')return Promise.resolve({items:[],nextCursor:null});
  if(method==='listPostgreSqlPhysicalBackups')return Promise.resolve({status:{postgreSqlConfigured:true,toolsReady:true,database:'review',username:'review'},backups:[{fileName:'review.dump'}]});
  if(method==='getServerMigrationStatus')return window.delayStatus?new Promise((resolve,reject)=>window.statusRefresh={resolve,reject}):Promise.resolve({supported:true,toolsReady:true,pendingRestore:false});
  return new Promise((resolve,reject)=>window.calls.push({owner,method,request,signal:options?.signal??request?.signal,resolve,reject}));
@@ -97,7 +98,7 @@ try {
     await page.waitForFunction(() => window.pg.canRestoreDatabase);
     await page.evaluate(() => { window.delayStatus=true; window.pg.databaseRestoreMutation.mutate(); });
     await page.waitForFunction(() => window.calls.length === 1);
-    await page.evaluate(() => window.calls[0].resolve({message:'已暂存'}));
+    await page.evaluate(() => window.calls[0].resolve({jobId:'restore-complete',status:'Succeeded',detailText:'已暂存'}));
     await page.waitForFunction(() => window.statusRefresh && !window.pg.databaseRestoreMutation.isPending);
     assert.equal(await page.evaluate(() => window.pg.databaseAdminPassword), '');
     assert.equal(await page.evaluate(() => window.cache.getMutationCache().getAll().length), 0);

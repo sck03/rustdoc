@@ -307,9 +307,9 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("secrets",r("ApiSettingsSecretsDto")),("message",s())
     ]).required(vec!["success","requiresRestart","settings","secrets","message"])),
     ("ApiSettingsSecretsDto",o(vec![
-        ("emailPasswordSet",b()),("webDavPasswordSet",b()),("postgreSqlPasswordSet",b()),
+        ("emailPasswordSet",b()),("webDavPasswordSet",b()),
         ("aiApiKeySet",b())
-    ]).required(vec!["emailPasswordSet","webDavPasswordSet","postgreSqlPasswordSet","aiApiKeySet"])),
+    ]).required(vec!["emailPasswordSet","webDavPasswordSet","aiApiKeySet"])),
     ("ApiSettingsValidationMessageDto",o(vec![
         ("level",s()),("propertyName",s()),("message",s()),
         ("isAutoFixable",b())
@@ -349,17 +349,16 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("imagePath",s()),("fileName",s()),("contentType",s()),
         ("sizeBytes",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int64").pattern("^-?(?:0|[1-9]\\d*)$")),("storagePolicy",s())
     ]).required(vec!["imagePath","fileName","contentType","sizeBytes","storagePolicy"])),
-    ("ApiSupportPackageRequest",o(vec![("includeLatestDatabaseBackup",b()),("includeSampleFiles",b()),("confirmationText",s())]).required(vec!["includeLatestDatabaseBackup","includeSampleFiles","confirmationText"])),
     ("ApiSupportPackageResponse",o(vec![
         ("success",b()),("message",s()),("fileName",s()),
         ("fullPath",s()),("sizeBytes",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int64").pattern("^-?(?:0|[1-9]\\d*)$")),("supportPackageRoot",s()),
         ("storagePolicy",s())
     ]).required(vec!["success","message","fileName","fullPath","sizeBytes","supportPackageRoot","storagePolicy"])),
     ("ApiSystemLogCleanupResponse",o(vec![
-        ("success",b()),("message",s()),("deletedAuditLogs",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
+        ("success",b()),("message",s()),
         ("deletedTextLogs",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("deletedTextLogsByAge",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("deletedTextLogsByCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("logRoot",s()),("storagePolicy",s())
-    ]).required(vec!["success","message","deletedAuditLogs","deletedTextLogs","deletedTextLogsByAge","deletedTextLogsByCount","logRoot","storagePolicy"])),
+    ]).required(vec!["success","message","deletedTextLogs","deletedTextLogsByAge","deletedTextLogsByCount","logRoot","storagePolicy"])),
     ("ApiUserAccountDto",o(vec![
         ("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("username",s()),("fullName",s()),
         ("role",s()),("permissionTemplateId",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("permissionTemplateCode",s()),

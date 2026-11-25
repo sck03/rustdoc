@@ -8,7 +8,6 @@ import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
 import { downloadJobResultWhenReady } from "../../ui/downloadJobResult.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { formatBytes } from "./settingsFormatters.ts";
-import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 
@@ -22,28 +21,19 @@ export function SupportPackagePanel({
   onPathError: (message: string) => void;
 }) {
   const runAbortableOperation = useAbortableOperation();
-  const requestConfirmation = useConfirmation();
   const [message, setMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [lastPackage, setLastPackage] = useState<ApiSupportPackageResponse | null>(null);
-  const [includeLatestDatabaseBackup, setIncludeLatestDatabaseBackup] = useState(false);
-  const [includeSampleFiles, setIncludeSampleFiles] = useState(false);
-  const includeOptionalFiles = includeLatestDatabaseBackup || includeSampleFiles;
   const isDesktop = isDesktopBridgeAvailable();
 
   const createMutation = useMutation({
     mutationFn: () => runAbortableOperation(async (signal) => {
-      const body = {
-        includeLatestDatabaseBackup,
-        includeSampleFiles,
-        confirmationText: includeOptionalFiles ? "INCLUDE OPTIONAL FILES" : "",
-      };
       if (isDesktop) {
-        const response = await client.saveSupportPackageToRuntime({ body }, { signal });
+        const response = await client.saveSupportPackageToRuntime({ signal });
         return { mode: "desktop" as const, response };
       }
 
-      const job = await client.downloadSupportPackage({ body }, { signal });
+      const job = await client.downloadSupportPackage({ signal });
       await downloadJobResultWhenReady(
         client,
         job,
@@ -64,20 +54,12 @@ export function SupportPackagePanel({
   });
   const supportPackageCanCreate = canManageSettings && !createMutation.isPending;
 
-  async function handleCreateSupportPackage() {
-    if (includeOptionalFiles && !await requestConfirmation({ title: "生成包含可选文件的支持包", description: "支持包将包含所选的数据库备份或样张文件。", details: ["请确认其中不含不应交给技术支持的敏感业务资料。"], confirmLabel: "确认生成" })) {
-      return;
-    }
-
-    createMutation.mutate();
-  }
-
   return (
     <section className="form-section support-package-section" aria-label="问题诊断包">
       <div className="section-header">
         <div>
           <h2>问题诊断包</h2>
-          <p className="section-description">遇到无法启动、报表异常等问题时，可导出资料交给技术支持。</p>
+          <p className="section-description">导出脱敏诊断摘要，不包含业务文件或数据库备份。</p>
         </div>
         <div className="toolbar-actions">
           <button
@@ -87,7 +69,7 @@ export function SupportPackagePanel({
             onClick={() => {
               setMessage(null);
               setSuccessMessage(null);
-              void handleCreateSupportPackage();
+              createMutation.mutate();
             }}
           >
             <LifeBuoy size={17} aria-hidden="true" />
@@ -97,26 +79,6 @@ export function SupportPackagePanel({
       </div>
       {message ? <InlineNotice tone="error" title="支持包导出失败">{message}</InlineNotice> : null}
       {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
-      <div className="backup-action-grid">
-        <label className="settings-check">
-          <input
-            type="checkbox"
-            checked={includeLatestDatabaseBackup}
-            disabled={!canManageSettings || createMutation.isPending}
-            onChange={(event) => setIncludeLatestDatabaseBackup(event.target.checked)}
-          />
-          <span>包含最新数据库备份</span>
-        </label>
-        <label className="settings-check">
-          <input
-            type="checkbox"
-            checked={includeSampleFiles}
-            disabled={!canManageSettings || createMutation.isPending}
-            onChange={(event) => setIncludeSampleFiles(event.target.checked)}
-          />
-          <span>包含样张文件</span>
-        </label>
-      </div>
       {isDesktop ? <div className="detail-grid runtime-detail-grid">
         <div className="detail-item detail-item-wide">
           <span>支持包目录</span>

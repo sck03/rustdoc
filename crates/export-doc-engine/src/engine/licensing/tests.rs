@@ -7,8 +7,7 @@ use crate::engine::test_support::{
     ScratchDirectory as Workspace, TestService, administrator as admin,
 };
 use crate::paths::{RuntimePaths, nonce};
-use std::sync::Arc;
-use zip::ZipArchive;
+use std::{fs, sync::Arc};
 
 const TEST_MACHINE: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const TEST_PUBLIC_KEY: &str = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAExmev74ezFtXdBMnhoFcZomuei6hvAkfOTiiQ/NkGo3VVMTizAky8BlPlJKi/GGG7jDQKhGCW3rPpmOJcmMuLeQ==";
@@ -220,107 +219,4 @@ fn license_registration_requires_an_administrator() {
         .status,
         Some(403)
     );
-}
-#[test]
-fn support_package_carries_diagnostics_without_secrets() {
-    let workspace = Workspace::new();
-    let service = open(&workspace);
-    register(
-        &service.store,
-        &service.protector,
-        &service.clock,
-        &TestVerifier,
-        &admin(),
-        "TEST-2099-12-31",
-    )
-    .unwrap();
-    let saved = handle(
-        &service,
-        &admin(),
-        SAVE_SUPPORT_PACKAGE_TO_RUNTIME,
-        &[],
-        &[],
-        &json!({}),
-    )
-    .unwrap();
-    assert_eq!(saved["success"], true);
-    let path = PathBuf::from(saved["fullPath"].as_str().unwrap());
-    assert!(path.is_file());
-    assert!(!String::from_utf8_lossy(&fs::read(&path).unwrap()).contains("TEST-2099-12-31"));
-    let output = download(&service, &admin(), DOWNLOAD_SUPPORT_PACKAGE, &[]).unwrap();
-    assert_eq!(output.media_type, "application/zip");
-    assert!(output.file_name.ends_with("_support_package.zip"));
-    let mut archive = ZipArchive::new(std::io::Cursor::new(output.content)).unwrap();
-    let mut names = vec![];
-    for index in 0..archive.len() {
-        names.push(
-            archive
-                .by_index(index)
-                .unwrap()
-                .name()
-                .unwrap()
-                .into_owned(),
-        );
-    }
-    assert_eq!(
-        names
-            .iter()
-            .filter(|name| name.starts_with("diagnostics/"))
-            .count(),
-        5
-    );
-    assert!(names.contains(&"diagnostics/database.json".to_string()));
-}
-#[test]
-fn system_log_cleanup_honors_the_configured_retention() {
-    let workspace = Workspace::new();
-    let paths = workspace.paths();
-    let service = open(&workspace);
-    service
-        .store
-        .transaction(|tx| {
-            tx.append_audit_details(
-                &AuditWrite {
-                    kind: "license",
-                    record_id: 0,
-                    version: 1,
-                    action: "register",
-                    actor_id: 1,
-                    occurred_at: "2020-01-01T00:00:00Z",
-                    note: "",
-                },
-                &json!({}),
-            )?;
-            Ok(tx.set_settings(
-                "settings",
-                1,
-                &json!({"system":{"auditLogRetentionDays":30,"logRetentionDays":30}}),
-            )?)
-        })
-        .unwrap();
-    let old_log = paths.log_root.join("2020-01-01.log");
-    fs::write(&old_log, b"old log line").unwrap();
-    std::fs::File::options()
-        .write(true)
-        .open(&old_log)
-        .unwrap()
-        .set_times(
-            std::fs::FileTimes::new().set_modified(
-                SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_577_836_800),
-            ),
-        )
-        .unwrap();
-    let response = handle(
-        &service,
-        &admin(),
-        CLEANUP_SYSTEM_LOGS,
-        &[],
-        &[],
-        &json!({}),
-    )
-    .unwrap();
-    assert_eq!(response["success"], true);
-    assert!(response["deletedAuditLogs"].as_i64().unwrap() >= 1);
-    assert!(response["deletedTextLogsByAge"].as_i64().unwrap() >= 1);
-    assert!(!old_log.exists());
 }

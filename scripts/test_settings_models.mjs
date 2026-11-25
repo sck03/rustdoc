@@ -19,7 +19,7 @@ const runtimeDependencyDiagnosticsPath = path.join(repoRoot, "apps", "export-doc
 const reportTemplateSelectionPath = path.join(repoRoot, "apps", "export-doc-web", "src", "features", "reports", "reportTemplateSelectionModel.ts").replaceAll("\\", "/");
 const updaterEndpointModelPath = path.join(repoRoot, "apps", "export-doc-web", "src", "features", "system", "updaterEndpointModel.ts").replaceAll("\\", "/");
 const masterDataModelPath = path.join(repoRoot, "apps", "export-doc-web", "src", "features", "master-data", "masterDataModel.ts").replaceAll("\\", "/");
-fs.writeFileSync(entry, `import * as draft from ${JSON.stringify(path.join(path.dirname(modelPath), "settingsDraftModel.ts"))}; globalThis.__draft = draft; import * as model from ${JSON.stringify(modelPath)}; import * as navigation from ${JSON.stringify(navigationPath)}; import * as categoryCatalog from ${JSON.stringify(categoryCatalogPath)}; import * as runtimeDiagnostics from ${JSON.stringify(runtimeDiagnosticsPath)}; import * as runtimeDependencyDiagnostics from ${JSON.stringify(runtimeDependencyDiagnosticsPath)}; import * as reportTemplateSelection from ${JSON.stringify(reportTemplateSelectionPath)}; import * as updaterEndpointModel from ${JSON.stringify(updaterEndpointModelPath)}; import * as masterDataModel from ${JSON.stringify(masterDataModelPath)}; globalThis.__model = model; globalThis.__navigation = navigation; globalThis.__categoryCatalog = categoryCatalog; globalThis.__runtimeDiagnostics = runtimeDiagnostics; globalThis.__runtimeDependencyDiagnostics = runtimeDependencyDiagnostics; globalThis.__reportTemplateSelection = reportTemplateSelection; globalThis.__updaterEndpointModel = updaterEndpointModel; globalThis.__masterDataModel = masterDataModel;`, "utf8");
+fs.writeFileSync(entry, `import { systemDefaultPatches } from ${JSON.stringify(path.join(path.dirname(modelPath), "settingsDefaults.ts"))}; globalThis.__defaults = systemDefaultPatches; import * as draft from ${JSON.stringify(path.join(path.dirname(modelPath), "settingsDraftModel.ts"))}; globalThis.__draft = draft; import * as model from ${JSON.stringify(modelPath)}; import * as navigation from ${JSON.stringify(navigationPath)}; import * as categoryCatalog from ${JSON.stringify(categoryCatalogPath)}; import * as runtimeDiagnostics from ${JSON.stringify(runtimeDiagnosticsPath)}; import * as runtimeDependencyDiagnostics from ${JSON.stringify(runtimeDependencyDiagnosticsPath)}; import * as reportTemplateSelection from ${JSON.stringify(reportTemplateSelectionPath)}; import * as updaterEndpointModel from ${JSON.stringify(updaterEndpointModelPath)}; import * as masterDataModel from ${JSON.stringify(masterDataModelPath)}; globalThis.__model = model; globalThis.__navigation = navigation; globalThis.__categoryCatalog = categoryCatalog; globalThis.__runtimeDiagnostics = runtimeDiagnostics; globalThis.__runtimeDependencyDiagnostics = runtimeDependencyDiagnostics; globalThis.__reportTemplateSelection = reportTemplateSelection; globalThis.__updaterEndpointModel = updaterEndpointModel; globalThis.__masterDataModel = masterDataModel;`, "utf8");
 const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
 await esbuild.build({ entryPoints: [entry], outfile: bundle, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
 await import(pathToFileURL(bundle).href);
@@ -32,6 +32,15 @@ const reportTemplateSelection = globalThis.__reportTemplateSelection;
 const updaterEndpointModel = globalThis.__updaterEndpointModel;
 const masterDataModel = globalThis.__masterDataModel;
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
+
+for (const provider of ["Sqlite", "PostgreSQL"]) {
+  const runtime = { databaseProvider: provider, sqliteDatabaseFileName: "exportdoc-native.db" };
+  for (const { path: settingPath, value } of globalThis.__defaults) {
+    if (settingPath[0] === "system") runtime[settingPath[1]] = value;
+  }
+  assert(runtime.databaseProvider === provider && runtime.sqliteDatabaseFileName === "exportdoc-native.db", "restore defaults preserves runtime database identity");
+  assert(!Object.keys(runtime).some(key => key.startsWith("postgreSql") || ["auditLogRetentionDays", "logFileSizeLimitMB", "backupRetentionDays"].includes(key)), "defaults do not revive retired settings");
+}
 
 const normalized = m.normalizeExcelImportSettings({ schemeName: "Custom", itemsStartRow: "25", invoiceNoCell: null });
 assert(normalized.schemeName === "Custom", "current contract scheme name");
@@ -156,8 +165,8 @@ assert(JSON.stringify(draft.changedSettingsCategories(before, after).map(item =>
 after.system.documentFieldLabels.invoice.spare1 = "旧名"; after.email.smtpHost = "old"; after.revision = 2;
 assert(draft.changedSettingsCategories(before, after).length === 0, "undo clears dirty categories and revision is not editable content");
 assert(draft.settingsCategoryForPath(["system", "defaultTemplateExporterNameCn"]) === "excel-import", "exporter default belongs to Excel");
-assert(draft.settingsCategoryForPath(["system", "postgreSqlAutoBackupTime"]) === "backup", "backup schedule ownership");
-assert(draft.settingsCategoryForPath(["system", "auditLogRetentionDays"]) === "maintenance", "audit retention ownership");
+assert(draft.settingsCategoryForPath(["webDav", "enabled"]) === "backup", "backup settings ownership");
+assert(draft.settingsCategoryForPath(["system", "logRetentionDays"]) === "maintenance", "text log retention ownership");
 // Secret-control visibility is exercised on the production settings panels in
 // settings-workspace-ui-cases.mjs; it is not duplicated in a model-only wrapper.
 process.stdout.write("settings-model tests passed\n");

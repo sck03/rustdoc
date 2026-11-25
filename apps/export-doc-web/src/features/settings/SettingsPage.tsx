@@ -8,8 +8,8 @@ import { readApiError } from "../../ui/formUtils.ts";
 import { PageHeader } from "../../ui/primitives/PageHeader.tsx";
 import { ConcurrencyConflictNotice, InlineNotice, PageState } from "../../ui/PageState.tsx";
 import { SettingsCategoryNav, SettingsValidationPanel } from "./SettingsPagePanels.tsx";
-import { settingsCategoryForPath, changedSettingCounts } from "./settingsDraftModel.ts";
-import { systemDefaultPatches } from "./settingsDefaults.ts";
+import { changedSettingCounts } from "./settingsDraftModel.ts";
+import { defaultPatchesForCategory } from "./settingsDefaults.ts";
 import { readSettingsCategoryFromSearch, readSettingsPanelLabelFromSearch } from "./settingsNavigationModel.ts";
 import { useSettingsWorkspace } from "./useSettingsWorkspace.ts";
 
@@ -77,7 +77,7 @@ export function SettingsPage({
               <button className="icon-button" type="button" title="刷新" aria-label="刷新" disabled={isBusy} onClick={() => void handleReloadSettings()}>
                 <RefreshCw size={18} aria-hidden="true" />
               </button>
-              {systemDefaultPatches.some(({ path }) => settingsCategoryForPath(path) === currentCategory) && <button className="command-button secondary" type="button" disabled={isBusy || !canManageSettings} onClick={handleRestoreSystemDefaults}>
+              {defaultPatchesForCategory(currentCategory, isDesktopRuntime).length > 0 && <button className="command-button secondary" type="button" disabled={isBusy || !canManageSettings} onClick={handleRestoreSystemDefaults}>
                 <RotateCcw size={17} aria-hidden="true" />
                 <span>恢复本分类默认</span>
               </button>}
@@ -114,10 +114,7 @@ export function SettingsPage({
               {currentCategory === "runtime" ? (
                 <LazyRuntimeDatabaseSettingsPanel
                   settings={settings}
-                  secrets={secrets}
                   canManageSettings={canManageSettings}
-                  updateSecrets={updateSecrets}
-                  onUpdateSecrets={setUpdateSecrets}
                   isBusy={isBusy}
                   canSelectDesktopDirectory={canSelectDesktopDirectory}
                   isDesktopRuntime={isDesktopRuntime}

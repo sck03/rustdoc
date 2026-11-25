@@ -145,6 +145,7 @@ impl NativeService {
             || report_templates::OPERATIONS.contains(&operation)
             || report_template_files::OPERATIONS.contains(&operation)
             || licensing::OPERATIONS.contains(&operation)
+            || super::diagnostics::OPERATIONS.contains(&operation)
             || team_backup::OPERATIONS.contains(&operation)
             || file_store::admin::OPERATIONS.contains(&operation)
             || sales::OPERATIONS.contains(&operation)

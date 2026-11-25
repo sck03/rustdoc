@@ -117,7 +117,7 @@ impl NativeService {
                 DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE => {
                     super::report_assets::download(self, actor, parameters)?
                 }
-                _ => super::licensing::download(self, actor, operation, parameters)?,
+                _ => super::diagnostics::download(self, actor)?,
             };
             if output.content.capacity() > working_mib * 1024 * 1024 {
                 return Err(super::error::unavailable("下载结果超过预留容量。"));

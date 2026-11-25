@@ -1,4 +1,4 @@
-//! License status/registration, diagnostic support packages and system log cleanup.
+//! License status and registration.
 //!
 //! License keys use the EDM2-<payload>.<signature> format: payload is the exact
 //! JSON {"v":2,"mid":<machine id>,"exp":<unix seconds, -1 for lifetime>} and the
@@ -9,38 +9,18 @@
 use super::{
     NativeService, auth,
     error::{Result, invalid, unavailable, unsupported},
-    settings,
     store::{self, Actor, Store},
-    tasks,
 };
-use crate::{
-    clock::BusinessClock,
-    contracts,
-    generated_api::*,
-    paths::{RuntimePaths, atomic_write, ensure_safe_absolute, nonce},
-};
+use crate::{clock::BusinessClock, contracts, generated_api::*};
 use base64::{Engine, prelude::BASE64_STANDARD, prelude::BASE64_URL_SAFE_NO_PAD};
-use chrono::{DateTime, NaiveDate, Utc};
+use chrono::{DateTime, NaiveDate};
 use export_doc_storage::AuditWrite;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-use std::{
-    fs,
-    io::Write,
-    path::{Path, PathBuf},
-    sync::Mutex,
-    time::SystemTime,
-};
-use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
+use std::sync::Mutex;
 
-pub const OPERATIONS: &[Operation] = &[
-    GET_LICENSE_STATUS,
-    REGISTER_LICENSE,
-    DOWNLOAD_SUPPORT_PACKAGE,
-    SAVE_SUPPORT_PACKAGE_TO_RUNTIME,
-    CLEANUP_SYSTEM_LOGS,
-];
+pub const OPERATIONS: &[Operation] = &[GET_LICENSE_STATUS, REGISTER_LICENSE];
 const TRIAL_DAYS: i64 = 7;
 const BINDING_VERSION: u8 = 3;
 const SIGNED_PREFIX: &str = "EDM2-";
@@ -49,9 +29,6 @@ const VENDOR_PUBLIC_KEY: &str = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEHfZ6xFQTzZb
 const ANCHOR_NAME: &str = "license-anchor";
 const ANCHOR_STORAGE: &str = "当前数据库 settings/license-anchor 受密封保护的授权锚点";
 const STORAGE_POLICY: &str = "授权状态、试用开始日期、稳定机器码种子、本机密封随机量与已验证注册码以 AES-256-GCM 密封保存到受管设置记录；本地主密钥位于运行数据根 Security 目录。删除程序目录后重新安装不会重置试用，也不会丢失已注册授权；业务数据库、模板和普通运行数据不写系统盘默认用户目录。";
-const SUPPORT_PACKAGE_POLICY: &str = "支持包只包含诊断摘要（版本、数据库类型、受管目录、脱敏配置摘要与审计统计）；不收集密码、令牌、业务数据或数据库内容。";
-const SCAN_LIMIT: i64 = 50_000;
-const DELETE_LIMIT: usize = 100_000;
 
 /// Verifies an issued license key against the current machine identity. The
 /// built-in implementation checks the EDM2- signed format with ECDSA P-256;
@@ -418,318 +395,6 @@ fn register(
     Ok(response)
 }
 
-// --- Diagnostic support packages. ---
-fn support_root(paths: &RuntimePaths) -> Result<PathBuf> {
-    let root = paths.data_root.join("SupportPackages");
-    ensure_safe_absolute(&root).map_err(invalid)?;
-    fs::create_dir_all(&root)?;
-    Ok(root)
-}
-fn entry(
-    writer: &mut ZipWriter<std::io::Cursor<Vec<u8>>>,
-    name: &str,
-    value: &Value,
-) -> Result<()> {
-    writer
-        .start_file(
-            name,
-            SimpleFileOptions::default().compression_method(CompressionMethod::Deflated),
-        )
-        .map_err(|error| unavailable(error.to_string()))?;
-    writer
-        .write_all(&serde_json::to_vec(value)?)
-        .map_err(|error| unavailable(error.to_string()))?;
-    Ok(())
-}
-fn support_package(
-    store: &Store,
-    paths: &RuntimePaths,
-    clock: &BusinessClock,
-) -> Result<(String, Vec<u8>)> {
-    let mut writer = ZipWriter::new(std::io::Cursor::new(Vec::new()));
-    entry(
-        &mut writer,
-        "diagnostics/runtime.json",
-        &runtime_diagnostics(store)?,
-    )?;
-    entry(
-        &mut writer,
-        "diagnostics/database.json",
-        &audit_statistics(store)?,
-    )?;
-    entry(
-        &mut writer,
-        "diagnostics/paths.json",
-        &paths_diagnostics(paths)?,
-    )?;
-    entry(
-        &mut writer,
-        "diagnostics/settings-redacted.json",
-        &settings_summary(store)?,
-    )?;
-    entry(
-        &mut writer,
-        "diagnostics/logs-inventory.json",
-        &log_inventory(paths)?,
-    )?;
-    let bytes = writer
-        .finish()
-        .map_err(|error| unavailable(error.to_string()))?
-        .into_inner();
-    let name = format!(
-        "{}_{}_support_package.zip",
-        Utc::now().format("%Y%m%d_%H%M%S"),
-        &nonce().map_err(unavailable)?[..8]
-    );
-    let _ = clock;
-    Ok((name, bytes))
-}
-fn runtime_diagnostics(store: &Store) -> Result<Value> {
-    let provider = store.provider()?;
-    Ok(json!({
-        "productVersion": crate::build_info::PRODUCT_VERSION,
-        "informationalVersion": crate::build_info::INFORMATIONAL_VERSION,
-        "databaseProvider": provider,
-        "databaseProviderKey": if provider == "SQLite" { "sqlite" } else { "postgresql" },
-        "operatingSystem": std::env::consts::OS,
-        "architecture": std::env::consts::ARCH,
-        "generatedAt": Utc::now().to_rfc3339(),
-        "storagePolicy": SUPPORT_PACKAGE_POLICY
-    }))
-}
-fn paths_diagnostics(paths: &RuntimePaths) -> Result<Value> {
-    let item = |key: &str, label: &str, path: &Path| json!({"key": key, "label": label, "path": path, "exists": path.exists()});
-    Ok(json!({"roots": [
-        item("appRoot", "程序", &paths.app_root),
-        item("dataRoot", "业务数据", &paths.data_root),
-        item("logRoot", "运行日志", &paths.log_root),
-        item("cacheRoot", "缓存", &paths.cache_root),
-        item("fontPath", "报表字体", &paths.font_path)
-    ], "storagePolicy": SUPPORT_PACKAGE_POLICY}))
-}
-fn settings_summary(store: &Store) -> Result<Value> {
-    let settings = settings::current(store)?;
-    let item = |path: &str| settings.pointer(path).cloned().unwrap_or(Value::Null);
-    Ok(json!({
-        "auditLogRetentionDays": item("/system/auditLogRetentionDays"),
-        "logRetentionDays": item("/system/logRetentionDays"),
-        "logRetainedFileCount": item("/system/logRetainedFileCount"),
-        "logFileSizeLimitMB": item("/system/logFileSizeLimitMB"),
-        "backupRetentionDays": item("/system/backupRetentionDays"),
-        "databaseProvider": item("/system/databaseProvider"),
-        "storagePolicy": SUPPORT_PACKAGE_POLICY
-    }))
-}
-fn audit_statistics(store: &Store) -> Result<Value> {
-    store.transaction(|tx| {
-        let mut before = i64::MAX;
-        let mut total = 0i64;
-        let mut days: std::collections::BTreeMap<String, i64> = std::collections::BTreeMap::new();
-        let mut actions: std::collections::BTreeMap<String, i64> =
-            std::collections::BTreeMap::new();
-        let mut oldest = String::new();
-        for _ in 0..50 {
-            crate::operation::check()?;
-            let batch = tx.audit_events(before, 1000)?;
-            if batch.is_empty() {
-                break;
-            }
-            before = batch
-                .iter()
-                .filter_map(|event| event["id"].as_i64())
-                .min()
-                .unwrap_or(before);
-            for event in &batch {
-                total += 1;
-                let timestamp = event["timestamp"].as_str().unwrap_or("");
-                if timestamp.len() >= 10 {
-                    days.entry(timestamp[..10].to_string())
-                        .and_modify(|count| *count += 1)
-                        .or_insert(1);
-                }
-                if oldest.as_str() < timestamp {
-                    oldest = timestamp.to_string();
-                }
-                actions
-                    .entry(event["action"].as_str().unwrap_or("").to_string())
-                    .and_modify(|count| *count += 1)
-                    .or_insert(1);
-            }
-        }
-        let mut top: Vec<_> = actions
-            .into_iter()
-            .map(|(action, count)| json!({"action": action, "count": count}))
-            .collect();
-        top.sort_by(|left, right| {
-            right["count"]
-                .as_i64()
-                .unwrap_or(0)
-                .cmp(&left["count"].as_i64().unwrap_or(0))
-        });
-        top.truncate(5);
-        Ok(json!({"scannedEvents": total, "oldestEvent": oldest, "byDay": days, "topActions": top}))
-    })
-}
-fn log_inventory(paths: &RuntimePaths) -> Result<Value> {
-    let mut files = vec![];
-    for item in fs::read_dir(&paths.log_root)? {
-        let item = item?;
-        let metadata = item.metadata()?;
-        if !metadata.is_file() {
-            continue;
-        }
-        let modified = metadata
-            .modified()
-            .ok()
-            .and_then(|time| time.duration_since(SystemTime::UNIX_EPOCH).ok())
-            .map(|duration| duration.as_secs())
-            .unwrap_or(0);
-        files.push(json!({"fileName": item.file_name().to_string_lossy(), "sizeBytes": metadata.len(), "modifiedUnixSeconds": modified}));
-    }
-    files.sort_by(|left, right| {
-        right["modifiedUnixSeconds"]
-            .as_i64()
-            .unwrap_or(0)
-            .cmp(&left["modifiedUnixSeconds"].as_i64().unwrap_or(0))
-    });
-    Ok(json!({"logRoot": paths.log_root, "count": files.len(), "files": files}))
-}
-fn save_support_package_to_runtime(
-    store: &Store,
-    paths: &RuntimePaths,
-    clock: &BusinessClock,
-    actor: &Actor,
-) -> Result<Value> {
-    auth::authorize(actor, "system.settings", "manage")?;
-    let (name, bytes) = support_package(store, paths, clock)?;
-    let root = support_root(paths)?;
-    let path = root.join(&name);
-    ensure_safe_absolute(&path).map_err(invalid)?;
-    atomic_write(&path, &bytes).map_err(unavailable)?;
-    let mut response = contracts::initial(contracts::schema("ApiSupportPackageResponse"));
-    response["success"] = json!(true);
-    response["message"] = json!("支持包已保存到运行数据根 SupportPackages 目录。");
-    response["fileName"] = json!(name);
-    response["fullPath"] = json!(path);
-    response["sizeBytes"] = json!(bytes.len());
-    response["supportPackageRoot"] = json!(root);
-    response["storagePolicy"] = json!(SUPPORT_PACKAGE_POLICY);
-    Ok(response)
-}
-
-// --- System log cleanup. ---
-fn cleanup_system_logs(store: &Store, paths: &RuntimePaths, actor: &Actor) -> Result<Value> {
-    auth::authorize(actor, "system.audit", "manage")?;
-    let settings = settings::current(store)?;
-    let audit_days = settings
-        .pointer("/system/auditLogRetentionDays")
-        .and_then(Value::as_i64)
-        .unwrap_or(0);
-    let log_days = settings
-        .pointer("/system/logRetentionDays")
-        .and_then(Value::as_i64)
-        .unwrap_or(0);
-    let log_count = settings
-        .pointer("/system/logRetainedFileCount")
-        .and_then(Value::as_i64)
-        .unwrap_or(0);
-    let deleted_audit = if audit_days > 0 {
-        store.transaction(|tx| {
-            let cutoff = Utc::now() - chrono::Duration::days(audit_days);
-            let mut before = i64::MAX;
-            let mut ids = Vec::new();
-            let mut scanned = 0i64;
-            loop {
-                crate::operation::check()?;
-                let batch = tx.audit_events(before, 1000)?;
-                if batch.is_empty() || scanned >= SCAN_LIMIT || ids.len() >= DELETE_LIMIT {
-                    break;
-                }
-                before = batch
-                    .iter()
-                    .filter_map(|event| event["id"].as_i64())
-                    .min()
-                    .unwrap_or(before);
-                scanned += batch.len() as i64;
-                ids.extend(
-                    batch
-                        .iter()
-                        .filter(|event| {
-                            event_time(event).map(|time| time < cutoff).unwrap_or(false)
-                        })
-                        .filter_map(|event| event["id"].as_i64()),
-                );
-            }
-            let deleted = tx.delete_audits(&ids)?;
-            tx.append_audit_details(
-                &AuditWrite {
-                    kind: "system-maintenance",
-                    record_id: 0,
-                    version: 1,
-                    action: "CleanupSystemLogs",
-                    actor_id: actor.id,
-                    occurred_at: &store::timestamp(),
-                    note: "",
-                },
-                &json!({"newValues":{"deletedAuditLogs":deleted}}),
-            )?;
-            Ok(deleted)
-        })?
-    } else {
-        0
-    };
-    let (by_age, by_count) = cleanup_text_logs(paths, log_days, log_count)?;
-    let mut response = contracts::initial(contracts::schema("ApiSystemLogCleanupResponse"));
-    response["success"] = json!(true);
-    response["message"] = json!(format!(
-        "日志清理已完成：审计日志 {deleted_audit} 条，文本日志 {} 个。",
-        by_age + by_count
-    ));
-    response["deletedAuditLogs"] = json!(deleted_audit);
-    response["deletedTextLogs"] = json!(by_age + by_count);
-    response["deletedTextLogsByAge"] = json!(by_age);
-    response["deletedTextLogsByCount"] = json!(by_count);
-    response["logRoot"] = json!(paths.log_root);
-    response["storagePolicy"] = json!(
-        "手动日志清理只读取已保存的日志保留设置；审计日志清理仅操作数据库审计表，文本日志清理仅操作运行数据根 Logs 目录，不接收任意路径。"
-    );
-    Ok(response)
-}
-fn event_time(event: &Value) -> Result<DateTime<Utc>> {
-    DateTime::parse_from_rfc3339(event["timestamp"].as_str().unwrap_or(""))
-        .map(|time| time.with_timezone(&Utc))
-        .map_err(|_| unavailable("审计记录时间损坏，已停止处理。"))
-}
-/// Age-based deletion first; the retained-file-count cap then keeps the newest logs.
-fn cleanup_text_logs(paths: &RuntimePaths, days: i64, retained: i64) -> Result<(i64, i64)> {
-    if days <= 0 && retained <= 0 {
-        return Ok((0, 0));
-    }
-    let cutoff: SystemTime = (Utc::now() - chrono::Duration::days(days.max(0))).into();
-    let mut files: Vec<(PathBuf, SystemTime)> = fs::read_dir(&paths.log_root)?
-        .filter_map(|item| item.ok())
-        .filter_map(|item| {
-            let metadata = item.metadata().ok()?;
-            if !metadata.is_file() {
-                return None;
-            }
-            Some((item.path(), metadata.modified().ok()?))
-        })
-        .collect();
-    files.sort_by(|left, right| right.1.cmp(&left.1));
-    let (mut by_age, mut by_count) = (0, 0);
-    for (index, (path, modified)) in files.iter().enumerate() {
-        let aged = days > 0 && *modified < cutoff;
-        let surplus = retained > 0 && index as i64 >= retained;
-        if aged || surplus {
-            ensure_safe_absolute(path).map_err(invalid)?;
-            fs::remove_file(path)?;
-            if aged { by_age += 1 } else { by_count += 1 }
-        }
-    }
-    Ok((by_age, by_count))
-}
-
 pub fn handle(
     service: &NativeService,
     actor: &Actor,
@@ -755,10 +420,6 @@ pub fn handle(
                 &super::records::text(body, "licenseKey"),
             )
         }
-        SAVE_SUPPORT_PACKAGE_TO_RUNTIME => {
-            save_support_package_to_runtime(&service.store, &service.paths, &service.clock, actor)
-        }
-        CLEANUP_SYSTEM_LOGS => cleanup_system_logs(&service.store, &service.paths, actor),
         _ => Err(unsupported("此项原生操作尚未接入。")),
     }
 }
@@ -780,24 +441,4 @@ pub(super) fn check_operation(service: &NativeService, operation: Operation) -> 
         403,
         state["message"].as_str().unwrap_or("授权无效，请注册。"),
     ))
-}
-pub fn download(
-    service: &NativeService,
-    actor: &Actor,
-    operation: Operation,
-    _parameters: &[(&str, String)],
-) -> Result<tasks::FileOutput> {
-    match operation {
-        DOWNLOAD_SUPPORT_PACKAGE => {
-            auth::authorize(actor, "system.settings", "manage")?;
-            let (file_name, content) =
-                support_package(&service.store, &service.paths, &service.clock)?;
-            Ok(tasks::FileOutput {
-                file_name,
-                media_type: "application/zip".into(),
-                content,
-            })
-        }
-        _ => Err(unsupported("此项原生操作尚未接入。")),
-    }
 }

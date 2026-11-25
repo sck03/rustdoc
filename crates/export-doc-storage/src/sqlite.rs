@@ -234,6 +234,18 @@ impl Adapter for Sqlite {
         Ok(affected as u64)
     }
 
+    fn audit_statistics(&self) -> Result<AuditStatistics> {
+        Ok(self
+            .connection
+            .borrow()
+            .query_cached(&audit_query::statistics(false), [], |row| {
+                Ok(AuditStatistics {
+                    total_events: row.get(0)?,
+                    oldest_event: row.get(1)?,
+                })
+            })?)
+    }
+
     fn query_audits(&self, query: &AuditQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let (sql, projection) = audit_query::build(query, false);
         let count = if query.count_all {

@@ -1,4 +1,44 @@
-use super::{error::Result, store};
+use super::{
+    NativeService, auth,
+    error::{Result, unsupported},
+    store, tasks,
+};
+use crate::generated_api::*;
+mod support_package;
+mod text_logs;
+
+pub const OPERATIONS: &[Operation] = &[
+    SAVE_SUPPORT_PACKAGE_TO_RUNTIME,
+    DOWNLOAD_SUPPORT_PACKAGE,
+    CLEANUP_SYSTEM_LOGS,
+];
+
+pub fn handle(
+    service: &NativeService,
+    actor: &store::Actor,
+    operation: Operation,
+) -> Result<Value> {
+    match operation {
+        SAVE_SUPPORT_PACKAGE_TO_RUNTIME => {
+            support_package::save(&service.store, &service.paths, actor)
+        }
+        CLEANUP_SYSTEM_LOGS => text_logs::cleanup(&service.store, &service.paths, actor),
+        _ => Err(unsupported("此项诊断操作尚未接入。")),
+    }
+}
+
+pub fn download(service: &NativeService, actor: &store::Actor) -> Result<tasks::FileOutput> {
+    auth::authorize(actor, "system.settings", "manage")?;
+    let (file_name, content) = support_package::build(&service.store, &service.paths)?;
+    Ok(tasks::FileOutput {
+        file_name,
+        media_type: "application/zip".into(),
+        content,
+    })
+}
+
+#[cfg(test)]
+mod tests;
 use crate::{build_info, contracts, paths::RuntimePaths};
 use serde_json::{Value, json};
 

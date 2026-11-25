@@ -37,9 +37,11 @@ assert.equal(model.worklist.worklistTarget({ source: "contract-end", recordId: 5
 assert.equal(model.worklist.worklistTarget({ source: "unknown", recordId: 1 }), null);
 assert.equal(model.worklist.worklistDueLabel({}, "Asia/Shanghai"), "未设截止日期");
 assert.equal(model.worklist.worklistDueLabel({ dueDate: "2026-09-08" }, "America/New_York"), "2026-09-08", "natural days must not shift with time zone conversion");
-assert.equal(model.attachments.canPreviewAttachment("text/html"), false);
-assert.equal(model.attachments.canPreviewAttachment("image/svg+xml"), false);
-assert.equal(model.attachments.canPreviewAttachment("application/pdf"), true);
+assert.equal(model.attachments.canPreviewAttachment("text/html", 1), false);
+assert.equal(model.attachments.canPreviewAttachment("image/svg+xml", 1), false);
+assert.equal(model.attachments.canPreviewAttachment("application/pdf", 16 * 1024 * 1024), true);
+assert.equal(model.attachments.canPreviewAttachment("application/pdf", 16 * 1024 * 1024 + 1), false);
+assert.equal(model.attachments.canPreviewAttachment("image/png", -1), false);
 assert.match(model.attachments.attachmentVersionLabel({ currentRevision: 1, latestRevision: 2 }), /v1/);
 const file = new File(["客户原始资料"], "café.txt", { type: "text/plain" });
 const request = model.attachments.attachmentUploadRequest({ invoiceId: 9, uploadKey: "key", title: "客户资料", categoryId: 3, note: "样".repeat(500), file });

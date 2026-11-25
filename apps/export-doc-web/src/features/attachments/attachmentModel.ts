@@ -27,6 +27,8 @@ export function fileSizeLabel(bytes: number) {
   return bytes < 1024 * 1024 ? `${Math.ceil(bytes / 1024)} KiB` : `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
 }
 
-export function canPreviewAttachment(contentType: string) {
-  return ["application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp"].includes(contentType);
+export const maximumAttachmentPreviewBytes = 16 * 1024 * 1024;
+
+export function canPreviewAttachment(contentType: string, length: number) {
+  return Number.isSafeInteger(length) && length > 0 && length <= maximumAttachmentPreviewBytes && ["application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp"].includes(contentType);
 }

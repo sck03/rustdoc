@@ -3266,7 +3266,6 @@ export interface ApiSettingsSaveResponse {
 export interface ApiSettingsSecretsDto {
   aiApiKeySet: boolean;
   emailPasswordSet: boolean;
-  postgreSqlPasswordSet: boolean;
   webDavPasswordSet: boolean;
 }
 
@@ -3785,12 +3784,6 @@ export interface ApiSupplierSaveRequest {
   website: string;
 }
 
-export interface ApiSupportPackageRequest {
-  confirmationText: string;
-  includeLatestDatabaseBackup: boolean;
-  includeSampleFiles: boolean;
-}
-
 export interface ApiSupportPackageResponse {
   fileName: string;
   fullPath: string;
@@ -3802,7 +3795,6 @@ export interface ApiSupportPackageResponse {
 }
 
 export interface ApiSystemLogCleanupResponse {
-  deletedAuditLogs: number;
   deletedTextLogs: number;
   deletedTextLogsByAge: number;
   deletedTextLogsByCount: number;
@@ -6870,28 +6862,14 @@ export interface SupplyRequestUpdateRequest {
 }
 
 export interface SystemSettings {
-  auditLogRetentionDays: number;
-  backupRetentionDays: number;
   databaseProvider: string;
   defaultExportDirectory: string;
   defaultTemplateExporterNameCn: string;
   documentFieldLabels: DocumentFieldLabelSettings;
   itemEntryBlankRowCount: number;
   itemEntrySpareColumnCount: number;
-  logFileSizeLimitMB: number;
   logRetainedFileCount: number;
   logRetentionDays: number;
-  postgreSqlAdditionalOptions: string;
-  postgreSqlAutoBackupDayOfWeek: number;
-  postgreSqlAutoBackupEnabled: boolean;
-  postgreSqlAutoBackupRetentionCount: number;
-  postgreSqlAutoBackupSchedule: string;
-  postgreSqlAutoBackupTime: string;
-  postgreSqlDatabase: string;
-  postgreSqlHost: string;
-  postgreSqlPassword: string;
-  postgreSqlPort: number;
-  postgreSqlUsername: string;
   sqliteDatabaseFileName: string;
   updaterEndpoint: string;
 }
@@ -8786,10 +8764,6 @@ export interface DownloadReportTemplateFileRequest {
 export interface DownloadReportTemplateV3ImageResourceRequest {
   resourceId: string;
   Range?: string;
-}
-
-export interface DownloadSupportPackageRequest {
-  body: ApiSupportPackageRequest;
 }
 
 export interface EditBusinessAttachmentMetadataRequest {
@@ -10725,10 +10699,6 @@ export interface SaveSingleWindowClientProfileRequest {
 
 export interface SaveSingleWindowReceiptPackageToPathRequest {
   body: ApiSingleWindowReceiptPackageExportRequest;
-}
-
-export interface SaveSupportPackageToRuntimeRequest {
-  body: ApiSupportPackageRequest;
 }
 
 export interface SaveUnitAccessRequest {

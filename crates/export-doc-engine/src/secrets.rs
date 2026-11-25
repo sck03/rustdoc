@@ -19,7 +19,6 @@ const PREFIX: &str = "edm-rust-aes256gcm-v1:";
 pub const FIELDS: &[(&str, &str)] = &[
     ("/email/password", "emailPasswordSet"),
     ("/webDav/password", "webDavPasswordSet"),
-    ("/system/postgreSqlPassword", "postgreSqlPasswordSet"),
     ("/ai/apiKey", "aiApiKeySet"),
 ];
 pub struct Protector {

@@ -386,17 +386,31 @@ mod tests {
         let file_path = data_root.join("not-a-directory.txt");
         fs::write(&file_path, "not a directory").unwrap();
 
-        assert!(is_existing_directory_candidate(Some(
-            valid.to_string_lossy().into_owned()
-        )));
-        assert!(!is_existing_directory_candidate(Some(
-            file_path.to_string_lossy().into_owned()
-        )));
-        assert!(!is_existing_directory_candidate(Some(
-            data_root.join("missing").to_string_lossy().into_owned()
-        )));
-        assert!(!is_existing_directory_candidate(Some("   ".to_owned())));
-        assert!(!is_existing_directory_candidate(None));
+        assert!(is_existing_directory_candidate(
+            &data_root,
+            Some(valid.to_string_lossy().into_owned())
+        ));
+        assert!(!is_existing_directory_candidate(
+            &data_root,
+            Some(file_path.to_string_lossy().into_owned())
+        ));
+        assert!(!is_existing_directory_candidate(
+            &data_root,
+            Some(data_root.join("missing").to_string_lossy().into_owned())
+        ));
+        assert!(!is_existing_directory_candidate(
+            &data_root,
+            Some("   ".to_owned())
+        ));
+        assert!(!is_existing_directory_candidate(&data_root, None));
+        assert!(is_existing_directory_candidate(
+            &data_root,
+            Some("Exports".into())
+        ));
+        assert!(!is_existing_directory_candidate(
+            &data_root,
+            Some("../Exports".into())
+        ));
 
         let _ = fs::remove_dir_all(data_root);
     }

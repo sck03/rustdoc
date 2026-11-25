@@ -1,3 +1,6 @@
+mod managed;
+pub use managed::{managed_relative_directory, resolve_managed_relative};
+
 use std::{
     fs,
     io::Write,

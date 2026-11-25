@@ -15094,9 +15094,6 @@
           "emailPasswordSet": {
             "type": "boolean"
           },
-          "postgreSqlPasswordSet": {
-            "type": "boolean"
-          },
           "webDavPasswordSet": {
             "type": "boolean"
           }
@@ -15104,7 +15101,6 @@
         "required": [
           "emailPasswordSet",
           "webDavPasswordSet",
-          "postgreSqlPasswordSet",
           "aiApiKeySet"
         ]
       },
@@ -17367,25 +17363,6 @@
           "notes"
         ]
       },
-      "ApiSupportPackageRequest": {
-        "type": "object",
-        "properties": {
-          "confirmationText": {
-            "type": "string"
-          },
-          "includeLatestDatabaseBackup": {
-            "type": "boolean"
-          },
-          "includeSampleFiles": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "includeLatestDatabaseBackup",
-          "includeSampleFiles",
-          "confirmationText"
-        ]
-      },
       "ApiSupportPackageResponse": {
         "type": "object",
         "properties": {
@@ -17429,14 +17406,6 @@
       "ApiSystemLogCleanupResponse": {
         "type": "object",
         "properties": {
-          "deletedAuditLogs": {
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$"
-          },
           "deletedTextLogs": {
             "type": [
               "integer",
@@ -17477,7 +17446,6 @@
         "required": [
           "success",
           "message",
-          "deletedAuditLogs",
           "deletedTextLogs",
           "deletedTextLogsByAge",
           "deletedTextLogsByCount",
@@ -32035,31 +32003,14 @@
       "SystemSettings": {
         "type": "object",
         "properties": {
-          "auditLogRetentionDays": {
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "description": "审计日志（数据库 AuditLogs）保留天数，超过天数自动清理（默认180，0表示不清理）"
-          },
-          "backupRetentionDays": {
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "description": "自动备份文件的保留天数，超过此天数的旧备份将被自动清理 (默认0天，表示关闭自动备份)"
-          },
           "databaseProvider": {
             "type": "string",
-            "description": "可选: Sqlite 或 PostgreSQL"
+            "description": "启动时确定的数据库类型",
+            "readOnly": true
           },
           "defaultExportDirectory": {
             "type": "string",
-            "description": "Excel和PDF文件的默认导出目录"
+            "description": "相对于运行数据根的默认导出目录，留空使用系统保存对话框默认位置"
           },
           "defaultTemplateExporterNameCn": {
             "type": "string",
@@ -32086,15 +32037,6 @@
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "description": "默认显示前 0—10 个备用列，0 表示隐藏全部空备用列；已有内容的备用列自动显示"
           },
-          "logFileSizeLimitMB": {
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "description": "单个日志文件大小上限，超出后自动滚动（默认20MB）"
-          },
           "logRetainedFileCount": {
             "type": [
               "integer",
@@ -32102,7 +32044,7 @@
             ],
             "format": "int32",
             "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "description": "Serilog rolling 文件最大保留数量（默认14）"
+            "description": "手动清理时保留最近的文本日志文件数（默认14）"
           },
           "logRetentionDays": {
             "type": [
@@ -32111,70 +32053,12 @@
             ],
             "format": "int32",
             "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "description": "logs 目录中文本日志的保留天数，超过天数自动清理（默认30，0表示不清理）"
-          },
-          "postgreSqlAdditionalOptions": {
-            "type": "string",
-            "description": "当数据库类型为 PostgreSQL 时生效；用于 SSL、超时等高级参数，可留空"
-          },
-          "postgreSqlAutoBackupDayOfWeek": {
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "description": "0=星期日，1=星期一，依此类推；仅周期为 Weekly 时生效"
-          },
-          "postgreSqlAutoBackupEnabled": {
-            "type": "boolean",
-            "description": "启用后，团队版/服务端 PostgreSQL 业务数据库会按计划执行 pg_dump 物理备份；SQLite 单机模式不生效"
-          },
-          "postgreSqlAutoBackupRetentionCount": {
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "description": "自动备份完成后保留最近 N 个 .dump 文件，0 表示不按份数清理"
-          },
-          "postgreSqlAutoBackupSchedule": {
-            "type": "string",
-            "description": "可选 Daily 或 Weekly"
-          },
-          "postgreSqlAutoBackupTime": {
-            "type": "string",
-            "description": "24 小时制 HH:mm，例如 02:00"
-          },
-          "postgreSqlDatabase": {
-            "type": "string",
-            "description": "当数据库类型为 PostgreSQL 时生效"
-          },
-          "postgreSqlHost": {
-            "type": "string",
-            "description": "当数据库类型为 PostgreSQL 时生效，例如 127.0.0.1 或局域网服务器名"
-          },
-          "postgreSqlPassword": {
-            "type": "string",
-            "description": "当数据库类型为 PostgreSQL 时生效；如数据库允许空密码可留空"
-          },
-          "postgreSqlPort": {
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "description": "当数据库类型为 PostgreSQL 时生效，默认 5432"
-          },
-          "postgreSqlUsername": {
-            "type": "string",
-            "description": "当数据库类型为 PostgreSQL 时生效"
+            "description": "手动清理时的文本日志保留天数（默认30，0表示不按天数清理）"
           },
           "sqliteDatabaseFileName": {
             "type": "string",
-            "description": "当数据库类型为 Sqlite 时生效"
+            "description": "运行时固定的 SQLite 文件名",
+            "readOnly": true
           },
           "updaterEndpoint": {
             "type": "string",
@@ -32184,29 +32068,16 @@
         "required": [
           "updaterEndpoint",
           "defaultTemplateExporterNameCn",
-          "backupRetentionDays",
-          "postgreSqlAutoBackupEnabled",
-          "postgreSqlAutoBackupSchedule",
-          "postgreSqlAutoBackupTime",
-          "postgreSqlAutoBackupDayOfWeek",
-          "postgreSqlAutoBackupRetentionCount",
           "itemEntryBlankRowCount",
           "itemEntrySpareColumnCount",
           "documentFieldLabels",
-          "auditLogRetentionDays",
           "logRetentionDays",
           "logRetainedFileCount",
-          "logFileSizeLimitMB",
           "defaultExportDirectory",
           "databaseProvider",
-          "sqliteDatabaseFileName",
-          "postgreSqlHost",
-          "postgreSqlPort",
-          "postgreSqlDatabase",
-          "postgreSqlUsername",
-          "postgreSqlPassword",
-          "postgreSqlAdditionalOptions"
-        ]
+          "sqliteDatabaseFileName"
+        ],
+        "additionalProperties": false
       },
       "UnitAccessDirectory": {
         "type": "object",
@@ -41609,12 +41480,6 @@
       "system": {
         "updaterEndpoint": "",
         "defaultTemplateExporterNameCn": "",
-        "backupRetentionDays": 0,
-        "postgreSqlAutoBackupEnabled": false,
-        "postgreSqlAutoBackupSchedule": "Daily",
-        "postgreSqlAutoBackupTime": "02:00",
-        "postgreSqlAutoBackupDayOfWeek": 1,
-        "postgreSqlAutoBackupRetentionCount": 14,
         "itemEntryBlankRowCount": 20,
         "itemEntrySpareColumnCount": 0,
         "documentFieldLabels": {
@@ -41622,19 +41487,11 @@
           "item": {},
           "payment": {}
         },
-        "auditLogRetentionDays": 180,
         "logRetentionDays": 30,
         "logRetainedFileCount": 14,
-        "logFileSizeLimitMB": 20,
         "defaultExportDirectory": "",
         "databaseProvider": "Sqlite",
-        "sqliteDatabaseFileName": "data.db",
-        "postgreSqlHost": "",
-        "postgreSqlPort": 5432,
-        "postgreSqlDatabase": "",
-        "postgreSqlUsername": "",
-        "postgreSqlPassword": "",
-        "postgreSqlAdditionalOptions": ""
+        "sqliteDatabaseFileName": "exportdoc-native.db"
       },
       "reportTemplateDefaults": {
         "exportDocumentTemplatePath": "",
@@ -41773,27 +41630,13 @@
     "labels": {
       "system.updaterEndpoint": "软件更新地址",
       "system.defaultTemplateExporterNameCn": "默认出口商中文名",
-      "system.backupRetentionDays": "数据备份保留天数",
-      "system.postgreSqlAutoBackupEnabled": "PostgreSQL 团队库自动备份",
-      "system.postgreSqlAutoBackupSchedule": "PostgreSQL 自动备份周期",
-      "system.postgreSqlAutoBackupTime": "PostgreSQL 自动备份时间",
-      "system.postgreSqlAutoBackupDayOfWeek": "PostgreSQL 每周备份星期",
-      "system.postgreSqlAutoBackupRetentionCount": "PostgreSQL 备份保留份数",
       "system.itemEntryBlankRowCount": "商品明细预留空白行数",
       "system.itemEntrySpareColumnCount": "商品明细默认显示备用列数",
-      "system.auditLogRetentionDays": "审计日志保留天数",
       "system.logRetentionDays": "文本日志保留天数",
       "system.logRetainedFileCount": "文本日志保留文件数",
-      "system.logFileSizeLimitMB": "单个日志文件大小MB",
       "system.defaultExportDirectory": "文件导出默认保存路径",
       "system.databaseProvider": "数据库类型",
       "system.sqliteDatabaseFileName": "SQLite 文件名",
-      "system.postgreSqlHost": "PostgreSQL 服务器",
-      "system.postgreSqlPort": "PostgreSQL 端口",
-      "system.postgreSqlDatabase": "PostgreSQL 数据库名",
-      "system.postgreSqlUsername": "PostgreSQL 账号",
-      "system.postgreSqlPassword": "PostgreSQL 密码",
-      "system.postgreSqlAdditionalOptions": "PostgreSQL 附加参数",
       "batchExport.outputFileNamePattern": "导出文件命名规则",
       "batchExport.outputFolderPattern": "导出文件夹命名规则",
       "batchExport.mergePdf": "导出后自动合并 PDF",
@@ -124081,7 +123924,16 @@
           "requiresDesktopAccess": true,
           "requiresLicense": true,
           "access": {
-            "bypass": true
+            "match": "All",
+            "resources": [
+              {
+                "resourceKey": "system.settings",
+                "actions": [
+                  "manage"
+                ],
+                "administratorOnly": true
+              }
+            ]
           }
         },
         "security": [
@@ -124089,17 +123941,7 @@
             "BearerAuth": [],
             "DesktopAccess": []
           }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ApiSupportPackageRequest"
-              }
-            }
-          }
-        }
+        ]
       }
     },
     "/api/support-package/save-to-runtime": {
@@ -124140,7 +123982,16 @@
           "requiresDesktopAccess": true,
           "requiresLicense": true,
           "access": {
-            "bypass": true
+            "match": "All",
+            "resources": [
+              {
+                "resourceKey": "system.settings",
+                "actions": [
+                  "manage"
+                ],
+                "administratorOnly": true
+              }
+            ]
           }
         },
         "security": [
@@ -124148,17 +123999,7 @@
             "BearerAuth": [],
             "DesktopAccess": []
           }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ApiSupportPackageRequest"
-              }
-            }
-          }
-        }
+        ]
       }
     },
     "/api/system/data-maintenance/invoices/{id}": {
@@ -124480,8 +124321,18 @@
               }
             }
           },
-          "409": {
-            "description": "Conflict",
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
             "content": {
               "application/json": {
                 "schema": {
@@ -124496,7 +124347,16 @@
           "requiresDesktopAccess": true,
           "requiresLicense": true,
           "access": {
-            "bypass": true
+            "match": "All",
+            "resources": [
+              {
+                "resourceKey": "system.settings",
+                "actions": [
+                  "manage"
+                ],
+                "administratorOnly": true
+              }
+            ]
           }
         },
         "security": [

@@ -11,36 +11,35 @@ pub(crate) fn open_append_log_file(path: &Path) -> io::Result<File> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
-    rotate_if_needed(path);
+    rotate_if_needed(path)?;
     OpenOptions::new().create(true).append(true).open(path)
 }
 
-fn rotate_if_needed(path: &Path) {
-    rotate_if_needed_with_limit(path, DEFAULT_LOG_FILE_SIZE_BYTES);
-}
-
-fn rotate_if_needed_with_limit(path: &Path, maximum_size: u64) {
-    let oversized = fs::metadata(path)
-        .map(|metadata| metadata.len() >= maximum_size)
-        .unwrap_or(false);
-    if !oversized {
-        return;
+fn rotate_if_needed(path: &Path) -> io::Result<()> {
+    match fs::metadata(path) {
+        Ok(metadata) if metadata.len() < DEFAULT_LOG_FILE_SIZE_BYTES => return Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error),
+        _ => {}
     }
-
-    rotate_files(path);
-}
-
-fn rotate_files(path: &Path) {
+    match fs::remove_file(rotated_path(path, ROTATED_LOG_COUNT)) {
+        Ok(()) => {}
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error),
+    }
     for index in (1..=ROTATED_LOG_COUNT).rev() {
         let source = if index == 1 {
             path.to_path_buf()
         } else {
             rotated_path(path, index - 1)
         };
-        let target = rotated_path(path, index);
-        let _ = fs::remove_file(&target);
-        let _ = fs::rename(&source, &target);
+        match fs::rename(source, rotated_path(path, index)) {
+            Ok(()) => {}
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
     }
+    Ok(())
 }
 
 fn rotated_path(path: &Path, index: usize) -> PathBuf {
@@ -60,10 +59,12 @@ mod tests {
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let root = std::env::temp_dir().join(format!(
-            "exportdoc-log-rotation-{}-{unique}",
-            std::process::id()
-        ));
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../.codex-runtime/log-rotation-tests")
+            .join(format!(
+                "exportdoc-log-rotation-{}-{unique}",
+                std::process::id()
+            ));
         fs::create_dir_all(&root).unwrap();
         let path = root.join("desktop.log");
         let previous_path = rotated_path(&path, 1);
@@ -84,6 +85,31 @@ mod tests {
         );
         assert_eq!(fs::read(rotated_path(&path, 2)).unwrap(), b"previous");
 
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn failed_rotation_preserves_the_active_log_and_reports_the_error() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../.codex-runtime/log-rotation-tests")
+            .join(format!(
+                "failure-{}",
+                SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
+            ));
+        fs::create_dir_all(&root).unwrap();
+        let path = root.join("desktop.log");
+        File::create(&path)
+            .unwrap()
+            .set_len(DEFAULT_LOG_FILE_SIZE_BYTES)
+            .unwrap();
+        fs::create_dir(rotated_path(&path, ROTATED_LOG_COUNT)).unwrap();
+        assert!(open_append_log_file(&path).is_err());
+        assert_eq!(
+            fs::metadata(&path).unwrap().len(),
+            DEFAULT_LOG_FILE_SIZE_BYTES
+        );
         fs::remove_dir_all(root).unwrap();
     }
 }

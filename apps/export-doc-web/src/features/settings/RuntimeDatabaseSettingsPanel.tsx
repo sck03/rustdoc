@@ -1,15 +1,11 @@
-import type { ApiSettingsSecretsDto } from "../../api/index.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
-import { DirectorySetting, NumberSetting, SecretToggle, TextSetting } from "./SettingsFieldControls.tsx";
+import { DirectorySetting, TextSetting, readSettingString } from "./SettingsFieldControls.tsx";
 import { systemUpdaterEndpointPath } from "./settingsConfigurationPaths.ts";
 import type { SettingsRecord } from "./settingsTypes.ts";
 
-export default function RuntimeDatabaseSettingsPanel({ settings, secrets, canManageSettings, updateSecrets, onUpdateSecrets, isBusy, isDesktopRuntime, databaseProvider, canSelectDesktopDirectory, onChange, onSelectDefaultExportDirectory }: {
+export default function RuntimeDatabaseSettingsPanel({ settings, canManageSettings, isBusy, isDesktopRuntime, databaseProvider, canSelectDesktopDirectory, onChange, onSelectDefaultExportDirectory }: {
   settings: SettingsRecord;
-  secrets: ApiSettingsSecretsDto | null;
   canManageSettings: boolean;
-  updateSecrets: boolean;
-  onUpdateSecrets: (update: boolean) => void;
   isBusy: boolean;
   isDesktopRuntime: boolean;
   databaseProvider: string | null;
@@ -19,31 +15,22 @@ export default function RuntimeDatabaseSettingsPanel({ settings, secrets, canMan
 }) {
   const disabled = !canManageSettings || isBusy;
   return <>
-    <section className="form-section" aria-label="常规与目录">
+    {isDesktopRuntime && <section className="form-section" aria-label="常规与目录">
       <div className="section-header"><h2>常规与目录</h2></div>
       <fieldset className="settings-fieldset" disabled={disabled}>
         <div className="field-grid">
           <DirectorySetting settings={settings} path={["system", "defaultExportDirectory"]} label="默认导出目录" disabled={disabled} canSelectDirectory={canSelectDesktopDirectory} onChange={onChange} onSelectDirectory={onSelectDefaultExportDirectory} />
         </div>
       </fieldset>
-    </section>
+      <p className="form-field-description">选择运行数据根目录内的子目录，配置保存相对路径。</p>
+    </section>}
     {databaseProvider && <section className="form-section" aria-label="数据库连接">
-      <div className="section-header"><h2>数据库连接</h2><span>当前使用 {databaseProvider === "sqlite" ? "SQLite" : "PostgreSQL"}</span>
-        {databaseProvider === "postgresql" && <SecretToggle checked={updateSecrets} disabled={disabled} onChange={onUpdateSecrets} />}</div>
-      <p className="form-field-description">当前数据库由启动配置决定。这里保存的参数不会切换正在使用的连接；服务器地址、账号和文件路径须由部署管理员在启动配置中维护。</p>
-      <fieldset className="settings-fieldset" disabled={disabled}>
-        <div className="field-grid">
-          {databaseProvider === "sqlite" && <TextSetting settings={settings} path={["system", "sqliteDatabaseFileName"]} label="SQLite 文件名" onChange={onChange} />}
-          {databaseProvider === "postgresql" && <>
-            <TextSetting settings={settings} path={["system", "postgreSqlHost"]} label="服务器" onChange={onChange} />
-            <NumberSetting settings={settings} path={["system", "postgreSqlPort"]} label="端口" onChange={onChange} />
-            <TextSetting settings={settings} path={["system", "postgreSqlDatabase"]} label="数据库名" onChange={onChange} />
-            <TextSetting settings={settings} path={["system", "postgreSqlUsername"]} label="账号" onChange={onChange} />
-            <TextSetting disabled={!updateSecrets} placeholder={secrets?.postgreSqlPasswordSet ? "已保存，勾选后可更新" : ""} settings={settings} path={["system", "postgreSqlPassword"]} label="密码" onChange={onChange} />
-            <TextSetting settings={settings} path={["system", "postgreSqlAdditionalOptions"]} label="附加参数" onChange={onChange} />
-          </>}
-        </div>
-      </fieldset>
+      <div className="section-header"><h2>数据库连接</h2></div>
+      <div className="detail-grid runtime-detail-grid">
+        <div className="detail-item"><span>当前数据库</span><strong>{databaseProvider === "sqlite" ? "SQLite" : "PostgreSQL"}</strong></div>
+        {databaseProvider === "sqlite" && <div className="detail-item"><span>SQLite 文件名</span><strong>{readSettingString(settings, ["system", "sqliteDatabaseFileName"])}</strong></div>}
+      </div>
+      <p className="form-field-description">数据库连接由启动配置管理。</p>
     </section>}
     {isDesktopRuntime && <section className="form-section" aria-label="软件更新">
       <div className="section-header"><h2>更新来源</h2></div>

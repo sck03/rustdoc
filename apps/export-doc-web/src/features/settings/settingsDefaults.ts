@@ -4,33 +4,19 @@ import {
   singleWindowCustomsCooOrgCodePath,
   systemUpdaterEndpointPath,
 } from "./settingsConfigurationPaths.ts";
+import { settingsCategoryForPath } from "./settingsDraftModel.ts";
+import type { SettingsCategoryKey } from "./settingsCategoryCatalog.ts";
 import type { SettingPatch } from "./settingsTypes.ts";
 
 export const systemDefaultPatches: SettingPatch[] = [
   { path: systemUpdaterEndpointPath, value: "" },
   { path: ["system", "defaultTemplateExporterNameCn"], value: "" },
-  { path: ["system", "backupRetentionDays"], value: 0 },
   { path: ["system", "itemEntryBlankRowCount"], value: 20 },
   { path: ["system", "itemEntrySpareColumnCount"], value: 0 },
   { path: ["system", "documentFieldLabels"], value: { invoice: {}, item: {}, payment: {} } },
-  { path: ["system", "auditLogRetentionDays"], value: 180 },
   { path: ["system", "logRetentionDays"], value: 30 },
   { path: ["system", "logRetainedFileCount"], value: 14 },
-  { path: ["system", "logFileSizeLimitMB"], value: 20 },
   { path: ["system", "defaultExportDirectory"], value: "" },
-  { path: ["system", "databaseProvider"], value: "Sqlite" },
-  { path: ["system", "sqliteDatabaseFileName"], value: "data.db" },
-  { path: ["system", "postgreSqlAutoBackupEnabled"], value: false },
-  { path: ["system", "postgreSqlAutoBackupSchedule"], value: "Daily" },
-  { path: ["system", "postgreSqlAutoBackupTime"], value: "02:00" },
-  { path: ["system", "postgreSqlAutoBackupDayOfWeek"], value: 1 },
-  { path: ["system", "postgreSqlAutoBackupRetentionCount"], value: 14 },
-  { path: ["system", "postgreSqlHost"], value: "" },
-  { path: ["system", "postgreSqlPort"], value: 5432 },
-  { path: ["system", "postgreSqlDatabase"], value: "" },
-  { path: ["system", "postgreSqlUsername"], value: "" },
-  { path: ["system", "postgreSqlPassword"], value: "" },
-  { path: ["system", "postgreSqlAdditionalOptions"], value: "" },
   { path: ["singleWindow", "customsCooDefaults", "applName"], value: "" },
   { path: ["singleWindow", "customsCooDefaults", "applicant"], value: "" },
   { path: ["singleWindow", "customsCooDefaults", "applTel"], value: "" },
@@ -38,3 +24,8 @@ export const systemDefaultPatches: SettingPatch[] = [
   { path: singleWindowCustomsCooFetchPlacePath, value: "" },
   { path: singleWindowCustomsCooAplAddPath, value: "" },
 ];
+
+export function defaultPatchesForCategory(category: SettingsCategoryKey, desktop: boolean) {
+  return systemDefaultPatches.filter(({ path }) => settingsCategoryForPath(path) === category
+    && (desktop || !["updaterEndpoint", "defaultExportDirectory"].includes(path[1] ?? "")));
+}
