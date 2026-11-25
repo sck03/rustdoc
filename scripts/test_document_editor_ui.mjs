@@ -218,7 +218,7 @@ try {
   await click(page, "#payment-tab-business");
   await click(page, "#payment-business-section .document-spare-fields summary");
   await field(page, "费用归属", "跨部门运输");
-  await field(page, "货物品名", "合计货物");
+  await input(page, 'input[aria-label="第 1 项货物品名"]', "合计货物");
   await click(page, "#payment-tab-amounts");
   await field(page, "差旅费", "200"); await field(page, "其他费用", "50");
   await click(page, "#payment-tab-basic");
@@ -227,7 +227,8 @@ try {
   await waitFor(page, "window.__calls.some(call=>call.name==='createPayment')");
   const acrossTabs = await read(page, "window.__calls.find(call=>call.name==='createPayment').input.body");
   assert.equal(acrossTabs.voucherNo, "PAY-TABS"); assert.equal(acrossTabs.spare1, "跨部门运输");
-  assert.equal(acrossTabs.goodsName, "合计货物"); assert.equal(acrossTabs.cnyAmount, "250");
+  assert.deepEqual(acrossTabs.goodsItems, [{ goodsName: "合计货物", quantity: "", quantityUnit: "" }]);
+  assert.equal(acrossTabs.goodsName, ""); assert.equal(acrossTabs.cnyAmount, "250");
   results.push("new-payment-cross-tab-keyboard-save-and-custom-labels");
   await open("payment", 1024, "&payment-output=1");
   await click(page, "#payment-tab-report");
