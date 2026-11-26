@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "33d23edb1d8039ffd12f25715b2582a933d22a3cc589975e3f70ef49c0f89acb",
+  "digest": "59c4907e5d1334789fddf1d9fed7f6723a9aeb0e94c5a16e05485e06a592aff9",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -99243,6 +99243,7 @@
       "properties": {
         "daysRemaining": {
           "type": [
+            "null",
             "integer",
             "string"
           ],
@@ -99250,7 +99251,10 @@
           "pattern": "^-?(?:0|[1-9]\\d*)$"
         },
         "expireDate": {
-          "type": "string",
+          "type": [
+            "null",
+            "string"
+          ],
           "format": "date"
         },
         "isRegistered": {
@@ -99258,6 +99262,17 @@
         },
         "isTrialExpired": {
           "type": "boolean"
+        },
+        "licenseState": {
+          "type": "string",
+          "enum": [
+            "Trial",
+            "TrialExpired",
+            "Lifetime",
+            "FixedTerm",
+            "Expired",
+            "Invalid"
+          ]
         },
         "licenseStoragePath": {
           "type": "string"
@@ -99281,6 +99296,7 @@
         }
       },
       "required": [
+        "licenseState",
         "isRegistered",
         "isTrialExpired",
         "trialDays",

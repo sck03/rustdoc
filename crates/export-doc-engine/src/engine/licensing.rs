@@ -272,6 +272,9 @@ fn status_with_gate(
         (anchor, identity)
     };
     let mut response = contracts::initial(contracts::schema("ApiLicenseStatusResponse"));
+    response["licenseState"] = json!("Invalid");
+    response["daysRemaining"] = Value::Null;
+    response["expireDate"] = Value::Null;
     response["machineId"] = json!(identity.machine_id);
     response["trialDays"] = json!(TRIAL_DAYS);
     response["licenseStoragePath"] = json!(ANCHOR_STORAGE);
@@ -286,18 +289,20 @@ fn status_with_gate(
         match verifier.validate(&identity.machine_id, &anchor.license_key) {
             Ok(None) => {
                 response["isRegistered"] = json!(true);
-                response["daysRemaining"] = json!(i64::MAX);
-                response["expireDate"] = json!(NaiveDate::MAX.to_string());
+                response["licenseState"] = json!("Lifetime");
                 response["message"] = json!("已注册 (终身授权)");
                 None
             }
             Ok(Some(unix)) => {
                 let expire = expire_date(clock, unix)?;
                 if effective > expire {
+                    response["licenseState"] = json!("Expired");
+                    response["daysRemaining"] = json!(0);
                     response["isTrialExpired"] = json!(true);
                     response["expireDate"] = json!(expire.to_string());
                     Some("授权已过期，请重新注册。")
                 } else {
+                    response["licenseState"] = json!("FixedTerm");
                     response["isRegistered"] = json!(true);
                     response["daysRemaining"] =
                         json!(expire.signed_duration_since(effective).num_days().max(0) + 1);
@@ -315,15 +320,20 @@ fn status_with_gate(
         response["isTrialExpired"] = json!(true);
         response["message"] = json!(message);
     } else if !response["isRegistered"].as_bool().unwrap_or(false) {
-        let used = effective
-            .signed_duration_since(anchor.install()?)
-            .num_days();
+        let install = anchor.install()?;
+        let used = effective.signed_duration_since(install).num_days();
         let remaining = TRIAL_DAYS - used;
+        let expire = install
+            .checked_add_signed(chrono::Duration::days(TRIAL_DAYS - 1))
+            .ok_or_else(|| unavailable("试用截止日期无效。"))?;
+        response["expireDate"] = json!(expire.to_string());
         response["daysRemaining"] = json!(remaining.max(0));
         if used >= TRIAL_DAYS {
+            response["licenseState"] = json!("TrialExpired");
             response["isTrialExpired"] = json!(true);
             response["message"] = json!("试用期已过，请注册。");
         } else {
+            response["licenseState"] = json!("Trial");
             response["message"] = json!(format!("试用期剩余 {} 天。", remaining.max(0)));
         }
     }
@@ -360,12 +370,9 @@ fn register(
     let expire = verifier
         .validate(&identity.machine_id, &key)
         .map_err(invalid)?;
-    let registered = match expire {
-        None => NaiveDate::MAX,
-        Some(unix) => expire_date(clock, unix)?,
-    };
+    let registered = expire.map(|unix| expire_date(clock, unix)).transpose()?;
     let effective = anchor.effective(today)?;
-    if registered < effective {
+    if registered.is_some_and(|expire| expire < effective) {
         return Err(invalid("注册码已过期，当前授权未更改。"));
     }
     anchor.license_key = key;
@@ -384,7 +391,11 @@ fn register(
                 occurred_at: &store::timestamp(),
                 note: "",
             },
-            &json!({"newValues":{"isRegistered":true,"expireDate":registered.to_string()}}),
+            &json!({"newValues":{
+                "isRegistered":true,
+                "licenseState":if registered.is_some() { "FixedTerm" } else { "Lifetime" },
+                "expireDate":registered.map(|date| date.to_string())
+            }}),
         )?;
         Ok(())
     })?;

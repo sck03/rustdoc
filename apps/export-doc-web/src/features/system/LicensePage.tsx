@@ -11,6 +11,7 @@ import { queryKeys } from "../../api/queryKeys.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { writeClipboardText } from "../../ui/clipboard.ts";
+import { licenseStatusPresentation } from "./licenseStatusModel.ts";
 
 export function LicensePage({ client }: { client: ExportDocManagerApiClient }) {
   const queryClient = useQueryClient();
@@ -53,8 +54,8 @@ export function LicensePage({ client }: { client: ExportDocManagerApiClient }) {
 
   const status = statusQuery.data ?? null;
   const isBusy = statusQuery.isFetching || registerMutation.isPending;
-  const canRegister = Boolean(licenseKey.trim()) && !isBusy;
-  const statusText = status ? readLicenseState(status) : "读取中";
+  const canRegister = Boolean(licenseKey.trim()) && !isBusy && !status?.isRegistered;
+  const presentation = licenseStatusPresentation(status, statusQuery.isError);
 
   async function copyMachineId() {
     if (!status?.machineId) {
@@ -83,8 +84,7 @@ export function LicensePage({ client }: { client: ExportDocManagerApiClient }) {
     <RecordWorkspace className="license-surface" aria-label="授权注册">
       <div className="toolbar license-toolbar">
         <div className="toolbar-summary">
-          <strong>{statusText}</strong>
-          <span>{status?.message || "正在读取授权状态"}</span>
+          <strong>{presentation.state}</strong>
         </div>
         <div className="toolbar-actions">
           <button
@@ -121,13 +121,14 @@ export function LicensePage({ client }: { client: ExportDocManagerApiClient }) {
       </div>
 
       {message ? <InlineNotice tone={messageType === "error" ? "error" : "success"}>{message}</InlineNotice> : null}
+      {status?.licenseState === "Invalid" ? <InlineNotice tone="error">{status.message}</InlineNotice> : null}
 
       <section className="form-section" aria-label="授权状态">
         <div className="detail-grid license-detail-grid">
-          <DetailItem label="状态" value={statusText} />
-          <DetailItem label="试用天数" value={status ? `${status.trialDays}` : "-"} />
-          <DetailItem label="剩余天数" value={status ? `${status.daysRemaining}` : "-"} />
-          <DetailItem label="到期日期" value={formatExpireDate(status)} />
+          <DetailItem label="状态" value={presentation.state} />
+          <DetailItem label={presentation.termLabel} value={presentation.term} />
+          <DetailItem label="剩余天数" value={presentation.remaining} />
+          <DetailItem label="到期日期" value={presentation.expires} />
           <DetailItem label="机器码" value={status?.machineId || "-"} wide />
         </div>
       </section>
@@ -136,7 +137,6 @@ export function LicensePage({ client }: { client: ExportDocManagerApiClient }) {
         <div className="section-header">
           <div>
             <h2>注册</h2>
-            <span>{status?.isRegistered ? "当前设备已注册" : "输入当前机器码对应的注册码"}</span>
           </div>
         </div>
         <label className="textarea-field">
@@ -171,27 +171,4 @@ function DetailItem({ label, value, wide }: { label: string; value: string; wide
       <strong title={value}>{value}</strong>
     </div>
   );
-}
-
-function readLicenseState(status: ApiLicenseStatusResponse) {
-  if (status.isRegistered) {
-    return "已注册";
-  }
-
-  return status.isTrialExpired ? "试用到期" : "试用中";
-}
-
-function formatExpireDate(status: ApiLicenseStatusResponse | null) {
-  if (!status?.isRegistered || !status.expireDate) {
-    return "-";
-  }
-
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(status.expireDate);
-  if (!match) {
-    return status.expireDate;
-  }
-
-  return Number(match[1]) >= 9999
-    ? "终身授权"
-    : `${Number(match[1])}/${Number(match[2])}/${Number(match[3])}`;
 }

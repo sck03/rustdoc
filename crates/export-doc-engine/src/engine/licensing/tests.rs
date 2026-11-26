@@ -103,6 +103,118 @@ fn expired_trial_blocks_business_but_keeps_license_management_available() {
         assert!(check_operation(&service, LIST_INVOICES).is_err());
     }
 }
+
+#[test]
+fn license_status_reports_explicit_validity_without_numeric_sentinels() {
+    let workspace = Workspace::new();
+    let service = open(&workspace);
+    let registered = register(
+        &service.store,
+        &service.protector,
+        &service.clock,
+        &TestVerifier,
+        &admin(),
+        "TEST-LIFETIME",
+    )
+    .unwrap();
+    assert_eq!(registered["status"]["licenseState"], "Lifetime");
+    assert!(registered["status"]["expireDate"].is_null());
+    let today = service.clock.now().unwrap().today;
+    let one_year = today.checked_add_months(chrono::Months::new(12)).unwrap();
+    let three_years = today.checked_add_months(chrono::Months::new(36)).unwrap();
+    let yesterday = today - chrono::Duration::days(1);
+    let cases = [
+        ("TEST-LIFETIME".to_owned(), "Lifetime", true, None, None),
+        (
+            format!("TEST-{one_year}"),
+            "FixedTerm",
+            true,
+            Some(one_year),
+            Some(one_year.signed_duration_since(today).num_days() + 1),
+        ),
+        (
+            format!("TEST-{three_years}"),
+            "FixedTerm",
+            true,
+            Some(three_years),
+            Some(three_years.signed_duration_since(today).num_days() + 1),
+        ),
+        (
+            format!("TEST-{today}"),
+            "FixedTerm",
+            true,
+            Some(today),
+            Some(1),
+        ),
+        (
+            format!("TEST-{yesterday}"),
+            "Expired",
+            false,
+            Some(yesterday),
+            Some(0),
+        ),
+        ("invalid-signature".to_owned(), "Invalid", false, None, None),
+    ];
+    for (key, state, registered, expire, remaining) in cases {
+        let mut anchor = ensure_anchor(&service.store, &service.protector, today).unwrap();
+        anchor.license_key = key;
+        // A failed or expired registration must never restart the trial.
+        anchor.install_date = (today - chrono::Duration::days(30)).to_string();
+        write_anchor(&service.store, &service.protector, &anchor).unwrap();
+        let status = super::status(
+            &service.store,
+            &service.protector,
+            &service.clock,
+            &TestVerifier,
+        )
+        .unwrap();
+        assert_eq!(status["licenseState"], state);
+        assert_eq!(status["isRegistered"], registered);
+        assert_eq!(status["isTrialExpired"], !registered);
+        assert_eq!(
+            status["expireDate"],
+            json!(expire.map(|date| date.to_string()))
+        );
+        assert_eq!(status["daysRemaining"], json!(remaining));
+        // Exercise the generated wire type as well as JSON: i64::MAX could not fit int32.
+        serde_json::from_value::<ApiLicenseStatusResponse>(status).unwrap();
+    }
+}
+
+#[test]
+fn trial_status_uses_inclusive_expiry_and_non_negative_days() {
+    let workspace = Workspace::new();
+    let service = open(&workspace);
+    let today = service.clock.now().unwrap().today;
+    for used in [0, TRIAL_DAYS - 1, TRIAL_DAYS, TRIAL_DAYS + 30] {
+        let install = today - chrono::Duration::days(used);
+        let mut anchor = ensure_anchor(&service.store, &service.protector, today).unwrap();
+        anchor.install_date = install.to_string();
+        write_anchor(&service.store, &service.protector, &anchor).unwrap();
+        let status = super::status(
+            &service.store,
+            &service.protector,
+            &service.clock,
+            &TestVerifier,
+        )
+        .unwrap();
+        assert_eq!(
+            status["licenseState"],
+            if used >= TRIAL_DAYS {
+                "TrialExpired"
+            } else {
+                "Trial"
+            }
+        );
+        assert_eq!(status["isRegistered"], false);
+        assert_eq!(status["isTrialExpired"], used >= TRIAL_DAYS);
+        assert_eq!(status["daysRemaining"], (TRIAL_DAYS - used).max(0));
+        assert_eq!(
+            status["expireDate"],
+            (install + chrono::Duration::days(TRIAL_DAYS - 1)).to_string()
+        );
+    }
+}
 #[test]
 fn registration_rejects_expired_keys_without_resetting_the_trial_clock() {
     let workspace = Workspace::new();

@@ -1,5 +1,7 @@
 # 脚本使用说明
 
+2026-11-26 授权有效期定向回归：`npm --prefix apps/export-doc-web run test:license-status-ui` 覆盖终身、一年、三年、到期当天、正式授权过期、未注册试用、试用最后一天／过期、授权无效、600px 窄屏注册刷新及读取失败，已登记到 maintenance 回归组。后端执行 `cargo test --locked -p export-doc-engine --lib engine::licensing::tests`，契约执行 `cargo test --locked -p export-doc-contracts --lib`；共用仓库 CARGO_HOME 并串行运行 Cargo。仅为专项验证，不代替完整平台／数据库门禁；结果见[记录](../docs/archive/2026-11/2026-11-26授权有效期显示与清理.md)。
+
 2026-11-26 Docker 恢复验证：`verify-native-docker.mjs --resume --stage-restore` 按现行 HTTP 202／`BackgroundJobSnapshot` 等待恢复暂存任务成功，再保存后续离线恢复的验证状态；失败或取消直接阻断。源码 Compose 部署和镜像直装共用这条路径。`node scripts/test_native_docker_validation.mjs` 覆盖任务等待、失败／取消、无效任务编号及恢复后的数据核对，已纳入 `verify-script-suite.ps1`，无需 Docker daemon 即可执行；真实容器验收仍由 Docker 发布工作流执行。
 
 2026-11-26 维护契约定向回归：`test-native-postgres.ps1 -PostgresBin <PostgreSQL18/bin> -Scope AuditStatistics` 只建立隔离库并验证六万条审计统计，不运行全业务套件。`test_settings_models.mjs`、`test_business_feature_models.mjs` 和四项已失败的 UI 脚本覆盖设置／预览／CI 修复；回归汇总保留失败退出码，并向 Actions 控制台输出有界错误尾部。实际运行与清理证据见[本批记录](../docs/archive/2026-11/2026-11-26维护契约修复与清理.md)。

@@ -93,6 +93,7 @@
     "test:customs-coo-model": "node ../../scripts/test_customs_coo_model.mjs",
     "test:container-packing-model": "node ../../scripts/test_container_packing_render_blocks.mjs",
     "test:reference-catalog-model": "node ../../scripts/test_reference_catalog_model.mjs",
+    "test:license-status-ui": "node ../../scripts/test_license_status_ui.mjs",
     "typecheck:api": "tsc -p tsconfig.generated.json --noEmit"
   },
   "dependencies": {

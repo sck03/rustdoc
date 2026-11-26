@@ -16,6 +16,9 @@ mod backup_recovery;
 #[path = "contract_browser_downloads.rs"]
 mod browser_downloads;
 #[cfg(test)]
+#[path = "../tests/fixtures/license_validity.rs"]
+mod license_validity;
+#[cfg(test)]
 #[path = "../tests/fixtures/maintenance_cleanup.rs"]
 mod maintenance_cleanup;
 #[cfg(test)]
@@ -310,6 +313,7 @@ mod tests {
         }
         backup_recovery::apply(&mut baseline);
         maintenance_cleanup::apply(&mut baseline);
+        license_validity::apply(&mut baseline);
         oa_resource_cleanup::apply(&mut baseline);
         if let Some(change) = difference("contract", &document(), &baseline) {
             panic!("undeclared contract change: {change}");

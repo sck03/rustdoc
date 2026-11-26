@@ -227,10 +227,11 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ("ApiLicenseRegisterRequest",o(vec![("licenseKey",s())]).required(vec!["licenseKey"])),
     ("ApiLicenseRegisterResponse",o(vec![("success",b()),("message",s()),("status",r("ApiLicenseStatusResponse"))]).required(vec!["success","message","status"])),
     ("ApiLicenseStatusResponse",o(vec![
+        ("licenseState",s().enumeration(Enumeration::Values(vec![serde_json::json!("Trial"),serde_json::json!("TrialExpired"),serde_json::json!("Lifetime"),serde_json::json!("FixedTerm"),serde_json::json!("Expired"),serde_json::json!("Invalid")]))),
         ("isRegistered",b()),("isTrialExpired",b()),("trialDays",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
-        ("daysRemaining",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("machineId",s()),("message",s()),
-        ("expireDate",s().format("date")),("licenseStoragePath",s()),("storagePolicy",s())
-    ]).required(vec!["isRegistered","isTrialExpired","trialDays","daysRemaining","machineId","message","expireDate","licenseStoragePath","storagePolicy"])),
+        ("daysRemaining",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("machineId",s()),("message",s()),
+        ("expireDate",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).format("date")),("licenseStoragePath",s()),("storagePolicy",s())
+    ]).required(vec!["licenseState","isRegistered","isTrialExpired","trialDays","daysRemaining","machineId","message","expireDate","licenseStoragePath","storagePolicy"])),
     ("ApiLoginRequest",o(vec![("username",s()),("password",s())]).required(vec!["username","password"])),
     ("ApiChangePasswordRequest",o(vec![("currentPassword",s().max_length(128)),("newPassword",s().min_length(8).max_length(128))]).required(vec!["currentPassword","newPassword"])),
     ("ApiLoginResponse",o(vec![

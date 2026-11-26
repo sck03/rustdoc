@@ -9320,6 +9320,7 @@
         "properties": {
           "daysRemaining": {
             "type": [
+              "null",
               "integer",
               "string"
             ],
@@ -9327,7 +9328,10 @@
             "pattern": "^-?(?:0|[1-9]\\d*)$"
           },
           "expireDate": {
-            "type": "string",
+            "type": [
+              "null",
+              "string"
+            ],
             "format": "date"
           },
           "isRegistered": {
@@ -9335,6 +9339,17 @@
           },
           "isTrialExpired": {
             "type": "boolean"
+          },
+          "licenseState": {
+            "type": "string",
+            "enum": [
+              "Trial",
+              "TrialExpired",
+              "Lifetime",
+              "FixedTerm",
+              "Expired",
+              "Invalid"
+            ]
           },
           "licenseStoragePath": {
             "type": "string"
@@ -9358,6 +9373,7 @@
           }
         },
         "required": [
+          "licenseState",
           "isRegistered",
           "isTrialExpired",
           "trialDays",

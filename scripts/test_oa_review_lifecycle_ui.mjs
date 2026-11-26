@@ -31,7 +31,7 @@ window.notification=notificationActionLabel({action:"approval-reassign",actionRe
 window.reads=0;window.version=1;
 const queries=new QueryClient({defaultOptions:{queries:{retry:false,refetchOnWindowFocus:false}}});window.queries=queries;
 const client={getLeaveRequest:async()=>{if(window.failure)throw new ApiError(window.failure,"failed","模拟读取失败");return {...structuredClone(row),versionNumber:window.version}},
- getLicenseStatus:async()=>({isRegistered:false,isTrialExpired:false}),
+ getLicenseStatus:async()=>({isRegistered:false,isTrialExpired:false,licenseState:"Trial",trialDays:7,daysRemaining:7,expireDate:"2026-12-02"}),
  registerLicense:(_input,init)=>new Promise(resolve=>{window.signal=init.signal;window.finish=resolve}),
  checkReportTemplateStorage:init=>new Promise(resolve=>{window.signal=init.signal;window.finish=resolve}),
  approveLeaveRequest:async input=>{window.command=input;throw new ApiError(409,"Conflict","申请已更新，请重新核对")},

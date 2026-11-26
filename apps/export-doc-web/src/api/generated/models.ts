@@ -2078,10 +2078,11 @@ export interface ApiLicenseRegisterResponse {
 }
 
 export interface ApiLicenseStatusResponse {
-  daysRemaining: number;
-  expireDate: string;
+  daysRemaining: number | null;
+  expireDate: string | null;
   isRegistered: boolean;
   isTrialExpired: boolean;
+  licenseState: "Trial" | "TrialExpired" | "Lifetime" | "FixedTerm" | "Expired" | "Invalid";
   licenseStoragePath: string;
   machineId: string;
   message: string;
