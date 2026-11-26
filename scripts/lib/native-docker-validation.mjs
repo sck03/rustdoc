@@ -32,6 +32,7 @@ export async function verifyContainerOcr(request, endpoint) {
 }
 
 export async function waitForJob(operation, jobId) {
+  assert(typeof jobId === 'string' && jobId.trim().length > 0, 'Native file task identifier is missing');
   const deadline = Date.now() + 120000;
   while (Date.now() < deadline) {
     const job = await (await operation('GetJob', { parameters: { jobId } })).json();
@@ -58,11 +59,11 @@ export async function verifyPostgresRestore(operation, state, stageRestore) {
   const unit = await (await operation('CreateUnit', { body: { id: 0, nameEN: `Restore-${backup.jobId}`,
     nameCN: '恢复验证临时单位', code: 'RV', rowVersion: '' } })).json();
   assert(unit.id, 'Post-backup mutation must be saved');
-  state.afterBackupUnitId = unit.id;
-  const staged = await (await operation('RestorePostgreSqlPhysicalBackup', { body: {
+  const restore = await (await operation('RestorePostgreSqlPhysicalBackup', { body: {
     backupFileName: created[0].fileName, adminPassword: state.password, confirmationText: 'RESTORE DATABASE',
   } })).json();
-  assert(staged.success && staged.restartRequired, 'PostgreSQL restore must be staged');
+  await waitForJob(operation, restore.jobId);
+  state.afterBackupUnitId = unit.id;
 }
 
 export function verifyComposeModel(model) {

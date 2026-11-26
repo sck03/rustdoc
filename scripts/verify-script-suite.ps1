@@ -53,6 +53,7 @@ foreach ($test in @('assert-tauri-command-permissions.ps1', 'test_generated_arti
         -WorkingDirectory $repoRoot
 }
 Invoke-ExportDocExternal -FilePath 'node' -Arguments @('scripts/test_cargo_paths.mjs') -WorkingDirectory $repoRoot
+Invoke-ExportDocExternal -FilePath 'node' -Arguments @('scripts/test_native_docker_validation.mjs') -WorkingDirectory $repoRoot
 Invoke-ExportDocExternal -FilePath 'node' -Arguments @('scripts/test_query_retention.mjs') -WorkingDirectory $repoRoot
 Invoke-ExportDocExternal -FilePath 'node' -Arguments @('scripts/test_verified_download.mjs') -WorkingDirectory $repoRoot
 $bashPath = Get-Command bash -CommandType Application -ErrorAction SilentlyContinue |
