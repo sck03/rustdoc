@@ -54,6 +54,10 @@ Windows 桌面两架构使用各自 MSVC runner；Linux 两架构分别使用 Ub
 
 同日[运行 45738059787](https://github.com/sck03/rustdoc/actions/runs/45738059787)的四组 Chromium 回归通过，新增恢复测试使交付脚本总行数达到 2675，超过原有 2673 行上限。测试桩改为直接返回响应，去除重复的可变响应状态，保留全部场景；本机恢复回归与源码体积门禁通过，交付脚本总行数降至 2665，门禁阈值保持不变。
 
+修复后的 [Docker 2.0.3 运行 45738083308](https://github.com/sck03/rustdoc/actions/runs/45738083308)已成功：原生 amd64／arm64 runner 均通过 React／API／OCR／文件验证、运行中重复部署、异步恢复暂存、独立维护容器恢复、保留数据库重启和仅凭镜像安装。镜像由提交 `99ef8336` 构建，后续提交仅精简测试桩并补充文档。GHCR 实际查询确认 `ghcr.io/sck03/exportdoc-rust-native:2.0.3` 与 `latest` 指向同一双架构索引 `sha256:48656aa4f0bf125c1b2efc2704295dc8e593141e9d3eccb1fc7d645eb747c8fa`，包含 `linux/amd64`、`linux/arm64`，两份镜像的版本与提交标签核对通过。
+
+最终测试提交 `924b16fb` 的[发布脚本验证 45739248330](https://github.com/sck03/rustdoc/actions/runs/45739248330)与[前端交付验证 45739248358](https://github.com/sck03/rustdoc/actions/runs/45739248358)通过，覆盖发布合同、脚本套件、Actionlint、前端构建、样式／源码体积、无障碍、权限、缩放、视觉基线及四组 Chromium 回归。本批只修改脚本与文档，Rust 单元／全量矩阵按范围跳过，未重新运行各桌面平台安装包验收。
+
 2026-11-14 复核 [运行 43404507392](https://github.com/sck03/rustdoc/actions/runs/43404507392/job/131815508870)：附件异步回归没有注入 `FileUploadPolicyProvider` 及策略客户端，界面报“文件上传服务未配置”，两个容量场景超时。夹具现显式提供 20 份测试容量并等待策略加载，再检查容量边界与部分成功后的版本；未改变产品默认容量或放宽断言。本机 72 个取消/异步场景通过。Dependabot 的 GLib 兼容性阻塞另见[依赖安全记录](./依赖更新与安全检查.md)。
 
 修复提交 `b148b778` 的[云端验证 43573103271](https://github.com/sck03/rustdoc/actions/runs/43573103271)已成功，包含此前失败的 Chromium 回归及前端构建/布局、Rust 单元/契约/桌面组合检查；[发布脚本验证 43573103248](https://github.com/sck03/rustdoc/actions/runs/43573103248)同步通过。手动 full 矩阵未触发。
