@@ -2,7 +2,7 @@
 
 产品界面名称为“业务协同平台”，与独立网页多用户版一致。Docker 表示部署方式；镜像地址、容器服务名和数据目录保持原有规则。分版名称及界面规范见[产品命名规范](./前端视觉与产品命名规范.md)。
 
-核对日期：2026-11-13。适用于包含 `--print-compose`、`--print-uninstall` 和 `--prepare-docker` 的 Rust 镜像。React 网页和 Rust API 在应用容器中，PostgreSQL 18 在独立数据库容器中。无需下载源码、安装 Rust、Node 或 PowerShell。当前只接受全新 schema 18，旧实验数据库必须另存并显式建立新库，不能直接覆盖升级。
+核对日期：2026-11-26。适用于包含 `--print-compose`、`--print-uninstall` 和 `--prepare-docker` 的 Rust 镜像。React 网页和 Rust API 在应用容器中，PostgreSQL 18 在独立数据库容器中。无需下载源码、安装 Rust、Node 或 PowerShell。当前只接受全新 schema 18，旧实验数据库必须另存并显式建立新库，不能直接覆盖升级。
 
 ## 1. 拉取镜像并启动
 
@@ -25,7 +25,7 @@ docker compose ps -a
 docker compose rm -f setup initialize
 ```
 
-该命令仅移除停止容器及其容器日志，不删除 `config`、`data` 和 `postgres_data`。初始化失败时先保留容器并用 `docker compose logs setup initialize` 排查。保留 Compose 中的服务定义；下次完整 `up` 会重建并运行它们，升级仍需要维护权限。普通重启已运行的应用可用 `docker compose restart application`，不会额外运行初始化。维护容器无需为隐藏退出状态而常驻，也不向业务程序开放 Docker socket 来自删容器。
+该命令仅移除停止容器及其容器日志，不删除 `config`、`data` 和 `postgres_data`。初始化失败时先保留容器，并查看 `docker compose logs --no-color --tail=100 setup initialize postgres`；旧卷与新密码不匹配的排查及重建步骤见第 8.2 节。保留 Compose 中的服务定义；下次完整 `up` 会重建并运行它们，升级仍需要维护权限。普通重启已运行的应用可用 `docker compose restart application`，不会额外运行初始化。维护容器无需为隐藏退出状态而常驻，也不向业务程序开放 Docker socket 来自删容器。
 
 打开 **`http://服务器局域网IP:5188`**；服务器本机也可打开 `http://127.0.0.1:5188`。首次登录使用 `admin`，自行设置至少 12 位的管理员密码，在登录页“连接设置”中填写管理员初始化口令。口令保存在：
 
@@ -161,6 +161,8 @@ docker compose -f compose.yml -f compose.file-storage.yml up -d --wait
 
 ## 8. 卸载与重装
 
+### 8.1 保留数据的普通卸载
+
 Linux 镜像部署在原 `compose.yml` 所在目录，用实际部署的同一镜像版本生成并运行卸载脚本：
 
 ```sh
@@ -171,3 +173,50 @@ sh ./uninstall.sh
 脚本移除本部署容器和网络，保留数据库卷、附件、配置、主密钥、备份与镜像。Windows 或不使用 shell 的部署可在原目录执行 `docker compose --file compose.yml --profile maintenance down`；使用挂载扩展时加上同一 `--file compose.file-storage.yml`。重复执行不会把数据清空；不要加 `-v` 或运行全局 prune。
 
 仓库源码部署使用 `.\scripts\uninstall-native-docker.cmd -RuntimeRoot <原目录> -NoPause`，或 `run-native-docker.ps1 -Uninstall`；它针对源码脚本的固定项目，不能用于另一个镜像安装项目。重装复用原目录、配置、项目名和同一受支持 schema 的卷；彻底删除数据属于单独运维操作，本入口不提供该开关。
+
+### 8.2 初始化失败：旧数据库卷与新密码不匹配
+
+当 `postgres` 为 healthy，但 `initialize` 退出码为 1、`application` 停留在 Created 时，先检查初始化和数据库日志，不能仅凭退出码判断为模型指纹问题。以下 Linux 命令以部署目录 `/opt/rustdoc`、默认项目名 `exportdoc` 为例；自定义目录、容器名或 Compose 扩展文件时，使用实际部署的名称和同一组 `-f` 参数。
+
+```sh
+cd /opt/rustdoc &&
+docker compose logs --no-color --tail=100 initialize postgres &&
+docker inspect exportdoc-postgres --format '{{range .Mounts}}{{printf "%s | %s | %s -> %s\n" .Type .Name .Source .Destination}}{{end}}'
+```
+
+本次故障的关键日志为：
+
+```text
+Rust API 启动或运行失败：PostgreSQL 数据库操作失败。 SQLSTATE=28P01
+PostgreSQL Database directory appears to contain a database; Skipping initialization
+FATAL: password authentication failed for user "exportdoc_maintenance"
+```
+
+`28P01` 表示密码认证失败，尚未进入数据库模型检查；`Skipping initialization` 单独出现只是复用已有数据库的正常提示。`pg_isready` 健康检查确认数据库可接受连接，不验证维护账号的密码。若日志明确提示“数据库模型指纹或结构不匹配”，按第 4 节处理，不要删除指纹记录或绕过初始化。
+
+数据库保存在 Docker 的独立命名卷中。默认卷名为 `exportdoc_postgres_data`，常见挂载源为 `/var/lib/docker/volumes/exportdoc_postgres_data/_data`，实际名称和位置以 `docker inspect` 输出为准。删除容器、执行普通卸载或清空 `/opt/rustdoc` 都不会删除这个卷。手动删除 `config` 后，`setup` 会为新的空配置目录生成新密码；旧卷中的账号仍使用原密码，PostgreSQL 不会对已有数据库重新执行初始化脚本，因此新维护连接认证失败。
+
+**需要保留旧数据时，不执行下方删卷命令。** 优先恢复与旧数据库配套的原 `config`，保留原卷、附件、密钥和备份；原配置缺失时先完成独立的凭据恢复。密码修复后仍须通过当前模型检查，不代表旧实验数据库自动获得兼容性。排查时不要公开配置中的密码、连接串或初始化口令。
+
+**仅在确认旧测试数据库可以永久删除、准备重新建库时执行以下步骤。** `docker volume rm` 会删除指定卷内的旧账号、OA 申请、单据等数据库记录。先核实挂载检查中的卷名确为 `exportdoc_postgres_data`，且它属于本部署；其他卷名须精确替换，不使用全局卷清理或手动删除 Docker 数据目录。
+
+```sh
+cd /opt/rustdoc &&
+docker compose --profile maintenance down &&
+docker volume rm exportdoc_postgres_data &&
+docker compose up -d --wait &&
+docker compose ps -a
+```
+
+`&&` 确保任何一步失败就停止。若卷仍被容器占用，先核对 `docker ps -a --filter volume=exportdoc_postgres_data` 的结果，不强制删除其他容器。保留本次 `setup` 已核对成功的 `config` 和 `data`；新卷会按当前配置重新建立角色和业务库。该操作只重建数据库，不删除现有附件、密钥或备份，也不会恢复之前删除的文件或旧数据库记录。
+
+成功时，`docker compose ps -a` 应显示：
+
+| 服务 | 预期状态 |
+| --- | --- |
+| `setup` | `Exited (0)` |
+| `initialize` | `Exited (0)` |
+| `postgres` | `Up ... (healthy)` |
+| `application` | `Up ... (healthy)`，默认发布端口 5188 |
+
+2026-11-26 Debian 13 现场回执确认：删除已核实的旧测试卷后，Compose 创建新卷，两项初始化服务均退出 0，PostgreSQL 与应用均 healthy。该状态证明初始化和服务健康检查通过；随后按第 1 节完成首次管理员登录并核对需要的业务功能。若仍失败，保留现场并重新采集本节开头的日志，不重复盲目删卷。
