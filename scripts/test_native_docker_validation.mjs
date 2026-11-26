@@ -18,39 +18,29 @@ function fixture(restoreStatus = 'Succeeded') {
   let restorePolls = 0;
   const operation = async (name, { parameters = {}, body } = {}) => {
     calls.push(name);
-    let result;
-    let status = 200;
     switch (name) {
-      case 'ListPostgreSqlPhysicalBackups': result = { backups }; break;
+      case 'ListPostgreSqlPhysicalBackups': return Response.json({ backups });
       case 'CreatePostgreSqlPhysicalBackup':
-        status = 202;
-        result = { jobId: 'backup-job', status: 'Queued' };
-        break;
+        return Response.json({ jobId: 'backup-job', status: 'Queued' }, { status: 202 });
       case 'CreateUnit':
         assert.equal(body.nameEN, 'Restore-backup-job');
         units = [{ id: 17 }];
-        result = units[0];
-        break;
+        return Response.json(units[0]);
       case 'RestorePostgreSqlPhysicalBackup':
         assert.deepEqual(body, { backupFileName: 'isolated.dump', adminPassword: state.password, confirmationText: 'RESTORE DATABASE' });
-        status = 202;
-        result = { jobId: 'restore-job', status: 'Queued' };
-        break;
+        return Response.json({ jobId: 'restore-job', status: 'Queued' }, { status: 202 });
       case 'GetJob':
         if (parameters.jobId === 'backup-job') {
           backups = [{ fileName: 'isolated.dump' }];
-          result = { jobId: 'backup-job', status: 'Succeeded' };
-        } else {
-          assert.equal(parameters.jobId, 'restore-job');
-          assert.equal(state.afterBackupUnitId, undefined, 'Do not promote validation state before staging succeeds');
-          restorePolls++;
-          result = { jobId: 'restore-job', status: restorePolls === 1 ? 'Running' : restoreStatus, errorMessage: 'isolated restore failure' };
+          return Response.json({ jobId: 'backup-job', status: 'Succeeded' });
         }
-        break;
-      case 'ListUnits': result = units; break;
+        assert.equal(parameters.jobId, 'restore-job');
+        assert.equal(state.afterBackupUnitId, undefined, 'Do not promote validation state before staging succeeds');
+        restorePolls++;
+        return Response.json({ jobId: 'restore-job', status: restorePolls === 1 ? 'Running' : restoreStatus, errorMessage: 'isolated restore failure' });
+      case 'ListUnits': return Response.json(units);
       default: assert.fail(`Unexpected operation ${name}`);
     }
-    return Response.json(result, { status });
   };
   return { state, calls, operation, get restorePolls() { return restorePolls; }, applyRestore() { units = []; } };
 }
