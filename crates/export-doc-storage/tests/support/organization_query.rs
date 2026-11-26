@@ -10,6 +10,7 @@ fn insert(tx: &Connection, kind: &str, mut body: Value) -> i64 {
     id
 }
 pub fn exercise(tx: &Connection) {
+    reference_ownership(tx);
     tx.begin().unwrap();
     super::organization_fixture::unit(tx, "ORG-A", &["ORG-D", "PRIMARY", "SECONDARY"]);
     let allowed = ["departments", "users", "people", "invoices"];
@@ -138,4 +139,118 @@ pub fn exercise(tx: &Connection) {
         tx.personnel_private_profile(person).unwrap().is_none(),
         "private and public writes roll back together"
     );
+}
+
+fn reference_ownership(tx: &Connection) {
+    tx.begin().unwrap();
+    let company = insert(
+        tx,
+        "companies",
+        json!({"code":"REF-A","name":"A","companyScope":"REF-A","departmentId":"CREATOR","isActive":true}),
+    );
+    let other = insert(
+        tx,
+        "companies",
+        json!({"code":"REF-B","name":"B","companyScope":"REF-B","isActive":true}),
+    );
+    let department = insert(
+        tx,
+        "departments",
+        json!({"companyCode":"REF-A","companyScope":"REF-A","code":"SIBLING","departmentId":"CREATOR","isActive":true}),
+    );
+    insert(
+        tx,
+        "permission-templates",
+        json!({"code":"GLOBAL","ownerUnitId":null,"companyScope":"REF-A","departmentId":"CREATOR"}),
+    );
+    let allowed = [
+        "companies",
+        "departments",
+        "permission-templates",
+        "users",
+        "people",
+        "invoices",
+        "unit-access",
+    ];
+    let references = |kind, code, exclude| {
+        tx.organization_referenced(kind, code, "REF-A", exclude, &allowed)
+            .unwrap()
+    };
+    assert!(
+        !references(OrganizationReference::Department, "CREATOR", 0),
+        "company, sibling department and global scheme creator metadata is not membership"
+    );
+    assert!(
+        references(OrganizationReference::Company, "REF-A", company),
+        "a department belongs to its explicit company"
+    );
+    tx.delete("departments", department, 1).unwrap();
+    assert!(
+        !references(OrganizationReference::Company, "REF-A", company),
+        "global schemes do not own their creator's company"
+    );
+
+    let owned = insert(
+        tx,
+        "permission-templates",
+        json!({"code":"OWNED","ownerUnitId":company,"companyScope":"REF-B","departmentId":"CREATOR"}),
+    );
+    assert!(
+        references(OrganizationReference::Company, "REF-A", company),
+        "unit schemes use ownerUnitId, independently of creator scope"
+    );
+    assert!(!references(OrganizationReference::Company, "REF-B", other));
+    assert!(!references(OrganizationReference::Department, "CREATOR", 0));
+    tx.delete("permission-templates", owned, 1).unwrap();
+
+    let child = insert(
+        tx,
+        "companies",
+        json!({"code":"REF-CHILD","name":"child","companyScope":"REF-CHILD","parentCompanyCode":"REF-A","isActive":true}),
+    );
+    assert!(references(OrganizationReference::Company, "REF-A", company));
+    tx.delete("companies", child, 1).unwrap();
+    let account = insert(
+        tx,
+        "users",
+        json!({"username":"reference-user","role":"Admin","companyScope":"REF-B","departmentId":"","isActive":true}),
+    );
+    let role = insert(
+        tx,
+        "unit-access",
+        json!({"userId":account,"companyCode":"REF-B","mode":"Administration","companyScope":"REF-A","departmentId":"CREATOR","permissionGrants":[],"isActive":true}),
+    );
+    assert!(
+        !references(OrganizationReference::Company, "REF-A", company),
+        "administration roles reference their target company"
+    );
+    assert!(
+        !references(OrganizationReference::Department, "CREATOR", 0),
+        "administration roles have no department appointment"
+    );
+    assert!(references(OrganizationReference::Company, "REF-B", account));
+    tx.delete("unit-access", role, 1).unwrap();
+    assert!(
+        references(OrganizationReference::Company, "REF-B", other),
+        "real account assignment remains protected"
+    );
+
+    let invoice = insert(
+        tx,
+        "invoices",
+        json!({"companyScope":"REF-A","departmentId":"CREATOR"}),
+    );
+    assert!(
+        references(OrganizationReference::Department, "CREATOR", 0),
+        "business scope is a real reference"
+    );
+    assert!(references(OrganizationReference::Company, "REF-A", company));
+    tx.delete("invoices", invoice, 1).unwrap();
+    assert!(!references(
+        OrganizationReference::Company,
+        "REF-A",
+        company
+    ));
+    assert!(!references(OrganizationReference::Department, "CREATOR", 0));
+    tx.rollback().unwrap();
 }

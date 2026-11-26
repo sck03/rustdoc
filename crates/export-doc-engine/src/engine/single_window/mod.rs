@@ -93,6 +93,7 @@ pub fn upload(
         #[cfg(feature = "excel")]
         return super::excel::preview_for(
             service,
+            actor,
             name,
             bytes,
             &records::text(metadata, "schemeName"),

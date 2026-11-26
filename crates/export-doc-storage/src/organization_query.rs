@@ -31,9 +31,12 @@ pub(crate) fn build(
         .join(",");
     let code = sql::bind(&mut values, code, pg);
     let excluded = sql::bind(&mut values, exclude, pg);
+    // Directory and authorization records retain creator scope metadata. Their
+    // references come from hierarchy/ownership, not that incidental scope.
+    let scoped = "r.kind NOT IN ('companies','departments','permission-templates','unit-access')";
     let fields = match reference {
         OrganizationReference::Company => format!(
-            "({}={code} OR {}={code} OR {}={code} OR (r.kind='people' AND EXISTS(SELECT 1 FROM personnel_memberships m WHERE m.person_id=r.id AND m.company={code})))",
+            "(({scoped} AND {}={code}) OR (r.kind IN ('departments','unit-access') AND {}={code}) OR (r.kind='companies' AND {}={code}) OR (r.kind='permission-templates' AND EXISTS(SELECT 1 FROM permission_schemes s JOIN organization_units u ON u.id=s.owner_unit_id WHERE s.id=r.id AND u.code={code})) OR (r.kind='people' AND EXISTS(SELECT 1 FROM personnel_memberships m WHERE m.person_id=r.id AND m.company={code})))",
             sql::field("companyScope", pg),
             sql::field("companyCode", pg),
             sql::field("parentCompanyCode", pg)
@@ -41,9 +44,9 @@ pub(crate) fn build(
         OrganizationReference::Department => {
             let company = sql::bind(&mut values, company, pg);
             format!(
-                "(((r.company={company} OR {}={company}) AND ({}={code} OR {}={code})) OR (r.kind='people' AND EXISTS(SELECT 1 FROM personnel_memberships m WHERE m.person_id=r.id AND m.company={company} AND m.department={code})))",
-                sql::field("companyCode", pg),
+                "(({scoped} AND r.company={company} AND {}={code}) OR (r.kind='departments' AND {}={company} AND {}={code}) OR (r.kind='people' AND EXISTS(SELECT 1 FROM personnel_memberships m WHERE m.person_id=r.id AND m.company={company} AND m.department={code})))",
                 sql::field("departmentId", pg),
+                sql::field("companyCode", pg),
                 sql::field("parentCode", pg)
             )
         }

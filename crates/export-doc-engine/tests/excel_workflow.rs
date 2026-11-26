@@ -26,7 +26,7 @@ fn excel_preview_export_backup_and_restore_keep_one_authoritative_database() {
         .join(nonce().unwrap());
     fs::create_dir_all(&root).unwrap();
     let paths = RuntimePaths::server(&workspace, &root.join("Data")).unwrap();
-    let client = ApiClient::native(paths)
+    let client = ApiClient::native(paths.clone())
         .unwrap()
         .login("admin".into(), "".into())
         .unwrap()
@@ -134,7 +134,8 @@ fn excel_preview_export_backup_and_restore_keep_one_authoritative_database() {
         .unwrap_err();
     assert_eq!(same_path.status, Some(400));
 
-    let _: Value = client.json(CREATE_DATABASE_BACKUP, &[], &[], None).unwrap();
+    let backup = client.json(CREATE_DATABASE_BACKUP, &[], &[], None).unwrap();
+    jobs::wait_for_completion(&client, backup, &AtomicBool::new(false)).unwrap();
     let backups: Value = client.json(LIST_DATABASE_BACKUPS, &[], &[], None).unwrap();
     let name = backups["backups"][0]["fileName"].as_str().unwrap();
     let _: Value = client.json(DELETE_JOB, &parameters, &[], None).unwrap();
@@ -142,10 +143,16 @@ fn excel_preview_export_backup_and_restore_keep_one_authoritative_database() {
         contracts::object(RESTORE_DATABASE_BACKUP.id, true),
         &json!({"backupFileName":name,"confirmationText":"RESTORE"}),
     );
-    let _: Value = client
+    let restore = client
         .json(RESTORE_DATABASE_BACKUP, &[], &[], Some(body))
         .unwrap();
-    let authenticated = client.login("admin".into(), "".into()).unwrap().0;
+    jobs::wait_for_completion(&client, restore, &AtomicBool::new(false)).unwrap();
+    drop(client);
+    let authenticated = ApiClient::native(paths)
+        .unwrap()
+        .login("admin".into(), "".into())
+        .unwrap()
+        .0;
     assert_eq!(
         authenticated
             .bytes(DOWNLOAD_JOB_RESULT, &parameters, &[], None, jobs::PDF_LIMIT)
@@ -153,6 +160,5 @@ fn excel_preview_export_backup_and_restore_keep_one_authoritative_database() {
         bytes
     );
     drop(authenticated);
-    drop(client);
     fs::remove_dir_all(root).unwrap();
 }

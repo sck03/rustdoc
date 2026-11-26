@@ -1,0 +1,37 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { withOfficeUi } from './lib/native-office-ui.mjs';
+
+await withOfficeUi('excel-exporter-ui', async ({ repo, output, url, invoke, openPage, require }) => {
+  const login = await invoke('Login', { username:'oa-review', password:'Review-2026-Test' });
+  const token = login.accessToken;
+  const settings = (await invoke('GetSettings', undefined, {}, token)).settings;
+  assert(!Object.hasOwn(settings.system, 'defaultTemplateExporterNameCn'));
+  const bundle = path.join(output, 'invoice-model.mjs');
+  await require('esbuild').build({ stdin:{ resolveDir:path.join(repo,'apps/export-doc-web'), contents:"export { createEmptyInvoice } from './src/features/invoices/invoiceModel.ts';" }, bundle:true, platform:'node', format:'esm', outfile:bundle, logLevel:'silent' });
+  const { createEmptyInvoice } = await import(pathToFileURL(bundle).href);
+  const invoice = (await invoke('CreateInvoice', { ...createEmptyInvoice(login.user.businessDate), invoiceNo:'EXCEL-EXPORTER-UI', exporterNameCN:'Excel原有出口商', exporterNameEN:'ORIGINAL EXCEL EXPORTER' }, {}, token)).invoice;
+  const exporter = await invoke('CreateExporter', { id:0, exporterNameEN:'SELECTED EXPORTER', exporterNameCN:'重新选择的出口商', addressEN:'SELECTED ADDRESS', addressCN:'新地址', contactPerson:'', creditCode:'', customsCode:'', phone:'', bankName:'SELECTED BANK', bankAccount:'12345', swiftCode:'', notes:'', docSealPath:'', customsSealPath:'', rowVersion:'' }, {}, token);
+  const page = await openPage('oa-review', 'Review-2026-Test');
+  await page.goto(`${url}/#/settings`);
+  await page.getByRole('button', { name:'Excel 导入', exact:true }).click();
+  await page.getByRole('heading', { name:'Excel 导入', exact:true }).first().waitFor();
+  assert.equal(await page.getByLabel('默认出口商中文名', { exact:true }).count(), 0);
+  await page.screenshot({ path:path.join(output,'excel-settings.png') });
+  await page.goto(`${url}/#/invoices/${invoice.id}`);
+  const chinese = page.getByLabel('出口商中文名', { exact:true });
+  await chinese.waitFor();
+  assert.equal(await chinese.inputValue(), 'Excel原有出口商');
+  await page.getByRole('combobox', { name:'出口商档案', exact:true }).selectOption(String(exporter.id));
+  assert.equal(await chinese.inputValue(), exporter.exporterNameCN);
+  assert.equal(await page.getByLabel('出口商英文名', { exact:true }).inputValue(), exporter.exporterNameEN);
+  const saved = page.waitForResponse(response => response.url().endsWith(`/api/invoices/${invoice.id}`) && response.request().method() === 'PUT');
+  await page.getByRole('button', { name:'保存发票', exact:true }).click();
+  assert((await saved).ok());
+  const actual = await invoke('GetInvoice', undefined, { id:invoice.id }, token);
+  for (const [field, expected] of Object.entries({ exporterId:exporter.id, exporterNameCN:exporter.exporterNameCN, exporterNameEN:exporter.exporterNameEN, exporterAddressEN:exporter.addressEN, bankName:exporter.bankName })) assert.equal(actual[field], expected, field);
+  await page.screenshot({ path:path.join(output,'invoice-selected-exporter.png') });
+  fs.writeFileSync(path.join(output,'summary.json'), JSON.stringify({ removedSetting:true, originalNamePreserved:true, exporterReselectionSaved:true }, null, 2));
+});

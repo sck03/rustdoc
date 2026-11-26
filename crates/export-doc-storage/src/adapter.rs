@@ -36,7 +36,6 @@ pub(crate) trait Adapter: Send {
         dashboard_counts(scope: &DataScope<'_>) -> DashboardCounts => dashboard_query::counts;
         party_candidates(kind: &str, company: &str, keys: &[(&str, String)]) -> Vec<Value> => party_query::candidates;
         existing_party_names(kind: &str, scope: &DataScope<'_>, names: &[String]) -> Vec<String> => party_query::existing_names;
-        sole_exporter_name(scope: &DataScope<'_>) -> Option<String> => party_query::sole_exporter_name;
         insert_file(file:&FileWrite<'_>)->() => file_catalog::insert;
         file_info(record:i64,kind:&str)->Option<FileInfo> => file_catalog::get;
         file_page(record:i64,prefix:&str,after:&str,limit:i64)->(i64,Vec<FileInfo>) => file_catalog::page;

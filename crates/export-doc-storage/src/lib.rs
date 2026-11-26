@@ -383,7 +383,6 @@ delegate! {
     dashboard_counts(scope:&DataScope<'_>)->DashboardCounts;
     party_candidates(kind:&str,company:&str,keys:&[(&str,String)])->Vec<Value>;
     existing_party_names(kind:&str,scope:&DataScope<'_>,names:&[String])->Vec<String>;
-    sole_exporter_name(scope:&DataScope<'_>)->Option<String>;
     insert_file(file:&FileWrite<'_>)->();
     file_info(record:i64,kind:&str)->Option<FileInfo>;
     file_page(record:i64,prefix:&str,after:&str,limit:i64)->(i64,Vec<FileInfo>);

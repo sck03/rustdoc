@@ -23,12 +23,12 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("returnDueDate",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).format("date")),("projectId",Schema::default().kind(Types::Many(vec![Primitive::String,Primitive::Null])).pattern("^[1-9][0-9]*$"))
     ]).required(vec!["expectedVersion","quantity","purpose","returnDueDate"])),
     ("SystemSettings",o(vec![
-        ("updaterEndpoint",s().description("留空时使用安装包内置默认地址；支持 GitHub、自建 HTTPS 地址和受控公司内网 HTTP 地址。仅管理员可以修改，签名公钥仍固定在安装包内")),("defaultTemplateExporterNameCn",s().description("Excel 未提供出口商中文名时用于导入草稿和导出模板；请先填写真实出口商中文公司名，避免把英文发票抬头当作中文名")),
+        ("updaterEndpoint",s().description("留空时使用安装包内置默认地址；支持 GitHub、自建 HTTPS 地址和受控公司内网 HTTP 地址。仅管理员可以修改，签名公钥仍固定在安装包内")),
         ("itemEntryBlankRowCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$").description("商品明细页在新建/清空后默认保留的空白录入行数")),("itemEntrySpareColumnCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$").description("默认显示前 0—10 个备用列，0 表示隐藏全部空备用列；已有内容的备用列自动显示")),("documentFieldLabels",r("DocumentFieldLabelSettings")),
         ("logRetentionDays",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$").description("手动清理时的文本日志保留天数（默认30，0表示不按天数清理）")),("logRetainedFileCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$").description("手动清理时保留最近的文本日志文件数（默认14）")),
         ("defaultExportDirectory",s().description("相对于运行数据根的默认导出目录，留空使用系统保存对话框默认位置")),("databaseProvider",s().description("启动时确定的数据库类型").read_only(true)),
         ("sqliteDatabaseFileName",s().description("运行时固定的 SQLite 文件名").read_only(true)),
-    ]).required(vec!["updaterEndpoint","defaultTemplateExporterNameCn","itemEntryBlankRowCount","itemEntrySpareColumnCount","documentFieldLabels","logRetentionDays","logRetainedFileCount","defaultExportDirectory","databaseProvider","sqliteDatabaseFileName"]).additional(Additional::Allowed(false))),
+    ]).required(vec!["updaterEndpoint","itemEntryBlankRowCount","itemEntrySpareColumnCount","documentFieldLabels","logRetentionDays","logRetainedFileCount","defaultExportDirectory","databaseProvider","sqliteDatabaseFileName"]).additional(Additional::Allowed(false))),
     ("WebDavSettings",o(vec![
         ("url",s().description("WebDAV 服务器地址，例如 https://dav.jianguoyun.com/dav/")),("userName",s().description("WebDAV 用户名")),("password",s().description("WebDAV 密码或应用专用密码")),
         ("enabled",b().description("是否在退出软件时自动备份"))

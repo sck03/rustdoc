@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { switchUnitIdentity } from './lib/unit-context-ui.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
@@ -71,8 +72,8 @@ await withOfficeUi('oa-completion-ui', async ({output,url,invoke,openPage,requir
   assert.equal(Object.hasOwn(member,'profile'),false);
   assert.equal(operations.has('SaveUnitMember'),false,'direct appointment mutation is retired');
   const unit=await openPage('completion-ui-3','Completion-UI-2026');
-  await unit.getByRole('combobox',{name:'当前单位身份',exact:true}).selectOption(contextId);
-  await unit.waitForFunction(id=>document.querySelector('select[aria-label="当前单位身份"]')?.value===id,contextId);
+  const selected = management.user.unitContexts.find(context=>context.id===contextId);
+  await switchUnitIdentity(unit,`${selected.companyName} · ${selected.name}`);
   await unit.goto(`${url}/#/system/organization`);
   const members=unit.getByRole('region',{name:'单位任职管理',exact:true});
   await members.getByRole('textbox',{name:'搜索单位任职人员'}).fill('COMPLETE-UI-1');

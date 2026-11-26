@@ -1,5 +1,6 @@
 //! Excel use cases share one optional native library. Desktop path operations
 //! and browser uploads join here after their distinct transport boundaries.
+mod company_defaults;
 use super::{
     NativeService, auth,
     error::{Result, error, invalid, unavailable},
@@ -96,7 +97,7 @@ pub fn upload(
         return Err(error(413, "上传的 Excel 为空或超过 25 MiB。"));
     }
     if operation == PREVIEW_UPLOADED_EXCEL_IMPORT {
-        return preview(service, name, bytes, &text(metadata, "schemeName"));
+        return preview(service, actor, name, bytes, &text(metadata, "schemeName"));
     }
     let replay = Replay::new(operation, &[], &serde_json::json!({})).with_input(name, bytes);
     let bytes = bytes.to_vec();
@@ -122,14 +123,16 @@ pub fn upload(
 }
 pub(super) fn preview(
     service: &NativeService,
+    actor: &Actor,
     name: &str,
     bytes: &[u8],
     scheme: &str,
 ) -> Result<Value> {
-    preview_for(service, name, bytes, scheme, false)
+    preview_for(service, actor, name, bytes, scheme, false)
 }
 pub(super) fn preview_for(
     service: &NativeService,
+    actor: &Actor,
     name: &str,
     bytes: &[u8],
     scheme: &str,
@@ -160,12 +163,15 @@ pub(super) fn preview_for(
         Some(matches[0])
     };
     if single_window {
-        let result = export_doc_excel::preview_single_window(bytes, name, mapping, &date, &check)
-            .map_err(invalid)?;
+        let mut result =
+            export_doc_excel::preview_single_window(bytes, name, mapping, &date, &check)
+                .map_err(invalid)?;
+        company_defaults::apply_to_preview(&service.store, actor, &mut result.result)?;
         serde_json::to_value(result).map_err(Into::into)
     } else {
-        let result =
+        let mut result =
             export_doc_excel::preview(bytes, name, mapping, &date, &check).map_err(invalid)?;
+        company_defaults::apply_to_preview(&service.store, actor, &mut result)?;
         serde_json::to_value(result).map_err(Into::into)
     }
 }
@@ -183,7 +189,7 @@ pub fn handle(
             .and_then(|name| name.to_str())
             .ok_or_else(|| invalid("Excel 源文件名无效。"))?;
         let bytes = read(&path, export_doc_excel::MAX_INPUT)?;
-        return preview(service, name, &bytes, &text(body, "schemeName"));
+        return preview(service, actor, name, &bytes, &text(body, "schemeName"));
     }
     let destination = destination(body, LOCAL_OPERATIONS.contains(&operation))?;
     if destination.is_some() && service.provider()? != "SQLite" {
@@ -265,7 +271,6 @@ pub fn handle(
             },
         );
     }
-    let settings = settings::current(&service.store)?;
     let template = service
         .paths
         .app_root
@@ -293,19 +298,6 @@ pub fn handle(
     } else {
         None
     };
-    let mut exporter_name = text(&settings["system"], "defaultTemplateExporterNameCn");
-    if invoice.is_none() && exporter_name.trim().is_empty() {
-        exporter_name = service
-            .store
-            .read(|tx| {
-                Ok(tx.sole_exporter_name(&auth::data_scope(
-                    actor,
-                    "document.reference-data",
-                    "view",
-                ))?)
-            })?
-            .unwrap_or_else(|| "请填写出口商中文名称".into());
-    }
     let booking = ![
         START_EXCEL_TEMPLATE_DOWNLOAD_JOB,
         START_EXCEL_TEMPLATE_SAVE_TO_PATH_JOB,
@@ -340,6 +332,7 @@ pub fn handle(
             let bytes = if let Some(invoice) = invoice {
                 export_doc_excel::booking_from_invoice(&bytes, &invoice, &check)
             } else {
+                let exporter_name = company_defaults::exporter_name(&store, &actor)?;
                 export_doc_excel::blank_template(&bytes, &exporter_name, booking, &check)
             }
             .map_err(invalid)?;

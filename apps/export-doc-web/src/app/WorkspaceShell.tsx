@@ -361,10 +361,6 @@ export function WorkspaceShell({
             </div>
           </div>
           <div className="session-strip">
-            {(user.unitContexts?.length ?? 0) > 1 && <label className="office-field"><span>单位身份</span><select aria-label="当前单位身份" value={user.contextId ?? ""} disabled={unitContext?.busy} onChange={event => void unitContext?.switchContext(event.target.value)}>
-              {user.unitContexts?.map(context => <option key={context.id} value={context.id}>{context.companyName} · {context.name}</option>)}
-            </select></label>}
-            {unitContext?.error && <span role="alert">{unitContext.error}</span>}
             <button
               className="density-toggle-button"
               type="button"
@@ -382,9 +378,12 @@ export function WorkspaceShell({
             </span>
             <AccountMenu user={user} displayName={displayName} identityLabel={renderUserWorkspaceLabel(user)}
               isDesktopRuntime={isDesktopRuntime} onLogout={onLogout} onChangePassword={onChangePassword}
+              onSwitchContext={unitContext?.switchContext}
               disabled={accountBusy || unitContext?.busy} passwordDisabled={Boolean(sessionAttention) || Boolean(backendStopped)} />
           </div>
         </header>
+
+        {unitContext?.error && <div className="workspace-service-notice" role="alert">{unitContext.error}</div>}
 
         {showConnectivityNotice ? <div className="workspace-connectivity-notice" role="status" aria-live="polite">
           <WifiOff size={18} aria-hidden="true" />

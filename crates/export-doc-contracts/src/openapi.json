@@ -31970,10 +31970,6 @@
             "type": "string",
             "description": "相对于运行数据根的默认导出目录，留空使用系统保存对话框默认位置"
           },
-          "defaultTemplateExporterNameCn": {
-            "type": "string",
-            "description": "Excel 未提供出口商中文名时用于导入草稿和导出模板；请先填写真实出口商中文公司名，避免把英文发票抬头当作中文名"
-          },
           "documentFieldLabels": {
             "$ref": "#/components/schemas/DocumentFieldLabelSettings"
           },
@@ -32025,7 +32021,6 @@
         },
         "required": [
           "updaterEndpoint",
-          "defaultTemplateExporterNameCn",
           "itemEntryBlankRowCount",
           "itemEntrySpareColumnCount",
           "documentFieldLabels",
@@ -41437,7 +41432,6 @@
       "revision": 0,
       "system": {
         "updaterEndpoint": "",
-        "defaultTemplateExporterNameCn": "",
         "itemEntryBlankRowCount": 20,
         "itemEntrySpareColumnCount": 0,
         "documentFieldLabels": {
@@ -41587,7 +41581,6 @@
     },
     "labels": {
       "system.updaterEndpoint": "软件更新地址",
-      "system.defaultTemplateExporterNameCn": "默认出口商中文名",
       "system.itemEntryBlankRowCount": "商品明细预留空白行数",
       "system.itemEntrySpareColumnCount": "商品明细默认显示备用列数",
       "system.logRetentionDays": "文本日志保留天数",

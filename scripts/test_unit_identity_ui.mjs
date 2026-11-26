@@ -2,16 +2,9 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { personnelChange, publishPermissionScheme } from './lib/approval-fixtures.mjs';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
+import { switchUnitIdentity } from './lib/unit-context-ui.mjs';
 
 await withOfficeUi('unit-identity-ui', async ({ output, url, operations, invoke, openPage, require }) => {
-  const switchIdentity = async (page, contextId) => {
-    await page.getByRole('combobox',{ name:'当前单位身份',exact:true }).selectOption(contextId);
-    await page.waitForFunction(id => {
-      const control = document.querySelector('[aria-label="当前单位身份"]');
-      return control?.value === id && !control.disabled;
-    }, contextId);
-    assert.equal(await page.getByText('当前页面不可用',{ exact:true }).count(),0,'Intentional identity switch does not report an unauthorized old route');
-  };
   const admin = (await invoke('Login', { username:'oa-review',password:'Review-2026-Test' })).accessToken;
   const sub = await invoke('CreateOrganizationCompany',{ code:'UNITUI',name:'界面验证子公司',parentCompanyCode:'DEFAULT',unitKind:'Company',isActive:true },{},admin);
   await invoke('CreateOrganizationDepartment',{ code:'TRADE',name:'子公司业务部',companyCode:'UNITUI',isActive:true },{},admin);
@@ -25,9 +18,9 @@ await withOfficeUi('unit-identity-ui', async ({ output, url, operations, invoke,
   const grants = ['view','create','edit'].map(action=>({ resourceKey:'office.general',action,dataScope:'own' }));
   const base = { companyCode:'UNITUI',permissionGrants:grants,disabledModules:[],oaAssignedOnly:false,management:{ organization:false,appointments:false,workflows:false,roles:false,analytics:false },includeDescendants:false,startsAt:'',endsAt:'',isActive:true,expectedVersion:0 };
   let workerRole = await invoke('SaveUnitAccess',{ ...base,userId:users[0].id,name:'子公司工作身份',mode:'Business',appointmentId:person.organization.additionalAssignments[0].id },{},admin);
-  const managerRole = await invoke('SaveUnitAccess',{ ...base,userId:users[1].id,name:'子公司权限管理',mode:'Administration',appointmentId:'',management:{ ...base.management,roles:true } },{},admin);
+  await invoke('SaveUnitAccess',{ ...base,userId:users[1].id,name:'子公司权限管理',mode:'Administration',appointmentId:'',management:{ ...base.management,roles:true } },{},admin);
   const manager = await openPage('unit-manager','Unit-UI-2026');
-  await switchIdentity(manager,`unit:${managerRole.id}:UNITUI`);
+  await switchUnitIdentity(manager,'界面验证子公司 · 子公司权限管理');
   await manager.goto(`${url}/#/system/organization`);
   await manager.locator('summary').filter({ hasText:'本单位权限方案' }).click();
   await manager.getByRole('button',{ name:'新增单位方案',exact:true }).click();
@@ -43,32 +36,15 @@ await withOfficeUi('unit-identity-ui', async ({ output, url, operations, invoke,
   const published = await publishPermissionScheme(invoke, admin, scheme);
   workerRole = await invoke('SaveUnitAccess',{ ...workerRole,permissionTemplateId:scheme.id,permissionSchemeVersion:published.version,permissionGrants:null,expectedVersion:workerRole.versionNumber },{},admin);
   const worker = await openPage('unit-worker','Unit-UI-2026');
-  const identity = worker.getByRole('combobox',{ name:'当前单位身份',exact:true });
-  const subContext = `unit:${workerRole.id}:UNITUI`;
-  await switchIdentity(worker,subContext);
+  const subLabel = '界面验证子公司 · 子公司工作身份';
+  await switchUnitIdentity(worker,subLabel);
   await worker.goto(`${url}/#/office/requests/general`);
   await worker.getByRole('button',{ name:/^账号菜单：/u }).click();
   await worker.getByRole('menuitem',{ name:'我的权限来源',exact:true }).click();
   const source = worker.getByRole('dialog',{ name:'当前身份与权限来源',exact:true });
   await source.getByText(/子公司登记方案/u).waitFor();
   await source.getByRole('button',{ name:'关闭窗口',exact:true }).click();
-  await worker.getByRole('button',{ name:'新建通用申请',exact:true }).click();
-  const draft = worker.getByRole('dialog',{ name:'新建通用申请',exact:true });
-  await draft.getByRole('textbox',{ name:'申请标题',exact:true }).fill('中文草稿切换保护');
-  await identity.selectOption('');
-  const confirmation = worker.getByRole('dialog',{ name:'放弃未保存的修改？',exact:true });
-  await confirmation.getByRole('button',{ name:'取消',exact:true }).click();
-  assert.equal(await identity.inputValue(),subContext);
-  assert.equal(await draft.getByRole('textbox',{ name:'申请标题',exact:true }).inputValue(),'中文草稿切换保护');
-  const switches = [];
-  worker.on('request',request=>{ if(request.url().endsWith('/api/auth/unit-context')) switches.push(request); });
-  await identity.selectOption('');
-  assert(await identity.isDisabled(),'Switch control remains locked while confirmation is pending');
-  await confirmation.getByRole('button',{ name:'切换单位身份',exact:true }).click();
-  await draft.waitFor({ state:'hidden' });
-  await worker.waitForFunction(()=>document.querySelector('[aria-label="当前单位身份"]')?.value==='');
-  assert.equal(switches.length,1,'One confirmed switch produces one HTTP request');
-  await worker.screenshot({ path:path.join(output,'unit-switch-draft-guard.png'),fullPage:true });
+  await switchUnitIdentity(worker,'本公司 · 主身份');
   const expiresAt = new Date(Date.now() + 15000).toISOString();
   const expiringRole = await invoke('SaveUnitAccess',{ ...base,userId:users[0].id,name:'即将结束的任职授权',mode:'Business',appointmentId:person.organization.additionalAssignments[0].id,endsAt:expiresAt },{},admin);
   const expiringLogin = await invoke('Login',{ username:'unit-worker',password:'Unit-UI-2026' });

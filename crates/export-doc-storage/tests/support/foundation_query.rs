@@ -206,34 +206,5 @@ pub fn exercise(tx: &Connection) {
     assert_eq!(departments["totalCount"], 505);
     assert_eq!(departments["items"].as_array().unwrap().len(), 5);
     assert_eq!(departments["items"][4]["code"], "DEPT-504");
-    let filter = DataScope {
-        company: "FOUND-A",
-        company_wide: true,
-        ..Default::default()
-    };
-    assert_eq!(tx.sole_exporter_name(&filter).unwrap(), None);
-    for (company, name) in [
-        ("FOUND-A", "  Exporter  "),
-        ("FOUND-A", "EXPORTER"),
-        ("FOUND-B", "Hidden name"),
-    ] {
-        tx.insert(&RecordWrite::unkeyed(
-            "exporters",
-            &json!({"companyScope":company,"versionNumber":1,"ownerUserId":7,"departmentId":"D","exporterNameCN":name}),
-        ))
-        .unwrap();
-    }
-    assert!(
-        tx.sole_exporter_name(&filter)
-            .unwrap()
-            .unwrap()
-            .eq_ignore_ascii_case("Exporter")
-    );
-    tx.insert(&RecordWrite::unkeyed(
-        "exporters",
-        &json!({"companyScope":"FOUND-A","versionNumber":1,"ownerUserId":7,"departmentId":"D","exporterNameCN":"Another"}),
-    ))
-    .unwrap();
-    assert_eq!(tx.sole_exporter_name(&filter).unwrap(), None);
     tx.rollback().unwrap();
 }

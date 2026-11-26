@@ -10,7 +10,6 @@ import type { SettingPatch } from "./settingsTypes.ts";
 
 export const systemDefaultPatches: SettingPatch[] = [
   { path: systemUpdaterEndpointPath, value: "" },
-  { path: ["system", "defaultTemplateExporterNameCn"], value: "" },
   { path: ["system", "itemEntryBlankRowCount"], value: 20 },
   { path: ["system", "itemEntrySpareColumnCount"], value: 0 },
   { path: ["system", "documentFieldLabels"], value: { invoice: {}, item: {}, payment: {} } },

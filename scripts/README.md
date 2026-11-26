@@ -1,5 +1,9 @@
 # 脚本使用说明
 
+2026-11-26 组织删除／账号单位菜单专项：`cargo test --locked -p export-doc-engine --test organization_deletion` 验证管理员迁出后默认组织可删除；`cargo test --locked -p export-doc-storage --test organization_references` 验证真实层级、人员历史、账号和业务引用保护。真实 PostgreSQL 使用 `test-native-postgres.ps1 -PostgresBin <PostgreSQL18的bin目录> -Scope Organization`，只执行同一引用契约。前端执行 `test_account_menu_ui.mjs`、`test_unit_identity_ui.mjs`，复用 `lib/unit-context-ui.mjs` 操作账号菜单中的单位单选项；中文草稿保护在账号菜单专项通过真实内联编辑器验证。真实 HTTP 夹具构建后复制到仓库 `.codex-runtime` 并通过 `EXPORTDOC_OFFICE_REVIEW_BINARY` 指定，避免与后续 Cargo 编译共用运行中的程序文件。验证边界见[本批记录](../docs/archive/2026-11/2026-11-26组织删除与账号单位菜单.md)。
+
+Excel 单位默认资料专项：`cargo test --locked -p export-doc-engine --features excel --test excel_company_defaults --test excel_workflow` 验证本地／上传预览保留表格名称、缺失时补当前公司、公司更名／未分配公司、真实空白模板／订舱输出和预览不写业务库。既有 Excel 工作流按现行任务契约等待备份、恢复暂存完成，并重开服务验证恢复。`node scripts/test_excel_exporter_ui.mjs` 验证设置字段移除、发票原有名称保留和重新选择出口商后保存回读；登记在 `test:identity-ui`，复用现有真实 HTTP 夹具。
+
 2026-11-26 授权有效期定向回归：`npm --prefix apps/export-doc-web run test:license-status-ui` 覆盖终身、一年、三年、到期当天、正式授权过期、未注册试用、试用最后一天／过期、授权无效、600px 窄屏注册刷新及读取失败，已登记到 maintenance 回归组。后端执行 `cargo test --locked -p export-doc-engine --lib engine::licensing::tests`，契约执行 `cargo test --locked -p export-doc-contracts --lib`；共用仓库 CARGO_HOME 并串行运行 Cargo。仅为专项验证，不代替完整平台／数据库门禁；结果见[记录](../docs/archive/2026-11/2026-11-26授权有效期显示与清理.md)。
 
 2026-11-26 Docker 恢复验证：`verify-native-docker.mjs --resume --stage-restore` 按现行 HTTP 202／`BackgroundJobSnapshot` 等待恢复暂存任务成功，再保存后续离线恢复的验证状态；失败或取消直接阻断。源码 Compose 部署和镜像直装共用这条路径。`node scripts/test_native_docker_validation.mjs` 覆盖任务等待、失败／取消、无效任务编号及恢复后的数据核对，已纳入 `verify-script-suite.ps1`，无需 Docker daemon 即可执行；真实容器验收仍由 Docker 发布工作流执行。
@@ -359,7 +363,7 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 - 任职与流程闭环：`node scripts/test_organization_workflow_ui.mjs` 复用上述隔离宿主，验证真实兼职/矩阵负责人选择、公司领导审批负责人/职位目录、会签和金额条件设置、未完成审批移交、仅分派可见及窄屏无障碍；先生成客户端、构建 React 和 `cargo build --locked -p export-doc-server --example office_review`。
 - OA 融合与资源档案：`node scripts/test_oa_integration_completion_ui.mjs` 在同一真实宿主验证五种窗口宽度的权限方案内部文字、单位调岗制度、身份缓存、本人范围明确审批、一次聚合查询、草稿附件/正式提交、资源任务移交、PDF 与窄屏无障碍。字段和接口共用生成客户端；原创建 API 默认直接提交，React 显式选择草稿后上传并提交。对应任职及原件/PDF合同同时进入 SQLite 与真实 PostgreSQL 团队回归。
 - PostgreSQL 权限/组织定向回归：`pwsh -NoProfile -File scripts/test-native-postgres.ps1 -PostgresBin <PostgreSQL18/bin> -Scope Workflows` 复用隔离集群与独立账号，串行运行存储合同和完整团队业务合同；`All` 额外运行 PostgreSQL 恢复和输出发布合同；独立的大容量文件流测试不随数据库验收执行。
-- 单位身份与权限方案：`node scripts/test_unit_identity_ui.mjs` 使用同一隔离宿主，验证本单位方案维护、权限来源、跨单位身份切换及中文草稿保护；须先完成当前 React 与 `office_review` 构建。
+- 单位身份与权限方案：`node scripts/test_unit_identity_ui.mjs` 使用同一隔离宿主，验证本单位方案维护、权限来源、跨单位身份切换、授权到期与注销；中文草稿保护由 `test_account_menu_ui.mjs` 验证。须先完成当前 React 与 `office_review` 构建。
 
 本分支已删除旧 C# 源码/测试/工程与 `deploy/container`；`verify-dependency-policy.mjs` 拒绝重新引入托管工程或将其依赖列入 Rust notices。原生 NuGet 归档仍按中央资源清单校验。手动跨浏览器验收使用锁定的 npm Playwright 和隔离 Rust `office_review` 宿主，不读取旧 .NET DLL；Firefox/WebKit 仍只在手动工作流执行。
 

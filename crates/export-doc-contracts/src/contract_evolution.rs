@@ -210,27 +210,29 @@ fn reviewed_profile_versions_and_product_identity(baseline: &mut Value) {
     }
     baseline["components"]["schemas"]["ApiSingleWindowClientProfilesResponse"]["properties"]["savedProfileKey"] =
         json!({"type":"string"});
-    let system = &mut baseline["components"]["schemas"]["SystemSettings"];
-    system["properties"]
-        .as_object_mut()
-        .unwrap()
-        .remove("appName")
-        .unwrap();
-    system["required"]
-        .as_array_mut()
-        .unwrap()
-        .retain(|field| field != "appName");
-    let configuration = &mut baseline["x-exportdoc-configuration"];
-    configuration["defaults"]["system"]
-        .as_object_mut()
-        .unwrap()
-        .remove("appName")
-        .unwrap();
-    configuration["labels"]
-        .as_object_mut()
-        .unwrap()
-        .remove("system.appName")
-        .unwrap();
+    for removed in ["appName", "defaultTemplateExporterNameCn"] {
+        let system = &mut baseline["components"]["schemas"]["SystemSettings"];
+        system["properties"]
+            .as_object_mut()
+            .unwrap()
+            .remove(removed)
+            .unwrap();
+        system["required"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|field| field != removed);
+        let configuration = &mut baseline["x-exportdoc-configuration"];
+        configuration["defaults"]["system"]
+            .as_object_mut()
+            .unwrap()
+            .remove(removed)
+            .unwrap();
+        configuration["labels"]
+            .as_object_mut()
+            .unwrap()
+            .remove(&format!("system.{removed}"))
+            .unwrap();
+    }
 }
 
 fn reviewed_export_and_worklist(baseline: &mut Value) {

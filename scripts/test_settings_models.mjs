@@ -164,7 +164,6 @@ after.system.documentFieldLabels.invoice.spare1 = "新名"; after.email.smtpHost
 assert(JSON.stringify(draft.changedSettingsCategories(before, after).map(item => item.key)) === JSON.stringify(["documents", "communication"]), "changes across categories");
 after.system.documentFieldLabels.invoice.spare1 = "旧名"; after.email.smtpHost = "old"; after.revision = 2;
 assert(draft.changedSettingsCategories(before, after).length === 0, "undo clears dirty categories and revision is not editable content");
-assert(draft.settingsCategoryForPath(["system", "defaultTemplateExporterNameCn"]) === "excel-import", "exporter default belongs to Excel");
 assert(draft.settingsCategoryForPath(["webDav", "enabled"]) === "backup", "backup settings ownership");
 assert(draft.settingsCategoryForPath(["system", "logRetentionDays"]) === "maintenance", "text log retention ownership");
 // Secret-control visibility is exercised on the production settings panels in

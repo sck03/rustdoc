@@ -6851,7 +6851,6 @@ export interface SupplyRequestUpdateRequest {
 export interface SystemSettings {
   databaseProvider: string;
   defaultExportDirectory: string;
-  defaultTemplateExporterNameCn: string;
   documentFieldLabels: DocumentFieldLabelSettings;
   itemEntryBlankRowCount: number;
   itemEntrySpareColumnCount: number;

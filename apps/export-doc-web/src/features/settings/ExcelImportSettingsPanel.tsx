@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { TextSetting } from "./SettingsFieldControls.tsx";
 import { RefreshCw, RotateCcw, Save, Trash2 } from "lucide-react";
 import { NumberField, SelectField } from "../../ui/FormFields.tsx";
 import { buildExcelSchemeOptions, createDefaultExcelImportSettings, normalizeExcelImportSettings, readExcelImportRecordNumber, readExcelImportSchemesForSettings, readExcelImportSettingsForSettings } from "./excelImportSettingsModel.ts";
@@ -156,7 +155,6 @@ export function ExcelImportSettingsPanel({
     <section className="form-section" aria-label="Excel 导入">
       <h2>Excel 导入</h2>
       <p>默认智能识别；特殊客户表格可在导入时选择手动方案。</p>
-      <div className="field-grid"><TextSetting settings={settings} path={["system", "defaultTemplateExporterNameCn"]} label="默认出口商中文名" disabled={disabled} onChange={onChange} /></div>
       <details><summary>高级导入方案</summary>
       <p>方案只在导入时主动选择才生效。填写工作表名称；不用的列填 0、单元格留空，明细结束行 0 表示自动。保存方案后还需保存系统设置。</p>
       <section className="excel-import-settings-section" aria-label="Excel 导入方案">

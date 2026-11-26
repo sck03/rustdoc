@@ -8,16 +8,23 @@ import "./account-menu.css";
 
 export type ChangeOwnPassword = (body: ApiChangePasswordRequest, signal: AbortSignal) => Promise<boolean>;
 
-export function AccountMenu({ user, displayName, identityLabel, isDesktopRuntime, disabled, passwordDisabled, onLogout, onChangePassword }: {
+export function AccountMenu({ user, displayName, identityLabel, isDesktopRuntime, disabled, passwordDisabled, onLogout, onChangePassword, onSwitchContext }: {
   user: ApiUserDto; displayName: string; identityLabel: string; isDesktopRuntime: boolean; disabled?: boolean; passwordDisabled?: boolean;
   onLogout: () => void; onChangePassword?: ChangeOwnPassword;
+  onSwitchContext?: (id: string) => Promise<void>;
 }) {
   const [dialog, setDialog] = useState<"password" | "permissions" | null>(null);
+  const contexts = user.unitContexts ?? [];
   return <>
     <DropdownMenu label="账号菜单：" triggerClassName="session-user account-menu-trigger" disabled={disabled}
       trigger={<><span className="session-avatar" aria-hidden="true">{displayName.trim().slice(0, 1).toUpperCase()}</span>
         <span className="session-user-copy"><strong title={displayName}>{displayName}</strong><small>账号 · {identityLabel}</small></span>
         <ChevronDown size={16} aria-hidden="true" /></>}
+      groups={contexts.length ? [{ key: "units", label: "单位身份", items: contexts.map(context => ({
+        key: context.id, label: `${context.companyName || "未分配单位"} · ${context.name}`,
+        checked: context.id === (user.contextId ?? ""), disabled: !onSwitchContext || contexts.length === 1,
+        onSelect: () => void onSwitchContext?.(context.id),
+      })) }] : []}
       items={[
         ...(onChangePassword ? [{ key: "password", label: "修改密码", disabled: passwordDisabled, icon: <KeyRound size={18} aria-hidden="true" />, onSelect: () => setDialog("password") }] : []),
         ...(user.permissionSource ? [{ key: "permissions", label: "我的权限来源", icon: <ShieldCheck size={18} aria-hidden="true" />, onSelect: () => setDialog("permissions") }] : []),

@@ -5,7 +5,7 @@ use super::model::*;
 pub(super) fn value() -> serde_json::Value { j_object(vec![
     ("defaults",j_object(vec![
         ("revision",serde_json::Value::Number(num("0"))),
-        ("system",j_object(vec![("updaterEndpoint",serde_json::Value::String("".into())),("defaultTemplateExporterNameCn",serde_json::Value::String("".into())),("itemEntryBlankRowCount",serde_json::Value::Number(num("20"))),("itemEntrySpareColumnCount",serde_json::Value::Number(num("0"))),("documentFieldLabels",j_object(vec![("invoice",j_object(vec![])),("item",j_object(vec![])),("payment",j_object(vec![]))])),("logRetentionDays",serde_json::Value::Number(num("30"))),("logRetainedFileCount",serde_json::Value::Number(num("14"))),("defaultExportDirectory",serde_json::Value::String("".into())),("databaseProvider",serde_json::Value::String("Sqlite".into())),("sqliteDatabaseFileName",serde_json::Value::String("exportdoc-native.db".into())),])),
+        ("system",j_object(vec![("updaterEndpoint",serde_json::Value::String("".into())),("itemEntryBlankRowCount",serde_json::Value::Number(num("20"))),("itemEntrySpareColumnCount",serde_json::Value::Number(num("0"))),("documentFieldLabels",j_object(vec![("invoice",j_object(vec![])),("item",j_object(vec![])),("payment",j_object(vec![]))])),("logRetentionDays",serde_json::Value::Number(num("30"))),("logRetainedFileCount",serde_json::Value::Number(num("14"))),("defaultExportDirectory",serde_json::Value::String("".into())),("databaseProvider",serde_json::Value::String("Sqlite".into())),("sqliteDatabaseFileName",serde_json::Value::String("exportdoc-native.db".into())),])),
         ("reportTemplateDefaults",j_object(vec![("exportDocumentTemplatePath",serde_json::Value::String("".into())),("paymentVoucherTemplatePath",serde_json::Value::String("".into()))])),
         ("batchExport",j_object(vec![("items",serde_json::Value::Array(vec![])),("outputFileNamePattern",serde_json::Value::String("{InvoiceNo}_{DocType}".into())),("outputFolderPattern",serde_json::Value::String("{InvoiceNo}_Docs_{Date}".into())),("mergePdf",serde_json::Value::Bool(true)),("zipAfterExport",serde_json::Value::Bool(true))])),
         ("paymentTemplates",serde_json::Value::Array(vec![])),
@@ -19,7 +19,6 @@ pub(super) fn value() -> serde_json::Value { j_object(vec![
     ])),
     ("labels",j_object(vec![
         ("system.updaterEndpoint",serde_json::Value::String("软件更新地址".into())),
-        ("system.defaultTemplateExporterNameCn",serde_json::Value::String("默认出口商中文名".into())),
         ("system.itemEntryBlankRowCount",serde_json::Value::String("商品明细预留空白行数".into())),
         ("system.itemEntrySpareColumnCount",serde_json::Value::String("商品明细默认显示备用列数".into())),
         ("system.logRetentionDays",serde_json::Value::String("文本日志保留天数".into())),

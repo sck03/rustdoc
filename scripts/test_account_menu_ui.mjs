@@ -2,9 +2,67 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
+import { switchUnitIdentity, chooseUnitIdentity, assertUnitIdentity } from './lib/unit-context-ui.mjs';
 
 await withOfficeUi('account-menu-ui', async ({ output, url, invoke, openPage, require }) => {
   const admin = (await invoke('Login', { username:'oa-review', password:'Review-2026-Test' })).accessToken;
+  const companyName = '宁波国际贸易与跨境供应链管理有限公司';
+  await invoke('CreateOrganizationCompany', { code:'MENU-UNIT', name:companyName, isActive:true }, {}, admin);
+  const administrator = await openPage('oa-review','Review-2026-Test');
+  const account = administrator.getByRole('button', { name:/^账号菜单：/u });
+  assert((await account.innerText()).includes('账号 · 管理员'));
+  assert(!(await account.innerText()).includes('本公司'));
+  assert.equal(await administrator.getByRole('combobox', { name:'当前单位身份', exact:true }).count(),0);
+  for (const width of [1920, 1180, 680, 390]) {
+    await administrator.setViewportSize({width,height:900});
+    await account.click();
+    const choices = administrator.getByRole('menu');
+    const box = await choices.boundingBox(), anchor = await account.boundingBox();
+    assert(box.x >= 0 && box.x + box.width <= width + 1);
+    assert(Math.abs(box.x + box.width - anchor.x - anchor.width) < 2);
+    assert(await administrator.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+    if (width >= 1180) {
+      const centers = await administrator.locator('.density-toggle-button,.service-status,.account-menu-trigger').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect()).filter(rect=>rect.height>0).map(rect=>rect.y+rect.height/2));
+      assert(Math.max(...centers)-Math.min(...centers)<2,'Header controls align vertically');
+    }
+    await administrator.screenshot({path:path.join(output,`unit-menu-${width}.png`)});
+    await administrator.keyboard.press('Escape');
+  }
+  await administrator.setViewportSize({width:1440,height:1000});
+  await account.focus(); await administrator.keyboard.press('ArrowDown');
+  await administrator.waitForFunction(()=>document.activeElement?.getAttribute('role')==='menuitemradio');
+  assert.equal(await administrator.evaluate(()=>document.activeElement.getAttribute('role')),'menuitemradio');
+  await administrator.keyboard.press('ArrowDown');
+  assert((await administrator.evaluate(()=>document.activeElement.textContent)).includes(companyName));
+  const unitAxe = require('axe-core'); await administrator.evaluate(unitAxe.source);
+  assert.deepEqual((await administrator.evaluate(()=>window.axe.run(document.querySelector('.session-strip'),{runOnly:{type:'tag',values:['wcag2a','wcag2aa']}}))).violations,[]);
+  await administrator.keyboard.press('Escape');
+  await administrator.route('**/api/auth/unit-context',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({message:'单位切换暂时不可用'})}));
+  await chooseUnitIdentity(administrator,`${companyName} · 系统管理`);
+  await administrator.getByRole('alert').filter({hasText:'单位切换暂时不可用'}).waitFor();
+  await assertUnitIdentity(administrator,'本公司 · 主身份');
+  await administrator.unroute('**/api/auth/unit-context');
+  await switchUnitIdentity(administrator,`${companyName} · 系统管理`);
+  assert((await account.innerText()).includes('账号 · 管理员'));
+  assert(!(await account.innerText()).includes(companyName));
+  await administrator.getByRole('alert').filter({hasText:'单位切换暂时不可用'}).waitFor({state:'hidden'});
+  await administrator.goto(`${url}/#/system/access-control`);
+  await administrator.getByRole('cell',{name:'oa-review',exact:true}).click();
+  const nameField = administrator.getByLabel('姓名',{exact:true});
+  await nameField.fill('中文草稿切换保护');
+  await chooseUnitIdentity(administrator,'本公司 · 主身份');
+  const confirmation = administrator.getByRole('dialog',{name:'放弃未保存的修改？',exact:true});
+  await confirmation.getByRole('button',{name:'取消',exact:true}).click();
+  assert.equal(await nameField.inputValue(),'中文草稿切换保护');
+  await assertUnitIdentity(administrator,`${companyName} · 系统管理`);
+  const switches = [];
+  administrator.on('request',request=>{if(request.url().endsWith('/api/auth/unit-context'))switches.push(request);});
+  await chooseUnitIdentity(administrator,'本公司 · 主身份');
+  assert(await account.isDisabled(),'The account menu is locked during the pending confirmation');
+  await confirmation.getByRole('button',{name:'切换单位身份',exact:true}).click();
+  await assertUnitIdentity(administrator,'本公司 · 主身份');
+  assert.equal(switches.length,1);
+  await administrator.screenshot({path:path.join(output,'unit-switch-draft-guard.png')});
   await invoke('createUserAccount', { username:'self-password-ui', fullName:'业务部密码测试负责人', role:'OfficeEmployee',
     companyScope:'DEFAULT', departmentId:'GENERAL', isActive:true, resetPassword:'Original-Pass-2026', permissionGrants:[] }, {}, admin);
   const other = (await invoke('Login', { username:'self-password-ui', password:'Original-Pass-2026' })).accessToken;
@@ -14,6 +72,7 @@ await withOfficeUi('account-menu-ui', async ({ output, url, invoke, openPage, re
   assert.equal(await page.locator('.workspace-logout-button').count(), 0);
   await trigger.focus(); await page.keyboard.press('ArrowDown'); await menu.waitFor();
   await page.getByRole('menuitem', { name:'修改密码', exact:true }).waitFor();
+  await page.waitForFunction(() => document.activeElement?.textContent === '修改密码');
   assert.equal(await page.evaluate(() => document.activeElement.textContent), '修改密码');
   await page.keyboard.press('End'); assert.equal(await page.evaluate(() => document.activeElement.textContent), '退出登录');
   await page.keyboard.press('Escape'); await menu.waitFor({ state:'hidden' });
@@ -84,5 +143,5 @@ await withOfficeUi('account-menu-ui', async ({ output, url, invoke, openPage, re
   assert(await restrictedDialog.locator('.permission-source-operations li').count()>0);
   await restricted.screenshot({path:path.join(output,'permission-source-restricted.png')});
   fs.writeFileSync(path.join(output, 'summary.json'), JSON.stringify({ keyboard:true, responsive:true, accessibility:true, selfPassword:true, otherSessionsRevoked:true, unrelatedAccountPreserved:true,
-    compactPermissionSource:true, realRestrictionsVisible:true }, null, 2));
+    compactPermissionSource:true, realRestrictionsVisible:true, unitMenu:true, unitSwitchFailure:true, headerAlignment:true, originalAccountLabel:true, unitSwitchDraftGuard:true }, null, 2));
 });

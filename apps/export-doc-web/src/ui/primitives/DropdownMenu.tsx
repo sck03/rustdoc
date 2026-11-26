@@ -1,11 +1,13 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { Check } from "lucide-react";
 import { isComposingKey } from "../keyboardEvent.ts";
 import "./dropdown-menu.css";
 
-type MenuItem = { key: string; label: string; icon?: ReactNode; onSelect: () => void; disabled?: boolean; danger?: boolean; separator?: boolean };
+type MenuItem = { key: string; label: string; icon?: ReactNode; onSelect: () => void; disabled?: boolean; danger?: boolean; separator?: boolean; checked?: boolean };
+type MenuGroup = { key: string; label: string; items: MenuItem[] };
 
-export function DropdownMenu({ label, trigger, triggerClassName, items, disabled = false }: {
-  label: string; trigger: ReactNode; triggerClassName?: string; items: MenuItem[]; disabled?: boolean;
+export function DropdownMenu({ label, trigger, triggerClassName, items, groups = [], disabled = false }: {
+  label: string; trigger: ReactNode; triggerClassName?: string; items: MenuItem[]; groups?: MenuGroup[]; disabled?: boolean;
 }) {
   const id = useId();
   const [open, setOpen] = useState(false);
@@ -14,7 +16,13 @@ export function DropdownMenu({ label, trigger, triggerClassName, items, disabled
   const menu = useRef<HTMLDivElement>(null);
   const initialIndex = useRef(0);
   const close = (restoreFocus = false) => { setOpen(false); if (restoreFocus) button.current?.focus(); };
-  const controls = () => Array.from(menu.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') ?? []);
+  const controls = () => Array.from(menu.current?.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]:not(:disabled)') ?? []);
+  const renderItem = (item: MenuItem) => <button key={item.key} type="button"
+    role={item.checked === undefined ? "menuitem" : "menuitemradio"} aria-checked={item.checked}
+    className="dropdown-menu-item" data-danger={item.danger || undefined} data-separator={item.separator || undefined}
+    disabled={item.disabled} onClick={() => { close(true); item.onSelect(); }}>
+    {item.icon}<span>{item.label}</span>{item.checked && <Check size={16} aria-hidden="true" />}
+  </button>;
   useEffect(() => {
     if (!open) return;
     const focus = window.requestAnimationFrame(() => {
@@ -51,9 +59,11 @@ export function DropdownMenu({ label, trigger, triggerClassName, items, disabled
           : (index + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
         buttons[next]?.focus();
       }}>
-      {items.map(item => <button key={item.key} type="button" role="menuitem" className="dropdown-menu-item"
-        data-danger={item.danger || undefined} data-separator={item.separator || undefined} disabled={item.disabled}
-        onClick={() => { close(true); item.onSelect(); }}>{item.icon}<span>{item.label}</span></button>)}
+      {groups.map(group => <div key={group.key} role="group" aria-label={group.label} className="dropdown-menu-group">
+        <div className="dropdown-menu-group-label" aria-hidden="true">{group.label}</div>
+        <div className="dropdown-menu-options">{group.items.map(renderItem)}</div>
+      </div>)}
+      {items.map(renderItem)}
     </div>}
   </div>;
 }

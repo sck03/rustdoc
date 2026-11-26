@@ -4,7 +4,6 @@ import type { SettingsRecord } from "./settingsTypes.ts";
 export function settingsCategoryForPath([root, field = ""]: readonly string[]): SettingsCategoryKey {
   if (root === "system") {
     if (["documentFieldLabels", "itemEntryBlankRowCount", "itemEntrySpareColumnCount"].includes(field)) return "documents";
-    if (field === "defaultTemplateExporterNameCn") return "excel-import";
     if (field === "logRetentionDays" || field === "logRetainedFileCount") return "maintenance";
     return "runtime";
   }
