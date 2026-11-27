@@ -1,6 +1,6 @@
 //! Account for concurrent, unwritten upload bytes on the injected cache volume.
-use crate::api::ApiError;
-use crate::engine::error::error;
+use crate::api::{ApiError, ErrorCode};
+use crate::engine::error::unavailable;
 use std::{
     path::PathBuf,
     sync::{Arc, Mutex},
@@ -102,13 +102,14 @@ impl Reservation {
         let mut pending = budget
             .pending
             .lock()
-            .map_err(|_| error(503, "上传空间预算不可用。"))?;
+            .map_err(|_| unavailable("上传空间预算不可用，请联系管理员检查运行状态。"))?;
         #[cfg(test)]
         if let Some(available) = budget.available {
             return self.ensure_available(&mut pending, bytes, available);
         }
-        let available =
-            fs2::available_space(&budget.root).map_err(|_| error(503, "无法检查上传暂存空间。"))?;
+        let available = fs2::available_space(&budget.root).map_err(|_| {
+            unavailable("无法检查上传暂存空间，请核对运行数据目录的挂载与访问权限。")
+        })?;
         self.ensure_available(&mut pending, bytes, available)
     }
 
@@ -123,9 +124,13 @@ impl Reservation {
             .checked_add(extra)
             .filter(|total| *total <= available.saturating_sub(HEADROOM));
         if available < HEADROOM || total.is_none() {
-            return Err(error(
-                503,
+            return Err(unavailable(
                 "上传暂存空间不足，需为运行数据保留 256 MiB；请释放空间后重试。",
+            )
+            .coded(ErrorCode::FileSpace)
+            .at(
+                "storage",
+                "扩容运行数据所在磁盘，或清理已确认无用的临时文件后重新执行。",
             ));
         }
         *pending = total.unwrap();
@@ -224,11 +229,14 @@ mod tests {
             remaining: 0,
         };
         for (bytes, available) in [(0, HEADROOM - 1), (u64::MAX, u64::MAX)] {
-            assert!(
-                upload
-                    .ensure_available(&mut budget.pending.lock().unwrap(), bytes, available)
-                    .is_err()
-            );
+            let error = upload
+                .ensure_available(&mut budget.pending.lock().unwrap(), bytes, available)
+                .unwrap_err();
+            let public = error.public_body("disk-budget-test");
+            assert_eq!(public["code"], "FILE_SPACE_EXHAUSTED");
+            assert!(public["message"].as_str().unwrap().contains("256 MiB"));
+            assert_eq!(public["issues"][0]["field"], "storage");
+            assert_eq!(public["outcome"], "NotCommitted");
         }
         upload
             .ensure_available(&mut budget.pending.lock().unwrap(), 10, HEADROOM + 10)

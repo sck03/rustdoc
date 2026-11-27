@@ -64,7 +64,7 @@ Excel 单位默认资料专项：`cargo test --locked -p export-doc-engine --fea
 
 2026-11-15：`test_review_boundaries_ui.mjs` 纳入 `test:settings-models`，验证真实 React 下的利润草稿失效/迟到结果、恢复密码无操作缓存、仅发送权限和历史游标分页。发票状态事件合同在 `business_contract` 中同时供 SQLite 与 PostgreSQL 团队测试使用；网络期限测试遍历全部最终生成元数据。当前 schema 18 模型指纹已随状态历史基线更新，旧实验库仍拒绝打开。
 
-核对日期：2026-11-13。当前使用全新 schema 18；旧实验库须另存后显式新建 DataRoot/数据库。日常文件已独立于数据库，完整迁机必须包含文件对象；下文带日期的旧验收条目不替代当前参数和能力。GitHub 入口与 quick/full 差异见[工作流手册](../docs/GitHub%20Actions工作流用途与运行手册.md)。
+核对日期：2026-11-28。当前使用全新 schema 19；旧实验库须另存后显式新建 DataRoot/数据库。日常文件已独立于数据库，迁机使用自包含 .edmpoint 或直接接入恢复仓库；下文带日期的旧验收条目不替代当前参数和能力。GitHub 入口与 quick/full 差异见[工作流手册](../docs/GitHub%20Actions工作流用途与运行手册.md)，本轮 CI 修复与专项见[复核记录](../docs/archive/2026-11/2026-11-28重构复核与CI修复清理.md)。
 
 操作与 OA 手册：`node scripts/generate-oa-manuals.mjs` 从 `docs/manuals` 的 Markdown 生成 OA 管理员、OA 用户和项目程序操作说明三份同名 PDF，复用 Playwright 和受管 Noto 字体；中间文件写入 `artifacts/oa-manuals`。先准备前端依赖与字体，匿名界面来源和日期见 `docs/manuals/images/README.md`，不能将保留截图冒充本批验收。更新后逐页检查中文、分页、表格、页码和完整性。阅读入口见[操作与 OA 手册](../docs/人员组织权限与OA操作手册.md)。
 
