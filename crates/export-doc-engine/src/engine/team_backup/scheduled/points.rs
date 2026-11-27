@@ -127,21 +127,7 @@ pub(super) fn page(service: &NativeService, query: &[(&str, String)]) -> Result<
         &password,
         false,
     )?;
-    let mut cursor = String::new();
-    let mut items = Vec::new();
-    let mut count = 0;
-    loop {
-        let points = repo.list(&cursor, 100)?;
-        if points.is_empty() {
-            break;
-        }
-        for point in points {
-            cursor = format!("point-{}.commit", point.id);
-            if count >= (number - 1) * size && items.len() < size {
-                items.push(json!({"available":true,"integrityMessage":"","id":point.id,"fileName":format!("{}.edmpoint",point.id),"createdAt":point.created_at,"sizeBytes":point.size_bytes,"replicaStatus":"Committed","message":format!("新增 {} 字节",point.new_bytes)}));
-            }
-            count += 1;
-        }
-    }
-    Ok(json!({"items":items,"page":number,"pageSize":size,"totalCount":count}))
+    service
+        .recovery_catalog
+        .page(&repo, saved.revision, number, size)
 }

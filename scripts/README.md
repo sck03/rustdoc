@@ -1,5 +1,7 @@
 # 脚本使用说明
 
+2026-11-28 异步草稿专项：`npm --prefix apps/export-doc-web run test:async-draft-ui` 使用真实邮件模板/容量界面，验证客户响应乱序、手工草稿保留、过期搜索/预览/跳转拦截、策略保存版本推进及历史告警。复用受管 Chromium 和 React fixture；相关后端定向测试、清理与边界见[本批记录](../docs/archive/2026-11/2026-11-28异步草稿与备份性能修复.md)。
+
 2026-11-28 存储恢复专项：`npm --prefix apps/export-doc-web run test:storage-governance-lifecycle` 检查任务查询恢复、跨面板刷新、取消作用域、档案复核明细、样例去重和结构化错误。`test-native-postgres.ps1 -PostgresBin <PostgreSQL18的bin目录> -Scope StorageRecovery` 仅运行档案存储实库合同及独立维护网页的真实 Cookie/CSRF、刷新恢复和终态重开验证；需要已构建 Web。完整 workspace 与全灾难恢复验收不在该专项范围，详见[实施记录](../docs/archive/2026-11/2026-11-28存储恢复稳定性与清理.md)。
 
 2026-11-27：schema 19、OA 批量部署与独立灾备维护已实现。本批按用户要求仅做必要专项，不执行完整 workspace 测试；证据见[本批记录](../docs/archive/2026-11/2026-11-27通用申请与存储灾备重构.md)。

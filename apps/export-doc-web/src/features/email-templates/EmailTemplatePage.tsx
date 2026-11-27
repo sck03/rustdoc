@@ -1,7 +1,7 @@
 import { EditorWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import type { ApiCrmCustomerDto, ApiEmailTemplateDto, ApiEmailTemplatePreviewDto, ApiEmailTemplateVariableDto, ApiEmailTemplateVersionDto, ExportDocManagerApiClient } from "../../api/index.ts";
+import type { ApiEmailTemplateDto, ApiEmailTemplateVersionDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { TaskViewTabs, getTaskViewPanelProps } from "../../ui/TaskViewTabs.tsx";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
@@ -26,7 +26,8 @@ import { useEmailTemplateWorkspace } from "./useEmailTemplateWorkspace.ts";
 import { usePermission } from "../../app/PermissionAccessContext.tsx";
 import { useConfirmation } from "../../ui/confirmationContext.ts";
 import { EmailHtmlPreview, EmailRichTextEditor } from "../../ui/EmailRichTextEditor.tsx";
-import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
+import { isAbortError } from "../../ui/useAbortableOperation.ts";
+import { useEmailTemplatePreview } from "./useEmailTemplatePreview.ts";
 import { Pagination } from "../../ui/primitives/Pagination.tsx";
 
 type EmailTemplateTaskView = "directory" | "editor" | "variables" | "preview" | "history";
@@ -42,27 +43,21 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
   const navigate = useNavigate();
   const workspace = useEmailTemplateWorkspace(client);
   const { templates, selected, draft: currentDraft, setDraft, savedDraft, versions, selectedVersion, catalogPage, historyPage, busy, loadVersions } = workspace;
-  const runAbortableOperation = useAbortableOperation(selected?.id);
-  const runCatalogOperation = useAbortableOperation(client);
-  const [variables, setVariables] = useState<ApiEmailTemplateVariableDto[]>([]);
   const [keyword, setKeyword] = useState("");
   const [includeArchived, setIncludeArchived] = useState(false);
   const [scope, setScope] = useState<EmailTemplateScope>("all");
   const { name, category, subject, bodyHtml } = currentDraft;
   const field = <K extends keyof EmailTemplateDraft>(key: K) => (value: EmailTemplateDraft[K] | ((previous: EmailTemplateDraft[K]) => EmailTemplateDraft[K])) => {
     setDraft((previous) => ({ ...previous, [key]: typeof value === "function" ? value(previous[key]) : value }));
-    setPreview(null);
+    clearPreview();
   };
   const setName = field("name"), setCategory = field("category"), setSubject = field("subject"), setBodyHtml = field("bodyHtml");
   const [shareScope, setShareScope] = useState("Private");
-  const [sampleValues, setSampleValues] = useState<Record<string, string>>({});
-  const [preview, setPreview] = useState<ApiEmailTemplatePreviewDto | null>(null);
   const [feedback, setFeedback] = useState<OperationFeedbackState | null>(null);
-  const [crmCustomerKeyword, setCrmCustomerKeyword] = useState("");
-  const [crmCustomers, setCrmCustomers] = useState<ApiCrmCustomerDto[]>([]);
-  const [crmCustomerId, setCrmCustomerId] = useState(0);
-  const [recipientAddress, setRecipientAddress] = useState("");
   const [view, setView] = useState<EmailTemplateTaskView>("directory");
+  const { variables, sampleValues, setSampleValue, preview, clearPreview, crmCustomerKeyword, setCrmCustomerKeyword,
+    crmCustomers, crmCustomerId, setCrmCustomerId, recipientAddress, searchCrmCustomers, loadCrmDraft, renderPreview } =
+    useEmailTemplatePreview(client, selected?.id, currentDraft, view, templateViewPermission.allowed, crmViewPermission.allowed, setFeedback);
   function showReadError(error:unknown) {if (!isAbortError(error)) setFeedback(errorFeedback(readApiError(error)));}
   const canEdit = templateEditPermission.allowed && (!selected || selected.canEdit);
   const canDelete = selected?.canArchive === true;
@@ -85,17 +80,10 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
   }
 
   useEffect(() => {
-    const requests: Promise<unknown>[] = [loadTemplates(), runCatalogOperation(async (signal) => {
-      const rows = await client.listEmailTemplateVariables({ signal });
-      if (signal.aborted) return;
-      setVariables(rows);
-      setSampleValues(Object.fromEntries(rows.map((item) => [item.key, item.sampleValue])));
-    })];
-    if (crmViewPermission.allowed) requests.push(searchCrmCustomers(""));
-    void Promise.all(requests).catch((error) => {
+    void loadTemplates().catch((error) => {
       if (!isAbortError(error)) setFeedback(errorFeedback(readApiError(error)));
     });
-  }, [client, crmViewPermission.allowed, includeArchived, scope]);
+  }, [client, includeArchived, scope]);
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -167,27 +155,12 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
         { signal },
       ));
       if (!restored) return;
-      setPreview(null);
+      clearPreview();
       setKeyword("");
       await refreshAfterWrite(`已从 V${version.versionNumber} 恢复，并生成 V${restored.versionNumber}。`);
       await loadVersions(restored.id);
     } catch (error) {
       if (!isAbortError(error)) setFeedback(errorFeedback(readApiError(error)));
-    }
-  }
-
-  async function renderPreview() {
-    if (!templateViewPermission.allowed) return null;
-    try {
-      const rendered = await runAbortableOperation((signal) => client.previewEmailTemplate(
-        { body: { subject, bodyHtml, variables: sampleValues } },
-        { signal },
-      ));
-      setPreview(rendered); setFeedback(rendered.unresolvedTokens.length ? warningFeedback(`仍有未识别变量：${rendered.unresolvedTokens.join("、")}`) : null);
-      return rendered;
-    } catch (error) {
-      if (!isAbortError(error)) setFeedback(errorFeedback(readApiError(error)));
-      return null;
     }
   }
 
@@ -206,13 +179,13 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
   async function startNewTemplate() {
     if (!templateEditPermission.allowed) return;
     if (!await confirmDiscardChanges("新建模板")) return;
-    workspace.open(); setPreview(null); setView("editor"); setFeedback(null);
+    workspace.open(); clearPreview(); setView("editor"); setFeedback(null);
   }
 
   async function openTemplate(template: ApiEmailTemplateDto) {
     if (template.id !== selected?.id && !await confirmDiscardChanges(`打开模板“${template.name}”`)) return;
     if (template.id !== selected?.id) workspace.open(template);
-    setShareScope(template.shareScope); setPreview(null); setView("editor"); setFeedback(null);
+    setShareScope(template.shareScope); clearPreview(); setView("editor"); setFeedback(null);
   }
 
   function copyAsNewTemplate() {
@@ -222,7 +195,7 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
       name: createEmailTemplateCopyName(currentDraft.name, templates.map((item) => item.name)),
     };
     workspace.open(undefined, copiedDraft);
-    setPreview(null); setView("editor"); setFeedback(infoFeedback("已复制为新模板草稿，确认名称后点击保存。原模板保持不变。"));
+    clearPreview(); setView("editor"); setFeedback(infoFeedback("已复制为新模板草稿，确认名称后点击保存。原模板保持不变。"));
   }
 
   async function changeView(next: EmailTemplateTaskView) {
@@ -237,38 +210,6 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
     }
     if (next === "directory" && !await confirmDiscardChanges("返回模板目录")) return;
     setView(next);
-  }
-
-  async function searchCrmCustomers(searchKeyword = crmCustomerKeyword) {
-    if (!crmViewPermission.allowed) return;
-    try {
-      const page = await runAbortableOperation((signal) => client.queryCrmCustomers(
-        { keyword: searchKeyword.trim(), status: "", pageNumber: 1, pageSize: 50 },
-        { signal },
-      ));
-      setCrmCustomers(page.items);
-      setCrmCustomerId((current) => page.items.some((item) => item.id === current) ? current : page.items[0]?.id ?? 0);
-    } catch (error) {
-      if (!isAbortError(error)) setFeedback(errorFeedback(readApiError(error)));
-    }
-  }
-
-  async function loadCrmDraft() {
-    if (!crmViewPermission.allowed || !templateViewPermission.allowed) return;
-    if (!crmCustomerId) { setFeedback(warningFeedback("请选择 CRM 客户。")); return; }
-    try {
-      const draft = await runAbortableOperation((signal) => client.getCrmEmailVariableDraft({ customerId: crmCustomerId }, { signal }));
-      const normalizedVariables = Object.fromEntries(Object.entries(draft.variables)
-        .map(([key, value]) => [key, typeof value === "string" ? value : ""])) as Record<string, string>;
-      setSampleValues((current) => ({ ...current, ...normalizedVariables }));
-      setRecipientAddress(draft.toAddress);
-      setPreview(null);
-      setFeedback(draft.toAddress
-        ? successFeedback("已载入客户、主要联系人和建议收件人。")
-        : warningFeedback("已载入客户变量；主要联系人尚未填写邮箱。"));
-    } catch (error) {
-      if (!isAbortError(error)) setFeedback(errorFeedback(readApiError(error)));
-    }
   }
 
   return <EditorWorkspace >
@@ -306,11 +247,11 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
         <label className="form-field-wide">邮件主题<input disabled={!canEdit} maxLength={300} value={subject} onChange={(event) => setSubject(event.target.value)} /></label>
         <div className="form-field-wide email-rich-text-field">
           <span className="email-rich-text-field-label">邮件正文</span>
-          <EmailRichTextEditor value={bodyHtml} disabled={!canEdit} onChange={(value) => { setBodyHtml(value); setPreview(null); }} />
+          <EmailRichTextEditor value={bodyHtml} disabled={!canEdit} onChange={(value) => { setBodyHtml(value); clearPreview(); }} />
           <span className="field-hint">可直接排版文字、列表和链接；图片请作为邮件附件发送。</span>
           <details className="email-html-advanced">
             <summary>高级 HTML</summary>
-            <textarea aria-label="邮件正文高级 HTML" disabled={!canEdit} rows={8} maxLength={10000} value={bodyHtml} onChange={(event) => { setBodyHtml(event.target.value); setPreview(null); }} />
+            <textarea aria-label="邮件正文高级 HTML" disabled={!canEdit} rows={8} maxLength={10000} value={bodyHtml} onChange={(event) => { setBodyHtml(event.target.value); clearPreview(); }} />
             <span className="field-hint">仅建议熟悉 HTML 的用户使用。系统会移除脚本、事件属性、嵌入内容和危险链接。</span>
           </details>
         </div>
@@ -330,7 +271,7 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
       </form> : null}
       {view === "variables" ? <section className="form-section" {...getTaskViewPanelProps(emailTemplateTabsId, "variables")}><div className="section-header"><div><h3>变量设置</h3><p className="section-description">填写预览样例，或把变量插入当前邮件正文。</p></div><span>{variables.length} 项</span></div>
         <div className="context-strip"><strong>{name.trim() || "未命名模板"}</strong><span>{canEdit ? "变量只用于生成当前预览，不会自动发送邮件。" : "这是只读共享模板；可调整预览样例，复制为自己的模板后才能修改正文。"}</span></div>
-        <div className="form-grid variable-setting-grid">{variables.map((item) => <label key={item.key}>{item.label}<input value={sampleValues[item.key] ?? ""} onChange={(event) => { setSampleValues((current) => ({ ...current, [item.key]: event.target.value })); setPreview(null); }} /><span className="field-hint">{item.token}</span><button className="secondary-button" disabled={!canEdit} type="button" onClick={() => { setBodyHtml((current) => `${current}<p>${item.token}</p>`); setPreview(null); }}>插入正文</button></label>)}</div>
+        <div className="form-grid variable-setting-grid">{variables.map((item) => <label key={item.key}>{item.label}<input value={sampleValues[item.key] ?? ""} onChange={(event) => { setSampleValue(item.key, event.target.value); clearPreview(); }} /><span className="field-hint">{item.token}</span><button className="secondary-button" disabled={!canEdit} type="button" onClick={() => { setBodyHtml((current) => `${current}<p>${item.token}</p>`); clearPreview(); }}>插入正文</button></label>)}</div>
         <div className="form-actions"><button className="secondary-button" type="button" onClick={() => setView("editor")}>{canEdit ? "返回编辑正文" : "返回模板详情"}</button>{selected && !canEdit && templateEditPermission.allowed ? <button className="secondary-button" type="button" onClick={copyAsNewTemplate}>复制后修改</button> : null}{templateViewPermission.allowed ? <button className="primary-button" type="button" onClick={() => void previewAndOpen()}>生成预览</button> : null}</div>
       </section> : null}
       {view === "preview" ? <section className="form-section" {...getTaskViewPanelProps(emailTemplateTabsId, "preview")}><div className="section-header"><div><h3>预览与套用</h3><p className="section-description">可选载入 CRM 客户资料，确认内容后再套用到单封邮件。</p></div></div>
@@ -341,9 +282,9 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
             if (!isAbortError(error)) setFeedback(errorFeedback(readApiError(error)));
           });
         }}>
-          <input value={crmCustomerKeyword} onChange={(event) => setCrmCustomerKeyword(event.target.value)} placeholder="搜索 CRM 客户" />
+          <input aria-label="搜索 CRM 客户" value={crmCustomerKeyword} onChange={(event) => setCrmCustomerKeyword(event.target.value)} placeholder="搜索 CRM 客户" />
           <button className="secondary-button" type="submit">查找客户</button>
-          <select value={crmCustomerId} onChange={(event) => setCrmCustomerId(Number(event.target.value))}><option value={0}>请选择客户</option>{crmCustomers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
+          <select aria-label="CRM 客户" value={crmCustomerId} onChange={(event) => setCrmCustomerId(Number(event.target.value))}><option value={0}>请选择客户</option>{crmCustomers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
           <button className="secondary-button" type="button" disabled={!templateViewPermission.allowed} onClick={() => void loadCrmDraft()}>载入客户变量</button>
         </form> : <div className="context-strip"><strong>未开放客户资料</strong><span>当前模板没有 CRM 客户读取权限，可继续使用手工样例变量。</span></div>}
         {recipientAddress ? <p>建议收件人：{recipientAddress}</p> : null}

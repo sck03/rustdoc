@@ -1,4 +1,6 @@
 use super::*;
+#[path = "remote_index.rs"]
+mod index;
 pub(in crate::engine::team_backup) enum Target {
     WebDav(super::super::cloud::RecoveryTarget),
     #[cfg(feature = "s3-backup")]
@@ -41,6 +43,9 @@ pub(in crate::engine::team_backup) struct Remote {
     target: Target,
     owner: Vec<u8>,
     session: Vec<u8>,
+    // WebDAV has no cursor listing. Snapshot immutable object names only while
+    // this handle owns writer-session; live reader markers are never cached.
+    names: index::Names,
 }
 impl Remote {
     pub fn open(target: Target, owner: &str, fenced: bool) -> Result<Self> {
@@ -92,6 +97,7 @@ impl Remote {
             target,
             owner: owner.as_bytes().to_vec(),
             session,
+            names: Default::default(),
         };
         remote.check()?;
         Ok(remote)
@@ -130,23 +136,30 @@ impl ObjectStore for Remote {
         io::valid_name(name)?;
         let result = self.target.create(name, bytes)?;
         self.check()?;
+        if result {
+            self.names.changed(name, true)?;
+        }
         Ok(result)
     }
     fn delete(&self, name: &str) -> Result<()> {
         self.check()?;
         io::valid_name(name)?;
         self.target.delete(name)?;
+        self.names.changed(name, false)?;
         self.check()
     }
     fn list(&self, prefix: &str, after: &str, limit: usize) -> Result<Vec<String>> {
         self.check()?;
-        self.target.list(prefix, after, limit)
+        let names = self.names.list(&self.target, prefix, after, limit)?;
+        self.check()?;
+        Ok(names)
     }
 }
 pub(in crate::engine::team_backup) struct Reader {
     target: Target,
     name: String,
     value: Vec<u8>,
+    names: index::Names,
 }
 impl Reader {
     pub fn open(target: Target) -> Result<Self> {
@@ -159,6 +172,7 @@ impl Reader {
             target,
             name,
             value,
+            names: Default::default(),
         };
         reader.check()?;
         Ok(reader)
@@ -192,7 +206,9 @@ impl ObjectStore for Reader {
     }
     fn list(&self, prefix: &str, after: &str, limit: usize) -> Result<Vec<String>> {
         self.check()?;
-        self.target.list(prefix, after, limit)
+        let names = self.names.list(&self.target, prefix, after, limit)?;
+        self.check()?;
+        Ok(names)
     }
 }
 impl Drop for Reader {

@@ -86,6 +86,11 @@ pub(in crate::engine) fn save(
             return Err(invalid("新灾备包密码至少需要 12 个字符。"));
         }
     }
+    // Host I/O must finish before acquiring either scheduling or database write
+    // admission. The transaction below still compares the current plan/version
+    // and registered medium identity; opening the repository rechecks the medium.
+    let medium_identity = points::medium(&service.paths, &plan)?;
+    crate::operation::check()?;
     {
         let _gate = service.backup_scheduler.lock()?;
         service.store.transaction_as(actor, |tx, actor| {
@@ -125,7 +130,6 @@ pub(in crate::engine) fn save(
             }
             let repository = if old.repository.is_empty(){crate::paths::nonce().map_err(unavailable)?}else{old.repository};
             let writer_identity = if old.writer_identity.is_empty(){crate::paths::nonce().map_err(unavailable)?}else{old.writer_identity};
-            let medium_identity = points::medium(&service.paths,&plan)?;
             if old.plan.replica_mode==plan.replica_mode && old.plan.backup_location==plan.backup_location && !old.medium_identity.is_empty() && old.medium_identity!=medium_identity {return Err(invalid("备份介质身份改变，请先接回原设备并核验仓库，不能自动重新登记替代设备。"));}
             let saved = SavedPlan { revision: old.revision + 1, owner: actor.id, password, s3_secret, s3_token, repository, writer_identity, medium_identity, plan: plan.clone() };
             tx.set_settings(PLAN, saved.revision, &serde_json::to_value(&saved)?)?;

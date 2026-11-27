@@ -1,12 +1,19 @@
 use super::*;
 use std::{fs, io::Write};
+#[path = "tests/catalog.rs"]
+mod catalog_tests;
+#[path = "tests/portable.rs"]
+mod portable_tests;
+#[path = "tests/remote.rs"]
+mod remote_tests;
 struct CountReads {
     inner: io::Directory,
     blobs: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    prefix: &'static str,
 }
 impl io::ObjectStore for CountReads {
     fn read(&self, name: &str, limit: usize) -> Result<Option<Vec<u8>>> {
-        if name.starts_with("blob-") {
+        if name.starts_with(self.prefix) {
             self.blobs
                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
@@ -40,6 +47,7 @@ fn garbage_collection_verifies_shared_chunks_once_and_rejects_corruption() {
         Box::new(CountReads {
             inner: io::Directory::open(root.clone(), None).unwrap(),
             blobs: reads.clone(),
+            prefix: "blob-",
         }),
         "11111111111111111111111111111111",
         "independent-recovery-password",
@@ -69,6 +77,25 @@ fn garbage_collection_verifies_shared_chunks_once_and_rejects_corruption() {
     assert!(repo.preview_gc().is_err());
 }
 struct Readback(Vec<u8>);
+#[test]
+fn initialization_rejects_objects_after_all_allowed_session_markers() {
+    let work = super::super::tests::Workspace::new();
+    let root = work.0.join("nonempty-repository");
+    fs::create_dir(&root).unwrap();
+    let io = io::Directory::open(root, None).unwrap();
+    for name in ["writer-lock", "writer-session", "zz-unregistered"] {
+        io.create(name, b"existing").unwrap();
+    }
+    assert!(
+        Repository::open(
+            Box::new(io),
+            "11111111111111111111111111111111",
+            "independent-recovery-password",
+            true
+        )
+        .is_err()
+    );
+}
 impl Visitor for Readback {
     fn begin(&mut self, _: &str, _: &str, _: u64, _: &str) -> Result<()> {
         Ok(())

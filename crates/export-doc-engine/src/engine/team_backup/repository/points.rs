@@ -223,14 +223,29 @@ pub(super) fn visit_commit(
     commit: Commit,
     visitor: &mut impl Visitor,
 ) -> Result<Commit> {
-    walk(repository, commit, &mut ReadMode::Content(visitor))
+    visit_with(repository, commit, visitor, &mut |name| {
+        repository.read(name)
+    })
+}
+pub(super) fn visit_with(
+    repository: &Repository,
+    commit: Commit,
+    visitor: &mut impl Visitor,
+    read: &mut impl FnMut(&str) -> Result<zeroize::Zeroizing<Vec<u8>>>,
+) -> Result<Commit> {
+    walk(repository, commit, &mut ReadMode::Content(visitor), read)
 }
 pub(super) fn references(
     repository: &Repository,
     commit: Commit,
     visitor: &mut dyn FnMut(&str, u64, &str) -> Result<()>,
 ) -> Result<Commit> {
-    walk(repository, commit, &mut ReadMode::References(visitor))
+    walk(
+        repository,
+        commit,
+        &mut ReadMode::References(visitor),
+        &mut |name| repository.read(name),
+    )
 }
 enum ReadMode<'a> {
     Content(&'a mut dyn Visitor),
@@ -238,7 +253,12 @@ enum ReadMode<'a> {
 }
 // Both modes authenticate the entire manifest, names, lengths and record order.
 // References permits GC to verify each shared block once across all live points.
-fn walk(repository: &Repository, commit: Commit, mode: &mut ReadMode<'_>) -> Result<Commit> {
+fn walk(
+    repository: &Repository,
+    commit: Commit,
+    mode: &mut ReadMode<'_>,
+    read: &mut impl FnMut(&str) -> Result<zeroize::Zeroizing<Vec<u8>>>,
+) -> Result<Commit> {
     let id = &commit.id;
     let mut manifest_hash = Sha256::new();
     let mut active: Option<(u64, String, u64, Sha256)> = None;
@@ -246,7 +266,7 @@ fn walk(repository: &Repository, commit: Commit, mode: &mut ReadMode<'_>) -> Res
     let mut total = 0u64;
     let mut ended = false;
     for page in 0..commit.pages {
-        let bytes = repository.read(&page_name(id, page))?;
+        let bytes = read(&page_name(id, page))?;
         if bytes.len() > PAGE_BYTES || !bytes.ends_with(b"\n") {
             return Err(invalid("恢复点清单页长度或结束标记无效。"));
         }
@@ -293,7 +313,7 @@ fn walk(repository: &Repository, commit: Commit, mode: &mut ReadMode<'_>) -> Res
                     }
                     match mode {
                         ReadMode::Content(visitor) => {
-                            let data = repository.read(&key)?;
+                            let data = read(&key)?;
                             verify_chunk(&data, size, &digest)?;
                             state.3.update(data.as_slice());
                             visitor.data(&data)?;

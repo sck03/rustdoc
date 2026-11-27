@@ -14,6 +14,9 @@ const STATE: &str = "storage-capacity-state";
 fn default_policy() -> Value {
     json!({"warningPercent":85,"criticalPercent":95,"minimumFreeBytes":1024*1024*1024u64,"growthDays":14})
 }
+fn default_settings() -> Value {
+    json!({"revision":0,"policy":default_policy()})
+}
 fn disk(area: &mut Value, path: &Path, policy: &Value) -> Result<()> {
     paths::ensure_safe_absolute(path).map_err(invalid)?;
     let total = fs2::total_space(path)?;
@@ -43,9 +46,21 @@ fn disk(area: &mut Value, path: &Path, policy: &Value) -> Result<()> {
     Ok(())
 }
 pub(in crate::engine) fn observe(service: &NativeService, force: bool) -> Result<()> {
+    let _sampling = service
+        .capacity_sampling
+        .write(std::time::Duration::from_secs(30))?;
+    observe_locked(service, force)
+}
+fn observe_locked(service: &NativeService, force: bool) -> Result<()> {
+    crate::operation::check()?;
     let previous = service.store.settings(STATE)?.unwrap_or_else(|| json!({}));
+    let saved = service
+        .store
+        .settings(POLICY)?
+        .unwrap_or_else(default_settings);
     let now = chrono::Utc::now();
     if !force
+        && previous["policyRevision"] == saved["revision"]
         && previous["updatedAt"]
             .as_str()
             .and_then(|v| chrono::DateTime::parse_from_rfc3339(v).ok())
@@ -53,10 +68,6 @@ pub(in crate::engine) fn observe(service: &NativeService, force: bool) -> Result
     {
         return Ok(());
     }
-    let saved = service
-        .store
-        .settings(POLICY)?
-        .unwrap_or_else(|| json!({"revision":0,"policy":default_policy()}));
     let policy = &saved["policy"];
     let config = service.store.files.configuration()?;
     let stats = service.store.connection()?.file_statistics()?;
@@ -113,7 +124,12 @@ pub(in crate::engine) fn observe(service: &NativeService, force: bool) -> Result
         runtime["physicalBytes"] = json!(total.saturating_sub(free));
     }
     let areas = vec![runtime, files, target];
+    crate::operation::check()?;
     service.store.transaction(|tx|{
+        if tx.settings(POLICY)?.unwrap_or_else(default_settings) != saved {
+            return Err(conflict("容量策略在采样期间变化，请刷新容量状态。"));
+        }
+        let previous = tx.settings(STATE)?.unwrap_or_else(|| json!({}));
         let today=crate::engine::units::today(tx)?;let oldest=(today-chrono::Duration::days(365)).to_string();
         let mut alerts=previous["alerts"].as_array().cloned().unwrap_or_default();
         for area in &areas{
@@ -125,7 +141,8 @@ pub(in crate::engine) fn observe(service: &NativeService, force: bool) -> Result
             }
         }
         if alerts.len()>100{alerts.drain(..alerts.len()-100);}
-        tx.set_settings(STATE,1,&json!({"updatedAt":now.to_rfc3339(),"areas":areas,"alerts":alerts}))?;Ok(())
+        let revision = previous["revision"].as_i64().unwrap_or(0) + 1;
+        tx.set_settings(STATE,revision,&json!({"revision":revision,"policyRevision":saved["revision"],"updatedAt":now.to_rfc3339(),"areas":areas,"alerts":alerts}))?;Ok(())
     })
 }
 pub(in crate::engine) fn handle(
@@ -140,6 +157,9 @@ pub(in crate::engine) fn handle(
             "容量与保留设置仅限系统管理员。",
         ));
     }
+    let _sampling = service
+        .capacity_sampling
+        .write(std::time::Duration::from_secs(30))?;
     if operation == SAVE_STORAGE_CAPACITY_POLICY {
         let policy = &body["policy"];
         if policy["warningPercent"].as_u64() >= policy["criticalPercent"].as_u64() {
@@ -162,13 +182,11 @@ pub(in crate::engine) fn handle(
             Ok(())
         })?;
     }
-    observe(service, operation == SAVE_STORAGE_CAPACITY_POLICY)?;
+    observe_locked(service, operation == SAVE_STORAGE_CAPACITY_POLICY)?;
     status(&service.store)
 }
 fn status(store: &Store) -> Result<Value> {
-    let saved = store
-        .settings(POLICY)?
-        .unwrap_or_else(|| json!({"revision":0,"policy":default_policy()}));
+    let saved = store.settings(POLICY)?.unwrap_or_else(default_settings);
     let state = store.settings(STATE)?.unwrap_or_else(|| json!({}));
     store.read(|tx|{let since=(crate::engine::units::today(tx)?-chrono::Duration::days(saved["policy"]["growthDays"].as_i64().unwrap_or(14))).to_string();Ok(json!({"revision":saved["revision"],"policy":saved["policy"],"areas":state["areas"],"alerts":state["alerts"],"updatedAt":state["updatedAt"],"samples":tx.capacity_history(&since)?}))})
 }

@@ -48,6 +48,7 @@ impl Fixture {
         let deletion_started = delete_started.clone();
         let handle = std::thread::spawn(move || {
             let mut calls = Vec::new();
+            let mut objects = std::collections::BTreeSet::<String>::new();
             let deadline = Instant::now() + Duration::from_secs(45);
             loop {
                 if stopped.load(Ordering::Acquire) {
@@ -142,7 +143,32 @@ impl Fixture {
                     assert_eq!(headers["x-amz-content-sha256"], hex(&hash.finalize()));
                 }
                 calls.push(format!("{method} {}", uri.path()));
-                let body = if s3 && method == "POST" && parameters.contains_key("uploads") {
+                if method == "PUT" && !conditional_conflict {
+                    objects.insert(uri.path().to_owned());
+                }
+                if method == "DELETE" {
+                    objects.remove(uri.path());
+                    if object_path.exists() {
+                        fs::remove_file(&object_path).unwrap();
+                    }
+                }
+                let listing = if method == "PROPFIND" {
+                    let prefix = format!("{}/", uri.path().trim_end_matches('/'));
+                    let rows = objects
+                        .iter()
+                        .filter(|name| {
+                            name.strip_prefix(&prefix)
+                                .is_some_and(|tail| !tail.contains('/'))
+                        })
+                        .map(|name| format!("<d:response><d:href>{name}</d:href></d:response>"))
+                        .collect::<String>();
+                    format!("<d:multistatus xmlns:d=\"DAV:\">{rows}</d:multistatus>")
+                } else {
+                    String::new()
+                };
+                let body = if method == "PROPFIND" {
+                    listing.as_bytes()
+                } else if s3 && method == "POST" && parameters.contains_key("uploads") {
                     b"<InitiateMultipartUploadResult><UploadId>upload&amp;01</UploadId></InitiateMultipartUploadResult>".as_slice()
                 } else if s3 && method == "POST" {
                     assert_eq!(parameters.get("uploadId").unwrap(), "upload&01");
@@ -154,7 +180,13 @@ impl Fixture {
                 } else {
                     b""
                 };
-                if method == "GET" {
+                if method == "GET" && !object_path.exists() {
+                    write!(
+                        stream,
+                        "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    )
+                    .unwrap();
+                } else if method == "GET" {
                     let mut file = fs::File::open(&object_path).unwrap();
                     write!(
                         stream,
@@ -179,6 +211,8 @@ impl Fixture {
                     }
                     let code = if conditional_conflict {
                         412
+                    } else if method == "PROPFIND" {
+                        207
                     } else if matches!(method, "MKCOL" | "MOVE") {
                         201
                     } else if method == "DELETE" {
@@ -194,9 +228,6 @@ impl Fixture {
                     if cancel.is_none() || method != "PUT" {
                         sent.unwrap();
                     }
-                }
-                if method == "DELETE" {
-                    break;
                 }
             }
             calls
@@ -216,6 +247,7 @@ impl Fixture {
         }
     }
     pub(crate) fn finish(mut self) -> Vec<String> {
+        self.stop.store(true, Ordering::Release);
         self.handle.take().unwrap().join().unwrap()
     }
 }

@@ -138,6 +138,8 @@ pub struct NativeService {
     jobs: tasks::Jobs,
     workflow_scheduler: tasks::scheduled::Scheduler,
     backup_scheduler: team_backup::scheduled::Scheduler,
+    capacity_sampling: operation_lock::OperationLock<()>,
+    recovery_catalog: team_backup::repository::Catalog,
     backup_tickets: team_backup::Tickets,
     bootstrap_token: String,
     clock: crate::clock::BusinessClock,

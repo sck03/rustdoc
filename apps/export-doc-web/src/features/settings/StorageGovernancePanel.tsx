@@ -1,6 +1,6 @@
 import { startBrowserDownload } from "../../ui/downloadBlob.ts";
 import { useEffect, useState } from "react";
-import type { ApiCapacityPolicy, ApiRetentionRow, ExportDocManagerApiClient } from "../../api/index.ts";
+import type { ApiRetentionRow, ExportDocManagerApiClient } from "../../api/index.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { Button } from "../../ui/Button.tsx";
 import { NumberField, TextField } from "../../ui/FormFields.tsx";
@@ -16,14 +16,14 @@ import { RetentionReview } from "./RetentionReview.tsx";
 const stateLabels: Record<string, string> = { Normal: "正常", Warning: "预警", Critical: "容量不足", Unavailable: "不可用", Unknown: "未知" };
 export function StorageGovernancePanel({ client, enabled }: { client: ExportDocManagerApiClient; enabled: boolean }) {
   const c = useStorageGovernance(client, enabled);
-  const [policy, setPolicy] = useState<{ version: number; value: ApiCapacityPolicy } | null>(null);
+  const { policy, setPolicy } = c;
   const [selected, setSelected] = useState<string[]>([]);
   const [editing, setEditing] = useState<ApiRetentionRow | null>(null);
   const [reason, setReason] = useState("");
   const [days, setDays] = useState(0);
   const [archiveLocation,setArchiveLocation]=useState("");
   const [archiveClass,setArchiveClass]=useState("");
-  useEffect(()=>{setPolicy(null);setSelected([]);setEditing(null);setReason("");setArchiveLocation("");setArchiveClass("");},[client,enabled]);
+  useEffect(()=>{setSelected([]);setEditing(null);setReason("");setArchiveLocation("");setArchiveClass("");},[client,enabled]);
   useEffect(()=>{setSelected([]);},[c.after,archiveClass]);
   useUnsavedChangesGuard({isDirty:policy!==null||editing!==null,message:"容量或档案保留设置尚未保存。"});
   const capacity = c.capacity.data;
@@ -41,8 +41,11 @@ export function StorageGovernancePanel({ client, enabled }: { client: ExportDocM
           <div className="field-grid">{([["warningPercent", "预警占用（%）"], ["criticalPercent", "严重占用（%）"], ["growthDays", "增长观察期（天）"]] as const).map(([key, label]) => <NumberField key={key} label={label} value={(policy?.value ?? capacity.policy)[key]} onChange={value => setPolicy(current => ({ version: current?.version ?? capacity.revision, value: { ...(current?.value ?? capacity.policy), [key]: value } }))} />)}
             <NumberField label="最少空闲容量（MiB）" value={(policy?.value ?? capacity.policy).minimumFreeBytes / 1048576} onChange={value => setPolicy(current => ({ version: current?.version ?? capacity.revision, value: { ...(current?.value ?? capacity.policy), minimumFreeBytes: Math.round(value * 1048576) } }))} />
           </div>
-          <Button disabled={disabled || !policy} onClick={() => void c.run(signal => client.saveStorageCapacityPolicy({ body: { expectedVersion: policy!.version, policy: policy!.value } }, { signal })).then(ok => { if (ok) setPolicy(null); })}>保存告警策略</Button>
+          <Button disabled={disabled || !policy} onClick={() => void c.savePolicy()}>保存告警策略</Button>
           <ResponsiveTableFrame label="容量日汇总" className="summary-table-frame"><table className="data-table" aria-label="容量日汇总"><thead><tr><th>日期</th><th>位置</th><th>物理占用</th><th>可回收</th></tr></thead><tbody>{capacity.samples.map(sample => <tr key={`${sample.day}:${sample.location}`}><td>{sample.day}</td><td>{sample.location === "Files" ? "生产文件库" : sample.location}</td><td>{formatBytes(sample.physicalBytes)}</td><td>{formatBytes(sample.reclaimableBytes)}</td></tr>)}</tbody></table></ResponsiveTableFrame>
+        </CollapsibleSection>
+        <CollapsibleSection title={`历史告警（${capacity.alerts.length}）`}>
+          {capacity.alerts.length ? <ResponsiveTableFrame label="容量历史告警" className="summary-table-frame"><table className="data-table" aria-label="容量历史告警"><thead><tr><th>时间</th><th>区域</th><th>状态</th><th>原因与处理</th></tr></thead><tbody>{capacity.alerts.slice().reverse().map((alert, index) => <tr key={`${alert.at}:${alert.area}:${index}`}><td>{formatRuntimeDate(alert.at)}</td><td>{capacity.areas.find(area => area.id === alert.area)?.name ?? alert.area}</td><td>{stateLabels[alert.state] ?? alert.state}</td><td>{alert.message}</td></tr>)}</tbody></table></ResponsiveTableFrame> : <p className="settings-helper-text">暂无容量告警。</p>}
         </CollapsibleSection>
       </>}
     </CollapsibleSection>

@@ -20,6 +20,16 @@ pub(in crate::engine::team_backup) struct RecoveryTarget {
     endpoint: Endpoint,
 }
 impl RecoveryTarget {
+    fn reader_endpoint(&self) -> Result<Endpoint> {
+        parse_url(&self.endpoint.request_url("readers"))
+    }
+    fn object_url(&self, name: &str) -> Result<String> {
+        if name.starts_with("reader-") {
+            remote_path(&self.reader_endpoint()?, name)
+        } else {
+            remote_path(&self.endpoint, name)
+        }
+    }
     pub(in crate::engine::team_backup) fn from_credentials(
         url: &str,
         user: &str,
@@ -46,7 +56,7 @@ impl RecoveryTarget {
         let response = request(
             &self.endpoint,
             "GET",
-            &remote_path(&self.endpoint, name)?,
+            &self.object_url(name)?,
             &[("Authorization", auth)],
             &[],
             limit,
@@ -67,11 +77,17 @@ impl RecoveryTarget {
         if !matches!(collection.status, 201 | 405) {
             return Err(failure(collection.status, &collection.body));
         }
+        if name.starts_with("reader-") {
+            let collection = self.call("MKCOL", &self.reader_endpoint()?.propfind_url(), &[])?;
+            if !matches!(collection.status, 201 | 405) {
+                return Err(failure(collection.status, &collection.body));
+            }
+        }
         let (_, auth) = authorization(&self.config);
         let response = request(
             &self.endpoint,
             "PUT",
-            &remote_path(&self.endpoint, name)?,
+            &self.object_url(name)?,
             &[
                 ("Authorization", auth),
                 ("If-None-Match", "*".into()),
@@ -93,10 +109,38 @@ impl RecoveryTarget {
         after: &str,
         limit: usize,
     ) -> Result<Vec<String>> {
+        // Reader admission remains live during every GC check. Keeping these
+        // markers in a small collection avoids enumerating all encrypted blobs.
+        if prefix.starts_with("reader-") {
+            return self.list_collection(&self.reader_endpoint()?, prefix, after, limit);
+        }
+        let mut names = self.list_collection(&self.endpoint, prefix, after, limit)?;
+        if prefix.is_empty() {
+            names.extend(self.list_collection(
+                &self.reader_endpoint()?,
+                "reader-",
+                after,
+                limit,
+            )?);
+            names.sort();
+            names.truncate(limit);
+        }
+        Ok(names)
+    }
+    pub(in crate::engine::team_backup) fn object_names(&self) -> Result<Vec<String>> {
+        self.list_collection(&self.endpoint, "", "", 1_000_001)
+    }
+    fn list_collection(
+        &self,
+        endpoint: &Endpoint,
+        prefix: &str,
+        after: &str,
+        limit: usize,
+    ) -> Result<Vec<String>> {
         let (_, auth) = authorization(&self.config);
         let request = ureq::http::Request::builder()
             .method("PROPFIND")
-            .uri(self.endpoint.propfind_url())
+            .uri(endpoint.propfind_url())
             .header("Authorization", auth)
             .header("Depth", "1")
             .body(Vec::<u8>::new())
@@ -140,7 +184,8 @@ impl RecoveryTarget {
                     let href = quick_xml::escape::unescape(&href)
                         .map_err(|_| invalid("WebDAV 对象名称编码无效。"))?;
                     if let Some(name) = href.rsplit('/').next().filter(|n| !n.is_empty()) {
-                        if name.starts_with(prefix)
+                        if name != "readers"
+                            && name.starts_with(prefix)
                             && name > after
                             && crate::paths::valid_file_name(name)
                         {
@@ -201,6 +246,6 @@ impl RecoveryTarget {
         Ok(())
     }
     pub(in crate::engine::team_backup) fn delete(&self, name: &str) -> Result<()> {
-        self.delete_url(&remote_path(&self.endpoint, name)?)
+        self.delete_url(&self.object_url(name)?)
     }
 }

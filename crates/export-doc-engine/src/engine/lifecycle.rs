@@ -134,6 +134,8 @@ impl NativeService {
             jobs,
             workflow_scheduler: Default::default(),
             backup_scheduler: Default::default(),
+            capacity_sampling: Default::default(),
+            recovery_catalog: Default::default(),
             backup_tickets: Default::default(),
             bootstrap_token,
             clock,

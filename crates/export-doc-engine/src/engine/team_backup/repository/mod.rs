@@ -12,6 +12,8 @@ use std::{
     path::{Path, PathBuf},
 };
 pub(super) mod capture;
+mod catalog;
+pub(in crate::engine) use catalog::Catalog;
 mod garbage;
 pub(super) mod io;
 mod points;
@@ -74,11 +76,12 @@ impl Repository {
             if password.chars().count() < 12 {
                 return Err(invalid("新仓库恢复凭证至少需要 12 个字符。"));
             }
-            if io
-                .list("", "", 3)?
-                .iter()
-                .any(|name| !matches!(name.as_str(), ".repository-lock" | "writer-lock"))
-            {
+            if io.list("", "", 4)?.iter().any(|name| {
+                !matches!(
+                    name.as_str(),
+                    ".repository-lock" | "writer-lock" | "writer-session"
+                )
+            }) {
                 return Err(invalid("目标不是空仓库，禁止覆盖未登记的文件。"));
             }
             let mut root = zeroize::Zeroizing::new([0u8; 32]);
@@ -126,6 +129,9 @@ impl Repository {
         sealed::object::seal(&self.root, &self.binding(name), plain)
     }
     fn read(&self, name: &str) -> Result<zeroize::Zeroizing<Vec<u8>>> {
+        self.read_object(name).map(|(_, plain)| plain)
+    }
+    fn read_object(&self, name: &str) -> Result<(Vec<u8>, zeroize::Zeroizing<Vec<u8>>)> {
         crate::operation::check()?;
         self.io.check()?;
         let bytes = self
@@ -136,7 +142,8 @@ impl Repository {
                     "恢复仓库缺少对象 {name}，请核对仓库完整性或选择其它恢复点。"
                 ))
             })?;
-        sealed::object::open(&self.root, &self.binding(name), &bytes)
+        let plain = sealed::object::open(&self.root, &self.binding(name), &bytes)?;
+        Ok((bytes, plain))
     }
     fn put(&self, name: &str, plain: &[u8]) -> Result<bool> {
         crate::operation::check()?;
@@ -177,14 +184,18 @@ impl Repository {
     pub fn commit(&self, id: &str) -> Result<Commit> {
         valid_id(id)?;
         let raw = self.read(&format!("point-{id}.commit"))?;
+        self.decode_commit(id, &raw)
+    }
+    fn decode_commit(&self, id: &str, raw: &[u8]) -> Result<Commit> {
         let commit: Commit =
-            serde_json::from_slice(&raw).map_err(|_| invalid("恢复点提交记录无效。"))?;
+            serde_json::from_slice(raw).map_err(|_| invalid("恢复点提交记录无效。"))?;
         if commit.id != id
             || commit.repository != self.id
             || commit.database_schema != export_doc_storage::SCHEMA_VERSION
             || commit.pages == 0
             || commit.pages > 1_000_000
             || !matches!(commit.provider.as_str(), "SQLite" | "PostgreSQL")
+            || chrono::DateTime::parse_from_rfc3339(&commit.created_at).is_err()
         {
             return Err(invalid("恢复点身份、数据库基线或清单范围无效。"));
         }
