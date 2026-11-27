@@ -202,6 +202,9 @@ pub(super) fn validate_plan(
             ),
             "expense" => node.handling_action == HandlingAction::Receive,
             "purchase" => node.handling_action == HandlingAction::Acceptance,
+            // General requests may have mutually exclusive category branches.
+            // build_plan validates the reachable handling path as a whole.
+            "general" => false,
             _ => node.handling_action == HandlingAction::Complete,
         };
         if required && node.skipped {

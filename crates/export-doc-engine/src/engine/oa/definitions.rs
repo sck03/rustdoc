@@ -5,6 +5,66 @@ use export_doc_domain::approval_policy::ApprovalRule;
 fn identity(company: &str, key: &str, version: i64) -> String {
     store::normalize(&format!("{company}:{key}:{version}"))
 }
+pub(super) fn validate_service_change(
+    tx: &Connection,
+    actor: &Actor,
+    service: &Value,
+) -> Result<()> {
+    if service["isActive"] != true
+        || matches!(service["category"].as_str(), Some("Room" | "Supply"))
+    {
+        return Ok(());
+    }
+    let registry = settings_store::registry(tx, &actor.company)?;
+    for publication in registry["publications"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|p| p["enabled"] == true)
+    {
+        let snapshot = tx
+            .find_identity(
+                "oa-definition-version",
+                &identity(
+                    &actor.company,
+                    &text(publication, "key"),
+                    publication["version"].as_i64().unwrap_or(0),
+                ),
+            )?
+            .ok_or_else(|| super::super::error::unavailable("启用的流程版本缺失。"))?;
+        if snapshot["definition"]["kind"] != "general" {
+            continue;
+        }
+        let samples = snapshot["samples"]
+            .as_array()
+            .ok_or_else(|| invalid("已发布流程缺少仿真样例，请重新发布。"))?;
+        let mut sample = samples
+            .iter()
+            .find(|s| s["category"] == service["category"])
+            .or_else(|| samples.first())
+            .cloned()
+            .ok_or_else(|| invalid("已发布流程缺少申请人员任职样例。"))?;
+        sample["definition"] = snapshot["definition"].clone();
+        sample["category"] = service["category"].clone();
+        sample["serviceId"] = service["key"].clone();
+        sample["serviceRevision"] = tx
+            .get_handling_service(&actor.company, &text(service, "key"))?
+            .ok_or_else(|| invalid("办理事项尚未保存。"))?["revision"]
+            .clone();
+        super::simulation::simulate_in(tx, actor, &sample).map_err(|mut cause| {
+            if matches!(cause.status, Some(400 | 403 | 409)) {
+                cause.message = format!(
+                    "事项“{}”无法用于已启用流程“{}”：{}。请先修正流程或保存为停用状态。",
+                    text(service, "name"),
+                    text(&snapshot["definition"], "name"),
+                    cause.message
+                );
+            }
+            cause
+        })?;
+    }
+    Ok(())
+}
 
 pub(super) fn published(
     tx: &Connection,
@@ -71,6 +131,52 @@ pub(super) fn published_rules(
         })
         .collect()
 }
+pub(super) fn preview(
+    tx: &Connection,
+    actor: &Actor,
+    settings: &Value,
+    key: &str,
+    samples: &[Value],
+) -> Result<Value> {
+    let mut rule = settings["rules"]
+        .as_array()
+        .and_then(|rows| rows.iter().find(|rule| rule["key"] == key))
+        .cloned()
+        .ok_or_else(|| invalid("流程编号不存在。"))?;
+    rule["calendar"] = settings["calendar"].clone();
+    let mut typed: ApprovalRule =
+        serde_json::from_value(rule).map_err(|_| invalid("流程定义格式无效。"))?;
+    super::business_nodes::instantiate_standard(&mut typed)?;
+    typed.validate().map_err(invalid)?;
+    super::approval_integrity::rule(tx, actor, &actor.company, &typed)?;
+    if samples.is_empty() || samples.len() > 20 {
+        return Err(invalid(
+            "发布前必须提供 1–20 个实际样例并通过同一内核仿真。",
+        ));
+    }
+    let catalog_revision = super::publication_coverage::revision(tx, &actor.company)?;
+    let definition = serde_json::to_value(&typed)?;
+    let mut reached = std::collections::HashSet::new();
+    for sample in samples {
+        if typed.kind == "general"
+            && sample["catalogRevision"]
+                .as_i64()
+                .is_some_and(|revision| revision != catalog_revision)
+        {
+            return Err(conflict("办理事项目录已变更，请重新仿真并核对发布样例。"));
+        }
+        let mut sample = sample.clone();
+        sample["definition"] = definition.clone();
+        let result = super::simulation::simulate_in(tx, actor, &sample)?;
+        super::publication_coverage::observe(&result, &mut reached);
+    }
+    reached.extend(super::publication_coverage::validate(
+        tx, actor, &typed, samples,
+    )?);
+    super::publication_coverage::branches(&typed, &reached)?;
+    Ok(definition)
+}
+
 pub(super) fn change(
     tx: &Connection,
     actor: &Actor,
@@ -79,12 +185,10 @@ pub(super) fn change(
     body: &Value,
 ) -> Result<()> {
     let key = text(body, "definitionKey");
-    let mut rule = previous["rules"]
+    previous["rules"]
         .as_array()
         .and_then(|rules| rules.iter().find(|r| r["key"] == key))
-        .ok_or_else(|| invalid("流程编号不存在。"))?
-        .clone();
-    let calendar = previous["calendar"].clone();
+        .ok_or_else(|| invalid("流程编号不存在。"))?;
     let publications = previous["publications"]
         .as_array()
         .ok_or_else(|| super::super::error::unavailable("流程发布记录损坏。"))?;
@@ -94,11 +198,10 @@ pub(super) fn change(
         previous["publications"][index]["enabled"] = json!(false);
         return Ok(());
     }
-    rule["calendar"] = calendar;
-    let mut typed: ApprovalRule =
-        serde_json::from_value(rule.clone()).map_err(|_| invalid("流程定义格式无效。"))?;
-    super::business_nodes::instantiate_standard(&mut typed)?;
-    rule = serde_json::to_value(&typed)?;
+    let samples = body["samples"]
+        .as_array()
+        .ok_or_else(|| invalid("缺少发布样例。"))?;
+    let rule = preview(tx, actor, previous, &key, samples)?;
     if let Some(draft) = previous["rules"]
         .as_array_mut()
         .and_then(|rules| rules.iter_mut().find(|r| r["key"] == key))
@@ -108,23 +211,12 @@ pub(super) fn change(
     let publications = previous["publications"]
         .as_array_mut()
         .ok_or_else(|| super::super::error::unavailable("发布目录损坏。"))?;
-    typed.validate().map_err(invalid)?;
-    super::approval_integrity::rule(tx, actor, &actor.company, &typed)?;
-    let samples = body["samples"]
-        .as_array()
-        .filter(|s| !s.is_empty() && s.len() <= 20)
-        .ok_or_else(|| invalid("发布前必须提供 1–20 个实际样例并通过同一内核仿真。"))?;
-    for sample in samples {
-        let mut sample = sample.clone();
-        sample["definition"] = serde_json::to_value(&typed)?;
-        super::simulation::simulate_in(tx, actor, &sample)?;
-    }
     let version = tx.workflow_version_next(&actor.company, &key)?;
     let snapshot = store::save(
         tx,
         "oa-definition-version",
         0,
-        json!({"definition":rule,"version":version,"publishedAt":store::timestamp(),"publishedBy":actor.id}),
+        json!({"definition":rule,"version":version,"publishedAt":store::timestamp(),"publishedBy":actor.id,"samples":samples,"catalogRevision":super::publication_coverage::revision(tx,&actor.company)?}),
         Some(identity(&actor.company, &key, version)),
         actor,
         "publish-definition",
@@ -179,6 +271,26 @@ pub(super) fn activate_scheduled(tx: &Connection, actor: &Actor, entry: &Value) 
     let rule: ApprovalRule = serde_json::from_value(snapshot["definition"].clone())
         .map_err(|_| super::super::error::unavailable("定时流程版本损坏。"))?;
     super::approval_integrity::rule(tx, actor, &actor.company, &rule)?;
+    if rule.kind == "general"
+        && snapshot["catalogRevision"].as_i64()
+            != Some(super::publication_coverage::revision(tx, &actor.company)?)
+    {
+        return Err(
+            conflict("办理分工已修改，定时发布核验已过期，请重新仿真发布。")
+                .coded(crate::api::ErrorCode::PublicationStale),
+        );
+    }
+    let samples = snapshot["samples"]
+        .as_array()
+        .ok_or_else(|| invalid("发布版本缺少核验样例。"))?;
+    let mut reached = super::publication_coverage::validate(tx, actor, &rule, samples)?;
+    for sample in samples {
+        let mut input = sample.clone();
+        input["definition"] = snapshot["definition"].clone();
+        let result = super::simulation::simulate_in(tx, actor, &input)?;
+        super::publication_coverage::observe(&result, &mut reached);
+    }
+    super::publication_coverage::branches(&rule, &reached)?;
     let publications = previous["publications"]
         .as_array_mut()
         .ok_or_else(|| super::super::error::unavailable("发布目录损坏。"))?;

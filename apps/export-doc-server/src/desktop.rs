@@ -195,6 +195,7 @@ fn denied() -> Response {
         message: "不允许的桌面请求来源。".into(),
         code: None,
         diagnostic: None,
+        ..Default::default()
     })
 }
 

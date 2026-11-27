@@ -21,7 +21,7 @@ pub(super) fn begin(
     let (action, confirmation_text, extension) = if operation == STAGE_SERVER_MIGRATION_RESTORE {
         let password = header(parameters, MIGRATION_PASSWORD_HEADER);
         validate_package_password(password)?;
-        (ACTION_RESTORE_SERVER, "MIGRATE", "edmmigration")
+        (ACTION_RESTORE_SERVER, "MIGRATE", "edmpoint")
     } else if operation == UPLOAD_AND_RESTORE_POSTGRE_SQL_PHYSICAL_BACKUP {
         (ACTION_RESTORE_DATABASE, CONFIRM_RESTORE_DATABASE, "dump")
     } else {

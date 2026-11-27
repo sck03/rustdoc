@@ -4,6 +4,7 @@ import { officeBookingDefaults } from "../office/officeModel.ts";
 import { readPersonnelProfile } from "../office/personnelModel.ts";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
 import { hasDepartment, isRecordWithinRestrictions } from "../../app/permissionScope.ts";
+import { defaultGeneralCategory, defaultLeaveCategory } from "./oaCategories.ts";
 
 export type OaKind = OaRequest["kind"];
 export const personnelChangeLabels: Record<OaPersonnelChange["action"], string> = { Hire: "入职", Confirm: "转正", Transfer: "调岗", Depart: "离职", Rehire: "返聘" };
@@ -49,10 +50,10 @@ export function oaDraft(kind: OaKind, user: ApiUserDto): OaRequestSave {
   const { start, end } = officeBookingDefaults(user.businessTimeZone);
   return { requestKey: createRequestKey(), title: "", reason: "", currency: "CNY",
     ...(kind === "personnel" ? { personnelChange: { action: "Hire" as const, registration: { requestKey: "", employeeNumber: "", departmentId: user.departmentId, jobTitle: "", employmentType: "FullTime" as const, hireDate: user.businessDate, onProbation: true, probationEndsOn: null, contractEndsOn: null, profile: readPersonnelProfile(new FormData()) } } } : {}),
-    ...(kind === "leave" ? { leave: { category: "Annual", startsOn: user.businessDate, endsOn: user.businessDate, startPeriod: "AM", endPeriod: "PM" } } : {}),
+    ...(kind === "leave" ? { leave: { category: defaultLeaveCategory, startsOn: user.businessDate, endsOn: user.businessDate, startPeriod: "AM", endPeriod: "PM" } } : {}),
     ...(kind === "expense" ? { lines: [{ category: "Travel", spentOn: user.businessDate, description: "", amount: "" }] } : {}),
     ...(kind === "purchase" ? { purchaseLines: [{ name: "", specification: "", quantity: "1", unit: "件", unitPrice: "" }] } : {}),
     ...(kind === "travel" ? { travel: { destination: "", startsOn: user.businessDate, endsOn: user.businessDate } } : {}),
     ...(kind === "overtime" ? { overtime: { startsAt: start, endsAt: end, location: "" } } : {}),
-    ...(kind === "general" ? { category: "Other" } : {}) };
+    ...(kind === "general" ? { category: defaultGeneralCategory } : {}) };
 }

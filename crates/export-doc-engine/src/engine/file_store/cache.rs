@@ -81,7 +81,10 @@ impl Cache {
         let entry = self
             .state
             .lock()
-            .map_err(|_| unavailable("文件缓存状态异常。"))?
+            .map_err(|_| {
+                unavailable("文件缓存状态异常。")
+                    .coded(crate::api::ErrorCode::DependencyUnavailable)
+            })?
             .entries
             .get(&object.digest)
             .map(|(_, entry)| entry.clone());
@@ -103,10 +106,9 @@ impl Cache {
         // Cancellation says nothing about the cached bytes. Keep the entry so
         // a subsequent reader can verify it again without another S3 transfer.
         crate::operation::check()?;
-        let mut state = self
-            .state
-            .lock()
-            .map_err(|_| unavailable("文件缓存状态异常。"))?;
+        let mut state = self.state.lock().map_err(|_| {
+            unavailable("文件缓存状态异常。").coded(crate::api::ErrorCode::DependencyUnavailable)
+        })?;
         let current = state
             .entries
             .get(&object.digest)
@@ -158,10 +160,9 @@ impl Cache {
         };
         store.download_into(config, object, &mut file)?;
         file.seek(SeekFrom::Start(0))?;
-        let mut state = self
-            .state
-            .lock()
-            .map_err(|_| unavailable("文件缓存状态异常。"))?;
+        let mut state = self.state.lock().map_err(|_| {
+            unavailable("文件缓存状态异常。").coded(crate::api::ErrorCode::DependencyUnavailable)
+        })?;
         let removed = state.insert(object.digest.clone(), Arc::new(entry));
         drop(state);
         // Existing readers retain their own entry until open/verification finishes.
@@ -182,7 +183,8 @@ impl FileStore {
             object.size,
         )?;
         if actual != (object.size, object.digest.clone()) {
-            return Err(unavailable("文件对象完整性校验失败。"));
+            return Err(unavailable("文件对象完整性校验失败。")
+                .coded(crate::api::ErrorCode::DependencyUnavailable));
         }
         Ok(())
     }
@@ -214,7 +216,8 @@ impl FileStore {
                     object.size,
                 )?;
                 if actual != (object.size, object.digest.clone()) {
-                    return Err(unavailable("文件对象完整性校验失败。"));
+                    return Err(unavailable("文件对象完整性校验失败。")
+                        .coded(crate::api::ErrorCode::DependencyUnavailable));
                 }
             }
         }
@@ -232,6 +235,7 @@ mod tests {
         fs::write(&path, b"original").unwrap();
         let modified = fs::metadata(&path).unwrap().modified().unwrap();
         let object = FileObject {
+            archive_identity: String::new(),
             digest: crate::engine::media::digest(b"original"),
             size: 8,
         };
@@ -268,6 +272,7 @@ mod tests {
         let path = root.0.join("cached-object");
         fs::write(&path, b"original").unwrap();
         let object = FileObject {
+            archive_identity: String::new(),
             digest: crate::engine::media::digest(b"original"),
             size: 8,
         };

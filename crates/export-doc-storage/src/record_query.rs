@@ -114,7 +114,7 @@ pub(super) fn sql(q: &RecordQuery<'_>, postgres: bool) -> QuerySql {
             .join(",");
         format!(
             "{} IN ({keys}) AND {} IN ({states})",
-            property("handlingKey", false),
+            property("serviceId", false),
             property("status", false)
         )
     } else {
@@ -125,7 +125,7 @@ pub(super) fn sql(q: &RecordQuery<'_>, postgres: bool) -> QuerySql {
         if q.handling_only {
             format!(
                 "({ordinary} AND COALESCE({},'')='') OR ({assigned})",
-                property("handlingKey", false)
+                property("serviceId", false)
             )
         } else if q.handling_keys.is_some() {
             format!("({ordinary}) OR ({assigned})")
@@ -258,7 +258,7 @@ pub(super) fn sql(q: &RecordQuery<'_>, postgres: bool) -> QuerySql {
     if let Some(key) = q.handling_key {
         filter += &format!(
             " AND {}={}",
-            property("handlingKey", false),
+            property("serviceId", false),
             bind(key.into(), "TEXT")
         );
     }
@@ -423,17 +423,12 @@ pub(crate) fn approval_condition(
         choices.join(" OR ")
     )
 }
-fn handler_origin_condition(postgres: bool, record: &str, user: &str) -> String {
-    let key = format!("{record}.body->>'handlingKey'");
-    let members = if postgres {
-        "records policy CROSS JOIN LATERAL jsonb_array_elements(policy.body->'value') service(value) CROSS JOIN LATERAL jsonb_array_elements_text(service.value->'handlerUserIds') handler(value)"
-    } else {
-        "records policy JOIN json_each(policy.body,'$.value') service JOIN json_each(service.value,'$.handlerUserIds') handler"
-    };
+fn handler_origin_condition(_postgres: bool, record: &str, user: &str) -> String {
+    let key = format!("{record}.body->>'serviceId'");
     // Keep historical actors as facts, while service handover revokes their
     // derived access in the same snapshot as list counts and pagination.
     format!(
-        "(COALESCE(assignment.origin->>'source','')<>'Handlers' OR assignment.administration=1 OR COALESCE({key},'')='' OR EXISTS(SELECT 1 FROM {members} WHERE policy.kind='oa-setting-section' AND policy.body->>'key'='handlingServices' AND policy.company={record}.company AND service.value->>'key'={key} AND CAST(handler.value AS BIGINT)={user}))"
+        "(COALESCE(assignment.origin->>'source','')<>'Handlers' OR assignment.administration=1 OR (COALESCE({key},'')='' AND {record}.kind<>'oa-general') OR EXISTS(SELECT 1 FROM handling_service_assignees member WHERE member.company={record}.company AND member.service_id={key} AND member.user_id={user}))"
     )
 }
 pub(crate) fn node_access_condition(

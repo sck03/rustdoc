@@ -315,7 +315,8 @@ pub(super) fn create_backup(service: &NativeService, actor: &Actor) -> Result<Va
                 )?;
                 fs::rename(&temporary, &target)?;
                 if !target.is_file() || fs::metadata(&target)?.len() == 0 {
-                    return Err(unavailable("pg_dump 未生成有效的物理备份文件。"));
+                    return Err(unavailable("pg_dump 未生成有效的物理备份文件。")
+                        .coded(crate::api::ErrorCode::DependencyUnavailable));
                 }
                 super::audit(
                     &store,
@@ -596,4 +597,6 @@ pub(super) fn verify_dump(paths: &RuntimePaths, path: &Path) -> Result<()> {
 
 mod recovery;
 pub use recovery::apply_pending;
+#[cfg(feature = "postgres")]
+pub(super) use recovery::apply_pending_with_lease;
 pub(crate) use recovery::{dump_to, ensure_no_pending, has_pending};

@@ -33,6 +33,7 @@
 
 - 正式桌面为 `apps/export-doc-tauri`，复用 `apps/export-doc-web` 的 React 界面；Tauri 在进程内托管共用 Rust HTTP 适配器与 SQLite 应用服务。Node 仅用于构建和开发验证，WebView 是桌面显示组件。
 - `apps/export-doc-web` 是唯一 React 前端，保留已确认的业务结构与操作习惯；`apps/export-doc-server` 是 Rust HTTP 组合根，团队及 Docker 使用 PostgreSQL 18，不能改用 SQLite 或把数据库账号交给前端。
+- 2026-11-27 用户确认：Docker 首次部署只需 A 主机，应用、PostgreSQL 和默认附件库即可在 A 运行；B 附件设备、独立备份位置和移动硬盘均按需接入，不作为安装或正常业务使用的前置条件。切到已登记外部文件库后，外部库故障必须明确报错，不能静默回退本地造成数据分散。
 - `crates/export-doc-contracts` 管理生成的 API 契约；`export-doc-domain` 放纯业务规则；`export-doc-engine` 编排用例；`export-doc-storage` 提供存储边界与 SQLite／PostgreSQL 适配。数据库 SQL 不进入 UI 或用例协调器，Domain 不引用 GUI、HTTP、数据库、进程或宿主文件系统。
 - UI 状态／事件、应用用例、业务校验、存储、文件、报表／PDF、Excel、OCR、邮件和系统集成须按职责分模块。能力依赖按 Cargo feature 或独立 crate 裁剪，核心不得为了单一可选功能拉入整套浏览器实现。
 - Excel 能力位于 `crates/export-doc-excel`，由组合根显式启用 `excel` feature；现有 `tools/excel-analyzer-rs` 同时提供库和对照 CLI，禁止复制第二套表头／字段识别器。文件任务位于 `engine::tasks`，状态和结果事务化发布，文件预览不得隐式写入正式业务数据。
@@ -52,7 +53,7 @@
 - 数据库、配置、日志、备份、模板、缓存、浏览器 profile、PostgreSQL 客户端、OCR/浏览器资源和随包工具必须落在运行目录或明确职责的容器层；不要默认写入 `C:\Users\...\AppData`、系统 TEMP、ProgramData 或系统级工具缓存。
 - 配置中保存相对路径；写入、读取、迁移前后都必须验证仍在受管根目录内，并拒绝符号链接、联接点、路径穿越、磁盘根和不可写目录。
 - 2026-11-09 用户授权例外：单一窗口官方客户端 COO/ACD 的 OutBox、SentBox、InBox、FailBox 分别保存检测或手选的现存绝对目录；只读官方配置，不提取、存储或输出 PIN。外部交接目录不随 DataRoot 迁移、备份或清理，其余路径规则保持不变。
-- SQLite 仅用于桌面单机；团队/服务器/容器模式使用 PostgreSQL 18。当前只接受全新 schema 18；按用户授权不维护旧库兼容链。旧库、空文件、损坏库、版本不明或超前版本报错，不自动删除或覆盖。只有确认数据库不存在才能初始化，重建使用显式新 DataRoot 或新 PostgreSQL 数据库；备份恢复同样拒绝旧 schema。SQLite 业务库统一在 DataRoot/Database；PostgreSQL 初始化与恢复使用独立维护账号，普通 API 不获得 DDL 权限。Full SQLite 与 PostgreSQL 共用人员身份、发布流程、审批任务和权限规则，不保留单机直接登记审批分支。
+- SQLite 仅用于桌面单机；团队/服务器/容器模式使用 PostgreSQL 18。当前只接受全新 schema 19；按用户授权不维护旧库兼容链。旧库、空文件、损坏库、版本不明或超前版本报错，不自动删除或覆盖。只有确认数据库不存在才能初始化，重建使用显式新 DataRoot 或新 PostgreSQL 数据库；备份恢复同样拒绝旧 schema。SQLite 业务库统一在 DataRoot/Database；PostgreSQL 初始化与恢复使用独立维护账号，普通 API 不获得 DDL 权限。Full SQLite 与 PostgreSQL 共用人员身份、发布流程、审批任务和权限规则，不保留单机直接登记审批分支。
 - 单 API 实例锁、后台任务、恢复和迁移必须保持 fail-closed；不能把数据库/文件系统故障伪装成空列表或普通业务冲突。
 
 ### 3.2 跨平台路径、文件名和时间
@@ -67,6 +68,7 @@
 - `/openapi/v1.json` 是唯一对外 API 契约事实源。`export-doc-contracts::native_contract` 提供原生定义，`openapi` 和生成器从该定义投影 OpenAPI、运行契约、Rust DTO/路由/权限元数据及 React 按域客户端。冻结发布契约只在测试夹具中作语义/元数据对照。OA/组织使用现行模型，组织编辑/删除使用稳定 ID，不恢复旧代码路由。回归须逐项证明明确变更，其余端点、schema、认证、错误和权限继续保留验证。禁止手改生成文件或建立第二套 endpoint/schema；修改原生定义或生成器时须验证 schema、错误、认证、权限和容量元数据，不能静默变更契约。
 - 端点认证、桌面令牌和许可证要求使用 endpoint metadata；不要按 `/api` 前缀、路径白名单或前端路由猜测授权。
 - 业务错误按现有分类映射：校验 400、权限 403、明确资源不存在 404、冲突 409、繁忙 429、依赖不可用 503、超时 504；不要把数据库、文件或外部工具故障包装成 404/409。
+- 2026-11-27 用户要求全项目错误具体可处理：指出实际原因、出错字段/对象/阶段及处理方法；OA 必须说明具体流程节点、缺少的人员/任职/职责/动作权限或办理配置。错误码、上下文和动作由单一契约投影，HTTP 不得把已知安全原因统一改成模糊提示；未知原因提供追踪编号且不编造诊断，不输出密钥、连接串、SQL 或无权查看的资料。结果不明的写入先查回执，不提示盲目重试。
 - 所有异步公共操作都要有明确取消边界、超时和资源清理；后台任务完成、失败、取消和输出清理必须可观察且幂等。
 
 ### 3.4 解耦与扩展

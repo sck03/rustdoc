@@ -12,7 +12,7 @@ pub(in crate::engine) fn revoke_delegations(
 ) -> Result<()> {
     super::settings_store::revoke_delegations(tx, actor, account)
 }
-fn response(tx: &Connection, company: &str, mut settings: Value) -> Result<Value> {
+pub(super) fn response(tx: &Connection, company: &str, mut settings: Value) -> Result<Value> {
     if !settings["revisions"].is_object() {
         settings["revisions"] = json!({});
     }
@@ -279,7 +279,13 @@ pub(super) fn handle(
                     &actor.company,
                     resource,
                     action,
-                )?;
+                ).map_err(|mut cause| {
+                    if matches!(cause.status,Some(400|403|404|409)) {
+                        cause.message = format!("流程“{}”的节点“{}”，账号 {id} 无法执行 {action}：{}",typed.name,stage.name,cause.message);
+                        cause = cause.at("stages", "核对该人员在当前单位的有效任职、关联账号、模块查看权限及节点动作权限。");
+                    }
+                    cause
+                })?;
                 auth::authorize(&reviewer, resource, "view")?;
                 auth::authorize(&reviewer, resource, action)?;
                 if stage.kind == export_doc_domain::approval_graph::NodeKind::Approval {
@@ -331,32 +337,8 @@ pub(super) fn handle(
     if value["sheetTemplates"] != previous["sheetTemplates"] {
         sheet_templates::validate(&value["sheetTemplates"])?;
     }
-    let mut services = body.get("handlingServices").cloned().unwrap_or_else(|| {
-        previous
-            .get("handlingServices")
-            .cloned()
-            .unwrap_or(json!([]))
-    });
-    for service in services.as_array_mut().into_iter().flatten() {
-        use unicode_normalization::UnicodeNormalization;
-        if !service.is_object() {
-            return Err(invalid("办理分工必须为对象。"));
-        }
-        for field in ["key", "name"] {
-            service[field] = json!(text(service, field).nfc().collect::<String>());
-        }
-        service
-            .as_object_mut()
-            .ok_or_else(|| invalid("办理分工必须为对象。"))?
-            .remove("handlerNames");
-    }
-    if services != previous["handlingServices"] {
-        handling::validate(tx, actor, &services, &previous["handlingServices"])?;
-    }
-    value["handlingServices"] = services;
     value["versionNumber"] = previous["versionNumber"].clone();
     let saved = super::settings_store::save(tx, actor, patch, &value)?;
-    super::handling_handover::notify(tx, actor, &previous, &saved)?;
     response(tx, &actor.company, saved)
 }
 pub(super) fn principals(tx: &Connection, actor: &Actor) -> Result<Vec<(i64, String)>> {

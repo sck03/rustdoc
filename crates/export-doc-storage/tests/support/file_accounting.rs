@@ -7,9 +7,10 @@ pub fn exercise(c: &Connection) {
     let mut body =
         json!({"companyScope":"FILE-QUOTA-A","versionNumber":1,"ownerUserId":1,"departmentId":"D"});
     let record = c
-        .insert(&RecordWrite::unkeyed("file-accounting-test", &body))
+        .insert(&RecordWrite::unkeyed("report-images", &body))
         .unwrap();
     let object = FileObject {
+        archive_identity: String::new(),
         digest: "a".repeat(64),
         size: 7,
     };

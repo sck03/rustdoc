@@ -1,6 +1,11 @@
 CREATE TABLE schema_model (version BIGINT PRIMARY KEY,model TEXT NOT NULL,shape TEXT NOT NULL);
-CREATE TABLE schema_version (version BIGINT PRIMARY KEY CHECK(version = 18));
-INSERT INTO schema_version VALUES (18);
+CREATE TABLE schema_version (version BIGINT PRIMARY KEY CHECK(version = 19));
+INSERT INTO schema_version VALUES (19);
+CREATE TABLE handling_services (company TEXT NOT NULL, service_id TEXT NOT NULL, category TEXT NOT NULL, name_key TEXT NOT NULL, enabled INTEGER NOT NULL CHECK(enabled IN (0,1)), revision BIGINT NOT NULL CHECK(revision>0), body JSONB NOT NULL, PRIMARY KEY(company,service_id));
+CREATE UNIQUE INDEX handling_services_name ON handling_services(company,category,name_key);
+CREATE INDEX handling_services_category ON handling_services(company,category,enabled,service_id);
+CREATE TABLE handling_service_assignees (company TEXT NOT NULL, service_id TEXT NOT NULL, user_id BIGINT NOT NULL, PRIMARY KEY(company,service_id,user_id), FOREIGN KEY(company,service_id) REFERENCES handling_services(company,service_id) ON DELETE CASCADE);
+CREATE INDEX handling_service_accounts ON handling_service_assignees(user_id,company);
 -- The same compact, UTF-8 key order supplies bounded search metadata and fallback reads.
 CREATE FUNCTION exportdoc_record_text(value jsonb) RETURNS text
 LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$
@@ -28,6 +33,7 @@ CREATE TABLE records (
     CHECK(kind<>'attachments' OR COALESCE(CASE WHEN jsonb_typeof(body->'invoiceId')='number' AND (body->>'invoiceId') ~ '^[1-9][0-9]*$' THEN (body->>'invoiceId')::numeric<=9223372036854775807 ELSE false END,false)),
     CHECK(kind<>'people' OR (COALESCE(NULLIF(body->'profile','null'::jsonb),'{}'::jsonb)-ARRAY['fullName','workEmail','workPhone','workLocation'])='{}'::jsonb)
 );
+ALTER TABLE handling_service_assignees ADD CONSTRAINT handling_service_user FOREIGN KEY(user_id) REFERENCES records(id);
 CREATE TABLE import_preview_rows (
     preview_id BIGINT NOT NULL REFERENCES records(id) ON DELETE CASCADE,
     position BIGINT NOT NULL CHECK(position >= 0),
@@ -246,8 +252,10 @@ CREATE TRIGGER queue_file_migrations AFTER INSERT ON file_objects FOR EACH ROW E
 CREATE TABLE file_locations (
     storage_identity TEXT NOT NULL,
     digest TEXT NOT NULL REFERENCES file_objects(digest) ON DELETE CASCADE,
+    archived INTEGER NOT NULL DEFAULT 0 CHECK(archived IN (0,1)),
     PRIMARY KEY(storage_identity,digest)
 );
+CREATE UNIQUE INDEX file_archive_route ON file_locations(digest) WHERE archived=1;
 
 
 CREATE INDEX records_status_page ON records(kind, (body->>'status'), id DESC);
@@ -311,3 +319,61 @@ CREATE TABLE unit_access_grants (
 -- Company-owned catalog natural keys are encoded as [company, key]; fresh schema only.
 CREATE INDEX records_invoice_versions ON records(company, (body->>'invoiceNo'), id DESC) WHERE kind='invoices';
 CREATE INDEX records_product_code ON records((lower(btrim(normalize(body->>'productCode', NFC), U&'\0009\000A\000B\000C\000D\0020\0085\00A0\1680\2000\2001\2002\2003\2004\2005\2006\2007\2008\2009\200A\2028\2029\202F\205F\3000') COLLATE pg_unicode_fast)), company, id DESC) WHERE kind='products';
+
+-- Removed permanent file versions remain protected until archival review.
+CREATE TABLE retention_policies (
+    archive_class TEXT PRIMARY KEY,
+    days INTEGER NOT NULL CHECK(days BETWEEN 0 AND 36500),
+    revision BIGINT NOT NULL CHECK(revision>0)
+);
+CREATE TABLE retention_holds (
+    digest TEXT PRIMARY KEY REFERENCES file_objects(digest) ON DELETE CASCADE,
+    active INTEGER NOT NULL CHECK(active IN (0,1)),
+    reason TEXT NOT NULL,
+    revision BIGINT NOT NULL CHECK(revision>0)
+);
+CREATE TABLE file_retention_refs (
+    id TEXT PRIMARY KEY,
+    record_id BIGINT NOT NULL,
+    file_kind TEXT NOT NULL,
+    archive_class TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    company TEXT NOT NULL,
+    digest TEXT NOT NULL REFERENCES file_objects(digest) ON DELETE RESTRICT,
+    basis_date TEXT,
+    revision BIGINT NOT NULL CHECK(revision>0)
+);
+CREATE INDEX file_retention_digest ON file_retention_refs(digest,id);
+CREATE INDEX file_retention_class_date ON file_retention_refs(archive_class,basis_date,id);
+CREATE TABLE file_retention_totals (id INTEGER PRIMARY KEY CHECK(id=1), protected_bytes BIGINT NOT NULL CHECK(protected_bytes>=0));
+INSERT INTO file_retention_totals VALUES(1,0);
+CREATE TABLE capacity_daily (
+    day TEXT NOT NULL,
+    location TEXT NOT NULL,
+    physical_bytes BIGINT NOT NULL CHECK(physical_bytes>=0),
+    logical_bytes BIGINT NOT NULL CHECK(logical_bytes>=0),
+    reclaimable_bytes BIGINT NOT NULL CHECK(reclaimable_bytes>=0),
+    PRIMARY KEY(day,location)
+);
+CREATE FUNCTION account_retained_file() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='INSERT' THEN
+        UPDATE file_retention_totals SET protected_bytes=protected_bytes+(SELECT CASE WHEN (SELECT COUNT(*) FROM file_retention_refs WHERE digest=NEW.digest)=1 THEN size_bytes ELSE 0 END FROM file_objects WHERE digest=NEW.digest) WHERE id=1;
+        UPDATE file_storage_totals SET referenced_bytes=referenced_bytes+(SELECT CASE WHEN reference_count=0 THEN size_bytes ELSE 0 END FROM file_objects WHERE digest=NEW.digest) WHERE id=1;
+        UPDATE file_objects SET reference_count=reference_count+1 WHERE digest=NEW.digest;
+        RETURN NEW;
+    ELSE
+        UPDATE file_retention_totals SET protected_bytes=protected_bytes-(SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM file_retention_refs WHERE digest=OLD.digest) THEN size_bytes ELSE 0 END FROM file_objects WHERE digest=OLD.digest) WHERE id=1;
+        UPDATE file_storage_totals SET referenced_bytes=referenced_bytes-(SELECT CASE WHEN reference_count=1 THEN size_bytes ELSE 0 END FROM file_objects WHERE digest=OLD.digest) WHERE id=1;
+        UPDATE file_objects SET reference_count=reference_count-1 WHERE digest=OLD.digest;
+        RETURN OLD;
+    END IF;
+END $$;
+CREATE TRIGGER retained_file_account AFTER INSERT OR DELETE ON file_retention_refs FOR EACH ROW EXECUTE FUNCTION account_retained_file();
+
+CREATE FUNCTION retain_removed_version() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    INSERT INTO file_retention_refs(id,record_id,file_kind,archive_class,file_name,company,digest,basis_date,revision) SELECT CAST(v.record_id AS TEXT)||':'||v.kind||':'||v.digest,v.record_id,v.kind,r.kind,v.file_name,COALESCE(r.body->>'companyScope',''),v.digest,NULL,1 FROM file_versions v JOIN records r ON r.id=v.record_id WHERE r.kind<>'report-images' AND v.record_id=OLD.record_id AND v.kind=OLD.kind ON CONFLICT(id) DO NOTHING;
+    RETURN OLD;
+END $$;
+CREATE TRIGGER retain_removed_version BEFORE DELETE ON file_versions FOR EACH ROW EXECUTE FUNCTION retain_removed_version();

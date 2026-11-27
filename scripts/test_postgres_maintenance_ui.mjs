@@ -192,6 +192,7 @@ try {
   await sections.getByRole('tab', { name: '备份文件', exact: true }).click();
   await page.locator('[aria-label="完整备份列表"]').getByRole('button', { name: '用于恢复' }).first().click();
   const archiveRestore = page.locator('[aria-label="从本地完整备份恢复"]');
+  await page.getByText('完整包恢复到服务器数据盘', { exact: true }).waitFor();
   await archiveRestore.getByLabel('所选备份的密码').fill('Scheduled-password-2026');
   await archiveRestore.getByLabel('管理员当前密码').fill(password);
   await archiveRestore.getByLabel('恢复确认文本').fill('MIGRATE');

@@ -1,8 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { OaLeave, OaRequestSave } from "../../api/index.ts";
 import { OfficeField } from "../office/OfficeUi.tsx";
-export const leaveCategories = { Annual: "年假", Sick: "病假", Personal: "事假", Other: "其他" } as const;
-export const generalCategories = { Seal: "用印", Certificate: "证明开具", IT: "IT 支持", Repair: "维修", Other: "其他事项" } as const;
+import { generalCategories, leaveCategories } from "./oaCategories.ts";
 
 export function OaTemporalFields({ draft, setDraft, timeZone }: { draft: OaRequestSave; setDraft: Dispatch<SetStateAction<OaRequestSave>>; timeZone: string }) {
   return <>
@@ -21,6 +20,6 @@ export function OaTemporalFields({ draft, setDraft, timeZone }: { draft: OaReque
       {(["startsAt", "endsAt"] as const).map((field) => <OfficeField key={field} label={field === "startsAt" ? "开始时间" : "结束时间"}><input type="datetime-local" required value={draft.overtime![field]} onChange={(event) => setDraft({ ...draft, overtime: { ...draft.overtime!, [field]: event.target.value } })} /></OfficeField>)}
       <OfficeField label="加班地点" wide><input required maxLength={200} value={draft.overtime.location} onChange={(event) => setDraft({ ...draft, overtime: { ...draft.overtime!, location: event.target.value } })} /></OfficeField>
     </>}
-    {draft.category && <OfficeField label="申请类别"><select value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value as OaRequestSave["category"], handlingKey: "" })}>{Object.entries(generalCategories).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></OfficeField>}
+    {draft.category && <OfficeField label="申请类别"><select value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value as OaRequestSave["category"], serviceId: "" })}>{Object.entries(generalCategories).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></OfficeField>}
   </>;
 }

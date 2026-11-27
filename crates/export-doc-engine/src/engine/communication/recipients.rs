@@ -36,7 +36,7 @@ impl Candidates {
         explicit.extend(cc);
         if handling_event {
             for service in super::super::handling::services(tx, &actor.company)? {
-                if service["key"] == row["handlingKey"] {
+                if service["key"] == row["serviceId"] {
                     for id in service["handlerUserIds"].as_array().into_iter().flatten() {
                         explicit.insert(id.as_i64().ok_or_else(|| {
                             super::super::error::unavailable("办理人员引用损坏。")

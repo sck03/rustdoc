@@ -97,8 +97,7 @@ pub(super) fn sql(q: &CommunicationQuery<'_>, postgres: bool) -> QuerySql {
                 condition += &status;
                 if let Some(keys) = &scope.handling_keys {
                     let keys = keys.iter().map(|key| bind(key.clone())).collect::<Vec<_>>();
-                    condition +=
-                        &format!(" AND parent.body->>'handlingKey' IN ({})", keys.join(","));
+                    condition += &format!(" AND parent.body->>'serviceId' IN ({})", keys.join(","));
                 }
                 // An unrestricted ordinary scope already admits every parent in this kind.
                 if scope.handling_keys.is_none() && (q.assigned_only || !condition.is_empty()) {

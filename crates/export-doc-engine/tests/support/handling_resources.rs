@@ -123,7 +123,7 @@ pub(super) fn exercise(
             .iter()
             .all(|r| r["category"] != "Room")
     );
-    let room = call(service, admin, CREATE_MEETING_ROOM, 0, Some(json!({"name":"双人办理会议室","capacity":10,"maximumBookingHours":8,"advanceBookingDays":90,"requiresKey":true,"isActive":true,"handlingKey":"meeting"}))).unwrap();
+    let room = call(service, admin, CREATE_MEETING_ROOM, 0, Some(json!({"name":"双人办理会议室","capacity":10,"maximumBookingHours":8,"advanceBookingDays":90,"requiresKey":true,"isActive":true,"serviceId":"meeting"}))).unwrap();
     let room_id = room["id"].as_i64().unwrap();
     assert!(
         list(service, applicant, LIST_MEETING_ROOMS, &[])["items"]
@@ -210,7 +210,7 @@ pub(super) fn exercise(
         let mut value = room.clone();
         value["expectedVersion"] = room["versionNumber"].clone();
         value["isActive"] = json!(active);
-        value["handlingKey"] = json!(key);
+        value["serviceId"] = json!(key);
         value
     };
     assert_eq!(
@@ -271,7 +271,8 @@ pub(super) fn exercise(
     let room_service = policy["handlingServices"]
         .as_array_mut()
         .unwrap()
-        .last_mut()
+        .iter_mut()
+        .find(|row| row["key"] == "meeting")
         .unwrap();
     room_service["handlerUserIds"] = json!([users[3]["id"]]);
     room_service["name"] = json!("会议接待新名称");
@@ -374,9 +375,14 @@ pub(super) fn exercise(
         "an inactive service must not block archiving its finished resource"
     );
     // Two custodians share a supply group, but inventory is deducted only once.
-    policy["handlingServices"][2]["handlerUserIds"] = json!([users[2]["id"], users[3]["id"]]);
+    policy["handlingServices"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|row| row["key"] == "daily")
+        .unwrap()["handlerUserIds"] = json!([users[2]["id"], users[3]["id"]]);
     save(policy);
-    let supply = call(service, admin, CREATE_OFFICE_SUPPLY, 0, Some(json!({"name":"共同保管耗材","unit":"件","minimumStock":0,"isActive":true,"isReturnable":false,"handlingKey":"daily"}))).unwrap();
+    let supply = call(service, admin, CREATE_OFFICE_SUPPLY, 0, Some(json!({"name":"共同保管耗材","unit":"件","minimumStock":0,"isActive":true,"isReturnable":false,"serviceId":"daily"}))).unwrap();
     let supply_id = supply["id"].as_i64().unwrap();
     call(service, first, RESTOCK_OFFICE_SUPPLY, supply_id, Some(json!({"operationId":nonce().unwrap(),"expectedVersion":supply["versionNumber"],"quantity":5,"note":"共同管理入库"}))).unwrap();
     let mut supply_request = call(service, applicant, CREATE_OFFICE_SUPPLY_REQUEST, 0, Some(json!({"requestKey":nonce().unwrap(),"projectId":project["id"],"officeSupplyId":supply_id,"quantity":2,"purpose":"双人办理库存只扣一次","returnDueDate":null}))).unwrap();
@@ -436,9 +442,14 @@ pub(super) fn exercise(
     assert_eq!(inventory["stockQuantity"], 3);
     assert_eq!(inventory["reservedQuantity"], 0);
     // General services also use any-one handling; a second completion is rejected.
-    policy["handlingServices"][0]["handlerUserIds"] = json!([users[2]["id"], users[3]["id"]]);
+    policy["handlingServices"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|row| row["key"] == "seal")
+        .unwrap()["handlerUserIds"] = json!([users[2]["id"], users[3]["id"]]);
     save(policy);
-    let draft = call(service, applicant, operation("general", "create"), 0, Some(json!({"requestKey":nonce().unwrap(),"title":"多位用印办理","reason":"任意一位完成","category":"Seal","handlingKey":"seal"}))).unwrap();
+    let draft = call(service, applicant, operation("general", "create"), 0, Some(json!({"requestKey":nonce().unwrap(),"title":"多位用印办理","reason":"任意一位完成","category":"Seal","serviceId":"seal"}))).unwrap();
     let pending = super::act(service, applicant, "submit", &draft);
     let approved = super::act(service, leader, "approve", &pending);
     for token in [first, second] {

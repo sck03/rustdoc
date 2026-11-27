@@ -104,13 +104,23 @@ export function approvalStage(key, approverUserIds = [], dependsOn = [], source 
   return { key, name: key, dependsOn, source, approverUserIds, decision: 'All', selfApproval: 'Skip', repeatedApprover: 'Allow', conditions: [], dueHours: 48 };
 }
 
+export async function listHandlingServices(invoke, token) {
+  const items=[]; let after='';
+  do { const page=await invoke('ListManagedHandlingServices',undefined,{after,pageSize:100},token); items.push(...page.items); after=page.nextCursor; } while(after);
+  return items;
+}
 export async function saveApprovalSettings(invoke, token, settings) {
+  if(settings.handlingServices) {
+    const current = await listHandlingServices(invoke, token);
+    for(const old of current) if(!settings.handlingServices.some(row=>row.key===old.key)) await invoke('RemoveHandlingService',{service:old,commandKey:randomUUID()},{},token);
+    for(const row of settings.handlingServices) await invoke('SaveHandlingService',{service:{...row,revision:row.revision??current.find(old=>old.key===row.key)?.revision??0},commandKey:randomUUID()},{},token);
+  }
   let saved=await invoke('GetOaApprovalSettings',undefined,{},token);
   for(const rule of settings.rules) {
     if(JSON.stringify(saved.rules.find(item=>item.key===rule.key))===JSON.stringify(rule))continue;
     saved=await invoke('SaveOaApprovalSettings',{section:'rules',definitionKey:rule.key,rule,expectedRevision:saved.revisions?.[`rule:${rule.key}`]??0},{},token);
   }
-  for(const section of ['calendar','delegations','handlingServices','sheetTemplates']) {
+  for(const section of ['calendar','delegations','sheetTemplates']) {
     if(settings[section]!==undefined&&JSON.stringify(saved[section])!==JSON.stringify(settings[section]))saved=await invoke('SaveOaApprovalSettings',{section,expectedRevision:saved.revisions?.[section]??0,[section]:settings[section]},{},token);
   }
   return saved;
@@ -129,8 +139,14 @@ export async function publishDefinitions(invoke, token, settings, keys, samplesB
         for (const appointment of person.appointments) {
           const sample = { employeeId: person.id, appointmentId: appointment.id, amount: '0', currency: 'CNY', duration: '1', category: definition.kind === 'leave' ? 'Annual' : 'Other', isReturnable: true };
           try {
-            await invoke('SimulateOaDefinition', { definition, ...sample }, {}, token);
-            samples = [sample];
+            if(definition.kind === 'general') {
+              const preview=await invoke('PreviewOaDeployment',{action:'Publish',items:[{definitionKey}],sample},{},token);
+              if(!preview.items[0].ready) throw new Error(preview.items[0].failure.message);
+              samples=preview.items[0].samples;
+            } else {
+              await invoke('SimulateOaDefinition', { definition, ...sample }, {}, token);
+              samples = [sample];
+            }
             break search;
           } catch (error) { failures.push(error); }
         }

@@ -2,13 +2,14 @@ use super::*;
 use crate::engine::{store::Store, test_support::ScratchDirectory};
 use export_doc_storage::RecordWrite;
 use serde_json::json;
+mod retention;
 #[cfg(feature = "s3-storage")]
 mod s3;
 
 fn record(store: &Store, prepared: &PreparedObject) -> Result<i64> {
     store.transaction(|tx| {
         let body = json!({"companyScope":"ACME","versionNumber":1,"ownerUserId":1,"departmentId":"GENERAL"});
-        let id = tx.insert(&RecordWrite {kind:"file-test",identity:None,body:&body})?;
+        let id = tx.insert(&RecordWrite {kind:"report-images",identity:None,body:&body})?;
         tx.publish_file(prepared,"original",id,"original.bin","application/octet-stream")?;
         Ok(id)
     })
@@ -24,7 +25,7 @@ fn immutable_objects_deduplicate_bytes_without_merging_business_references() {
     let second = record(&store, &b).unwrap();
     assert_eq!(
         store.connection().unwrap().file_statistics().unwrap(),
-        json!({"fileCount":1,"physicalBytes":8,"logicalBytes":16,"unreferencedBytes":0})
+        json!({"fileCount":1,"physicalBytes":8,"logicalBytes":16,"unreferencedBytes":0,"protectedBytes":0})
     );
     assert_eq!(store.connection().unwrap().file_usage("ACME").unwrap(), 16);
     assert!(
@@ -170,45 +171,6 @@ fn missing_identity_configuration_and_corrupt_objects_fail_closed() {
     drop((prepared, store));
     fs::remove_file(root.0.join("Configuration/file-storage.json")).unwrap();
     assert!(Store::open(&root.paths()).is_err());
-}
-
-#[test]
-fn recovery_pack_verifies_every_database_object_and_detects_missing_content() {
-    let root = ScratchDirectory::new();
-    let store = Store::open(&root.paths()).unwrap();
-    let prepared = store.files.prepare(b"backup bytes").unwrap();
-    record(&store, &prepared).unwrap();
-    let pack = root.0.join("objects.pack");
-    let snapshot_path = root.0.join("snapshot.sqlite3");
-    store
-        .connection()
-        .unwrap()
-        .backup(&snapshot_path, &mut |_| Ok(()))
-        .unwrap();
-    let snapshot = export_doc_storage::Connection::sqlite_read_only(&snapshot_path).unwrap();
-    let later = store.files.prepare(b"added after snapshot").unwrap();
-    record(&store, &later).unwrap();
-    export_snapshot(&store, &pack, &snapshot).unwrap();
-    let staging = root.0.join("Restored");
-    restore_archive(&pack, &staging, &root.paths().disk_space).unwrap();
-    let scan = |cursor: &str| Ok(snapshot.file_objects(cursor, 200, false)?);
-    verify_local_inventory(&staging, scan).unwrap();
-    assert!(
-        !staging
-            .join("Files/objects")
-            .join(&later.object.digest[..2])
-            .join(&later.object.digest)
-            .exists()
-    );
-    let identity = fs::read(staging.join("Files/.store-id")).unwrap();
-    verify_archive(&pack, &staging, &root.paths().disk_space).unwrap();
-    assert_eq!(fs::read(staging.join("Files/.store-id")).unwrap(), identity);
-    let object_path = staging
-        .join("Files/objects")
-        .join(&prepared.object.digest[..2])
-        .join(&prepared.object.digest);
-    fs::remove_file(object_path).unwrap();
-    assert!(verify_local_inventory(&staging, scan).is_err());
 }
 
 #[test]

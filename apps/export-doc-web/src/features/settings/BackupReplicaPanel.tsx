@@ -11,11 +11,12 @@ export function BackupReplicaPanel({ controller: c, disabled }: { controller: Ba
   if (!c.draft || !c.status) return null;
   const { plan, webDav } = c.draft;
   const s3 = plan.s3;
-  return <section className="form-section" aria-label="异机副本">
-    <div className="section-header"><h2>异机副本</h2></div>
-    <p className="section-description">每份本地加密备份完成后，再复制到指定存储。上传失败会保留本地文件和旧备份，结果显示为“部分完成”。</p>
+  return <section className="form-section" aria-label="备份目标">
+    <div className="section-header"><h2>备份目标</h2></div>
+    <p className="section-description">恢复点直接写入所选仓库。同机备份不能抵御整机故障。</p>
     <fieldset className="settings-fieldset" disabled={disabled}>
-      <label><span>副本存储</span><select value={plan.replicaMode} onChange={(event) => c.updatePlan("replicaMode", event.target.value as "None" | "WebDav" | "S3")}><option value="None">仅保存在服务器／本机</option><option value="WebDav">WebDAV／NAS</option><option value="S3" disabled={!c.status.s3Available}>S3／兼容对象存储</option></select></label>
+      <label><span>备份存储</span><select value={plan.replicaMode} onChange={(event) => c.updatePlan("replicaMode", event.target.value as typeof plan.replicaMode)}><option value="None">服务器／本机</option><option value="Directory">已登记目录／移动硬盘</option><option value="WebDav">WebDAV／NAS</option><option value="S3" disabled={!c.status.s3Available}>S3／兼容对象存储</option></select></label>
+      {plan.replicaMode === "Directory" && <label><span>存储位置</span><select value={plan.backupLocation ?? ""} onChange={(event) => c.updatePlan("backupLocation", event.target.value)}><option value="">请选择已登记位置</option>{c.status.locations?.map(location => <option key={location.id} value={location.id}>{location.name}</option>)}</select></label>}
       {plan.replicaMode === "WebDav" && <div className="field-grid">
         <label><span>WebDAV 地址</span><input type="url" value={webDav.url} placeholder="https://nas.example.com/backups/" onChange={(event) => c.updateWebDav("url", event.target.value)} /><small>填写已存在的备份目录，支持局域网 IP。</small></label>
         <label><span>WebDAV 用户名</span><input autoComplete="off" value={webDav.userName} onChange={(event) => c.updateWebDav("userName", event.target.value)} /></label>
@@ -36,9 +37,8 @@ export function BackupReplicaPanel({ controller: c, disabled }: { controller: Ba
           <p className="settings-helper-text">长期凭证通常不需要 Session Token。临时凭证过期后需要更新。</p>
         </details>
       </>}
-      {plan.replicaMode !== "None" && <label className="checkbox-field"><input type="checkbox" checked={plan.verifyReplica} onChange={(event) => c.updatePlan("verifyReplica", event.target.checked)} /><span>上传后完整回读并校验 SHA-256（增加一次下载流量）</span></label>}
     </fieldset>
-    {plan.replicaMode !== "None" && <button className="command-button secondary" type="button" disabled={disabled || c.dirty || c.activeJob} onClick={() => c.start("test")}>测试已保存的副本存储</button>}
-    <p className="settings-helper-text">副本保存在本安装独立的子目录／前缀中。切换存储目标后，旧目标上的副本由管理员自行保留或清理。</p>
+    <button className="command-button secondary" type="button" disabled={disabled || c.dirty || c.activeJob} onClick={() => c.start("test")}>核验已保存的备份目标</button>
+    <p className="settings-helper-text">恢复凭证须在 A 之外保管。切换目标后，旧仓库继续保留；目录和移动盘须先由部署管理员登记。</p>
   </section>;
 }

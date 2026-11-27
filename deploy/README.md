@@ -15,3 +15,5 @@
 新版镜像用户通过 `docker run --rm <image> --print-compose > compose.yml` 取得配置，再执行 `docker compose up -d --wait`，无需源码或宿主脚本。旧 [scripts/run-native-docker.ps1](../scripts/run-native-docker.ps1) 保留原部署的构建、启停及维护流程；两种入口不能混用空目录接管旧卷。已有数据库卷、data/config 和 runtime 凭据必须保留。
 
 桌面包不使用 Docker；旧 deploy/container 已退役。首次启动和升级见[Docker 用户指南](../docs/Docker容器部署与启动指南.md)，数据操作见[备份迁移与恢复指南](../docs/服务器备份迁移与恢复指南.md)，参数见[脚本说明](../scripts/README.md#网页与-docker)，公开发布见[镜像说明](../docs/GitHub开源发布与Docker镜像说明.md)。
+
+2026-11-27：两份 Compose 均有独立 `maintenance` profile，默认 127.0.0.1:5189，使用独立维护 token 与数据库维护身份。只用 A 即可首次部署；外部 B/C 按需登记。现行数据库基线为 schema 19。进入维护前停止 application，详细步骤见[灾备指南](../docs/服务器备份迁移与恢复指南.md)。本批未把静态配置检查当作 Docker 实机验收。

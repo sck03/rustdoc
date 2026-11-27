@@ -171,6 +171,8 @@ pub enum Access {
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Policy {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub authentication_context: Option<&'static str>,
     pub requires_authentication: bool,
     pub requires_desktop_access: bool,
     pub requires_license: bool,

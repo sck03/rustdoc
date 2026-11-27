@@ -10,6 +10,9 @@ use unicode_normalization::UnicodeNormalization;
 mod temporary;
 pub use temporary::anonymous_file;
 mod containment;
+pub(crate) use containment::overlaps;
+mod volume;
+pub(crate) use volume::identity as volume_identity;
 
 pub const SQLITE_DATABASE_RELATIVE_PATH: &str = "Database/exportdoc-native.db";
 
@@ -43,6 +46,11 @@ impl RuntimePaths {
             || containment::overlaps(&path, &self.app_root)?
         {
             return Err("独立文件存储必须是程序和数据目录之外的现有目录。".into());
+        }
+        for existing in self.file_storage_roots.values() {
+            if containment::overlaps(existing, &path)? {
+                return Err("登记位置不能相同或相互包含，请为各用途提供独立目录。".into());
+            }
         }
         self.file_storage_roots.insert(name.into(), path);
         Ok(())

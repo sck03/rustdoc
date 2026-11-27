@@ -680,7 +680,7 @@ pub fn delete(
         auth::authorize(actor, resource.permission, "delete")?;
         let previous = store::get(transaction, resource.key, record_id)?;
         if matches!(resource.key, "rooms" | "supplies")
-            && !text(&previous, "handlingKey").is_empty()
+            && !text(&previous, "serviceId").is_empty()
             && !super::handling::can_handle(transaction, actor, &previous, resource.permission)?
         {
             return Err(error(403, "只能删除本人负责且尚无业务历史的资源。"));

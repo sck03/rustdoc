@@ -281,7 +281,10 @@ pub(super) fn finish_controlled(
                     } else {
                         "处理失败"
                     });
-                    job["errorMessage"] = json!(cause.message);
+                    let mut failure = cause.public_body(job["jobId"].as_str().unwrap_or("task"));
+                    failure["jobId"] = job["jobId"].clone();
+                    job["errorMessage"] = failure["message"].clone();
+                    job["failure"] = failure;
                 }
             }
         }

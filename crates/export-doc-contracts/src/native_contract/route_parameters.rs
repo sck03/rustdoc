@@ -1,5 +1,29 @@
 //! Shared query/path shapes. Requiredness, integer widths and bounds remain explicit.
 use super::model::*;
+pub(super) fn handling_directory() -> Vec<Parameter> {
+    vec![
+        p("category", "query", None, s().max_length(32)),
+        p("keyword", "query", None, s().max_length(100)),
+        p(
+            "state",
+            "query",
+            None,
+            s().enumeration(Enumeration::Values(vec![
+                "active".into(),
+                "inactive".into(),
+                "".into(),
+            ])),
+        ),
+        p("after", "query", None, s().max_length(100)),
+        p("selected", "query", None, s().max_length(100)),
+        p(
+            "pageSize",
+            "query",
+            None,
+            i().minimum(num("1")).maximum(num("100")),
+        ),
+    ]
+}
 pub(super) fn general_request_page() -> Vec<Parameter> {
     let mut parameters = office_request_page();
     parameters.push(p("definitionKey", "query", None, s().max_length(80)));

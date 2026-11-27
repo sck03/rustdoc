@@ -164,4 +164,87 @@ fn postgres_migration_and_physical_restore_preserve_roles_and_reject_live_instan
         "before"
     );
     service.close().unwrap();
+    drop(service);
+    let target_app = std::env::var("EXPORTDOC_TEST_RECOVERY_TARGET_APP").unwrap();
+    let target_admin = std::env::var("EXPORTDOC_TEST_RECOVERY_TARGET_MAINTENANCE").unwrap();
+    let target = Workspace::new();
+    let target_paths = target.paths();
+    fs::create_dir_all(target_paths.data_root.join("Recovery/Inbox")).unwrap();
+    fs::write(
+        target_paths
+            .data_root
+            .join("Recovery/Inbox/transfer.edmpoint"),
+        &output.content,
+    )
+    .unwrap();
+    let maintenance_paths = crate::paths::RuntimePaths {
+        app_root: paths.app_root.clone(),
+        ..target_paths.clone()
+    };
+    let recovery = super::super::maintenance::RecoveryMaintenance::open(
+        maintenance_paths,
+        target_admin.clone(),
+        target_app.clone(),
+        "native_owner".into(),
+    )
+    .unwrap();
+    assert!(
+        NativeService::open_postgres(
+            target_paths.clone(),
+            &target_app,
+            "a".repeat(32),
+            Default::default()
+        )
+        .is_err()
+    );
+    let run = |operation: &str, body: Value| {
+        recovery.start(operation, body).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(120);
+        loop {
+            let state = recovery.status().unwrap();
+            if !matches!(
+                state["state"].as_str(),
+                Some("Preparing" | "Preflight" | "ApplyingFiles" | "Committing")
+            ) {
+                assert_ne!(state["state"], "Failed", "{state}");
+                return state;
+            }
+            assert!(Instant::now() < deadline, "maintenance timed out: {state}");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    };
+    let state = run(
+        "UnlockRecoveryRepository",
+        json!({"repositoryId":"","sourceKind":"Directory","locationId":"","portableFile":"transfer.edmpoint","password":"Migration-password-2026","oldInstanceIsolated":true}),
+    );
+    let point = state["points"][0]["id"].clone();
+    assert!(point.is_string(), "{state}");
+    let plan = run(
+        "PreflightRecoveryPoint",
+        json!({"pointId":point,"fileMode":"Local","targetLocation":""}),
+    );
+    assert_eq!(plan["state"], "Ready", "{plan}");
+    let done = run("ApplyRecoveryPoint", json!({"planId":plan["planId"]}));
+    assert_eq!(done["state"], "Completed", "{done}");
+    recovery.close().unwrap();
+    drop(recovery);
+    let restored = NativeService::open_postgres(
+        target_paths,
+        &target_app,
+        "a".repeat(32),
+        Default::default(),
+    )
+    .unwrap();
+    assert_eq!(
+        restored.store.settings("restore-test").unwrap().unwrap()["value"],
+        "before"
+    );
+    restored
+        .store
+        .read(|tx| {
+            tx.verify_file_accounting()?;
+            Ok(())
+        })
+        .unwrap();
+    restored.close().unwrap();
 }

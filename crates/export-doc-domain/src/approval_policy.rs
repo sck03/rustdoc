@@ -110,6 +110,9 @@ pub struct SubflowReference {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ApprovalRule {
+    #[serde(default = "crate::general_request::default_requirements")]
+    pub general_handling:
+        std::collections::BTreeMap<String, crate::general_request::HandlingRequirement>,
     #[serde(default)]
     pub form: Option<crate::oa_form::FormDefinition>,
     #[serde(default)]
@@ -231,6 +234,9 @@ impl ApprovalRule {
         Ok(excluded)
     }
     pub fn validate(&self) -> Result<(), String> {
+        if self.kind == "general" {
+            crate::general_request::validate_requirements(&self.general_handling)?;
+        }
         self.check(true)
     }
     pub fn validate_draft(&self) -> Result<(), String> {
@@ -530,6 +536,7 @@ impl ApprovalRule {
                     }
                     ConditionField::PersonnelAction => self.kind == "personnel",
                     ConditionField::Category => matches!(self.kind.as_str(), "general" | "leave"),
+                    ConditionField::ServiceId => self.kind == "general",
                     ConditionField::Department => true,
                     ConditionField::Returnable => self.kind == "supply",
                     ConditionField::FormText | ConditionField::FormNumber => {

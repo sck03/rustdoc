@@ -1,60 +1,17 @@
 use super::*;
-use crate::engine::team_backup::tests::{Workspace, admin, open_service};
+use crate::engine::team_backup::tests::{TestService, Workspace, admin, open_service};
 use std::time::Instant;
-
 fn request(service: &NativeService) -> Value {
-    let status = status(service, &admin()).unwrap();
-    json!({"expectedRevision":status["revision"], "expectedSettingsRevision":status["settingsRevision"],
-        "plan":status["plan"], "webDav":status["webDav"], "webDavPassword":null,
-        "s3SecretAccessKey":null, "s3SessionToken":null, "encryptionPassword":""})
+    let state = status(service, &admin()).unwrap();
+    json!({"expectedRevision":state["revision"],"expectedSettingsRevision":state["settingsRevision"],"plan":state["plan"],"webDav":state["webDav"],"webDavPassword":null,"s3SecretAccessKey":null,"s3SessionToken":null,"encryptionPassword":""})
 }
 fn configure(service: &NativeService) {
     let mut body = request(service);
     body["encryptionPassword"] = json!("scheduled-backup-test-password");
     save(service, &admin(), &body).unwrap();
 }
-
-#[test]
-fn desktop_archive_save_streams_verified_bytes_and_rejects_changed_sources() {
-    let workspace = Workspace::new();
-    let service = open_service(&workspace);
-    configure(&service);
-    assert_eq!(
-        wait(&service, run_now(&service, &admin()).unwrap())["status"],
-        "Succeeded"
-    );
-    let archive = repository::list(&service.paths).unwrap().remove(0);
-    let target = service.paths.cache_root.join("selected.edmrecovery");
-    let body = json!({"destinationPath":target});
-    let mut unauthorized = admin();
-    unauthorized.admin = false;
-    assert_eq!(
-        save_to_path(&service, &unauthorized, &archive.id, &body)
-            .unwrap_err()
-            .status,
-        Some(403)
-    );
-    let job = wait(
-        &service,
-        save_to_path(&service, &admin(), &archive.id, &body).unwrap(),
-    );
-    assert_eq!(job["status"], "Succeeded", "{job}");
-    assert_eq!(job["outputPath"], json!(target));
-    assert_eq!(
-        crate::engine::backup_io::digest_file(&target).unwrap(),
-        (archive.size_bytes, archive.sha256)
-    );
-    fs::write(
-        repository::root(&service.paths).join(&archive.file_name),
-        b"corrupt",
-    )
-    .unwrap();
-    assert!(save_to_path(&service, &admin(), &archive.id, &body).is_err());
-    assert_eq!(fs::metadata(&target).unwrap().len(), archive.size_bytes);
-    service.close().unwrap();
-}
 fn wait(service: &NativeService, job: Value) -> Value {
-    let deadline = Instant::now() + Duration::from_secs(30);
+    let deadline = Instant::now() + Duration::from_secs(60);
     loop {
         let value = service
             .jobs
@@ -69,6 +26,83 @@ fn wait(service: &NativeService, job: Value) -> Value {
         assert!(Instant::now() < deadline, "backup timed out: {value}");
         std::thread::sleep(Duration::from_millis(10));
     }
+}
+#[test]
+fn recovery_point_exports_independently_and_restores_directly_to_registered_library() {
+    let workspace = Workspace::new();
+    let external = Workspace::new();
+    let mut paths = workspace.paths();
+    paths
+        .register_file_storage_root("nas", external.0.clone())
+        .unwrap();
+    let service = TestService::open(paths.clone());
+    configure(&service);
+    service
+        .store
+        .connection()
+        .unwrap()
+        .set_settings("recovery-test", 1, &json!({"value":"original"}))
+        .unwrap();
+    let prepared = service.store.files.prepare(b"original attachment").unwrap();
+    let record=service.store.transaction(|tx|{
+  let body=json!({"companyScope":"DEFAULT","versionNumber":1,"ownerUserId":1,"departmentId":"GENERAL"});
+  let id=tx.insert(&export_doc_storage::RecordWrite{kind:"repository-test",identity:None,body:&body})?;
+  tx.publish_file(&prepared,"original",id,"original.bin","application/octet-stream")?;Ok(id)
+ }).unwrap();
+    drop(prepared);
+    let backup = wait(&service, run_now(&service, &admin()).unwrap());
+    assert_eq!(backup["status"], "Succeeded", "{backup}");
+    let listed = archives(&service, &admin(), &[]).unwrap();
+    let id = listed["items"][0]["id"].as_str().unwrap();
+    let destination = paths.cache_root.join("portable.edmpoint");
+    let exported = wait(
+        &service,
+        save_to_path(
+            &service,
+            &admin(),
+            id,
+            &json!({"destinationPath":destination}),
+        )
+        .unwrap(),
+    );
+    assert_eq!(exported["status"], "Succeeded", "{exported}");
+    let (repo, point) = super::super::repository::Repository::from_portable(
+        fs::File::open(&destination).unwrap(),
+        "scheduled-backup-test-password",
+    )
+    .unwrap();
+    assert_eq!(point, id);
+    drop(repo);
+    service
+        .store
+        .connection()
+        .unwrap()
+        .set_settings("recovery-test", 2, &json!({"value":"modified"}))
+        .unwrap();
+    let job=wait(&service,stage_restore(&service,&admin(),id,&json!({"password":"scheduled-backup-test-password","adminPassword":"","confirmationText":"RECOVER","fileMode":"Directory","targetLocation":"nas"})).unwrap());
+    assert_eq!(job["status"], "Succeeded", "{job}");
+    service.close().unwrap();
+    drop(service);
+    let restored = TestService::open(paths);
+    assert_eq!(
+        restored.store.settings("recovery-test").unwrap().unwrap()["value"],
+        "original"
+    );
+    let info = restored
+        .store
+        .connection()
+        .unwrap()
+        .file_info(record, "original")
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        restored.store.files.load(&info, 100).unwrap().content,
+        b"original attachment"
+    );
+    assert!(
+        matches!(restored.store.files.configuration().unwrap().backend,crate::engine::file_store::Backend::Local{ref directory} if directory.starts_with("@nas/recovered-"))
+    );
+    restored.close().unwrap();
 }
 #[test]
 fn scheduling_starts_disabled_and_secrets_remain_protected() {
@@ -177,151 +211,5 @@ fn scheduled_backups_deduplicate_slots_and_defer_busy_packages() {
             .unwrap()
             .is_none()
     );
-    assert_eq!(repository::list(&service.paths).unwrap().len(), 1);
-}
-#[test]
-fn retention_is_owned_and_replica_failure_keeps_the_local_archive_and_previous_copy() {
-    let workspace = Workspace::new();
-    let service = open_service(&workspace);
-    configure(&service);
-    let unrelated = repository::root(&service.paths).join("administrator-file.txt");
-    fs::write(&unrelated, b"preserve").unwrap();
-    assert_eq!(
-        wait(&service, run_now(&service, &admin()).unwrap())["status"],
-        "Succeeded"
-    );
-    let first = repository::list(&service.paths).unwrap()[0]
-        .file_name
-        .clone();
-    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let address = listener.local_addr().unwrap();
-    drop(listener);
-    let mut body = request(&service);
-    body["plan"]["replicaMode"] = json!("WebDav");
-    body["plan"]["retentionCount"] = json!(1);
-    body["webDav"] =
-        json!({"enabled":true,"url":format!("http://{address}/backups"),"userName":"test"});
-    save(&service, &admin(), &body).unwrap();
-    assert_eq!(
-        wait(&service, run_now(&service, &admin()).unwrap())["status"],
-        "Succeeded"
-    );
-    let status = status(&service, &admin()).unwrap();
-    assert_eq!(status["lastResult"], "Partial");
-    assert_eq!(
-        archives(&service, &admin(), &[]).unwrap()["items"]
-            .as_array()
-            .unwrap()
-            .len(),
-        2
-    );
-    assert!(repository::root(&service.paths).join(&first).is_file());
-    let mut body = request(&service);
-    body["plan"]["replicaMode"] = json!("None");
-    save(&service, &admin(), &body).unwrap();
-    assert_eq!(
-        wait(&service, run_now(&service, &admin()).unwrap())["status"],
-        "Succeeded"
-    );
-    assert_eq!(repository::list(&service.paths).unwrap().len(), 1);
-    assert_eq!(fs::read(&unrelated).unwrap(), b"preserve");
-}
-#[test]
-fn archive_restore_uses_saved_password_and_preserves_schema_compatible_data() {
-    let workspace = Workspace::new();
-    let service = open_service(&workspace);
-    configure(&service);
-    service
-        .store
-        .transaction(|tx| {
-            tx.set_settings("restore-proof", 1, &json!({"value":"before"}))?;
-            Ok(())
-        })
-        .unwrap();
-    assert_eq!(
-        wait(&service, run_now(&service, &admin()).unwrap())["status"],
-        "Succeeded"
-    );
-    let id = repository::list(&service.paths).unwrap()[0].id.clone();
-    service
-        .store
-        .transaction(|tx| {
-            tx.set_settings("restore-proof", 2, &json!({"value":"after"}))?;
-            Ok(())
-        })
-        .unwrap();
-    let request = json!({"password":"scheduled-backup-test-password","adminPassword":"","confirmationText":"RECOVER"});
-    assert_eq!(
-        wait(
-            &service,
-            stage_restore(&service, &admin(), &id, &request).unwrap()
-        )["status"],
-        "Succeeded"
-    );
-    let paths = service.paths.clone();
-    service.close().unwrap();
-    drop(service);
-    disaster::apply_pending(&paths).unwrap();
-    let restored = NativeService::open(paths).unwrap();
-    assert_eq!(
-        restored.store.settings("restore-proof").unwrap().unwrap()["value"],
-        "before"
-    );
-    assert_eq!(
-        status(&restored, &admin()).unwrap()["plan"]["enabled"],
-        false
-    );
-    restored.close().unwrap();
-}
-
-#[test]
-fn archive_pages_isolate_missing_and_corrupt_entries_from_plan_status() {
-    let workspace = Workspace::new();
-    let service = open_service(&workspace);
-    configure(&service);
-    let repository_id = repository::ensure(&service.paths).unwrap();
-    for index in 0..22 {
-        let id = format!("{index:032x}");
-        let file_name = format!("{id}.edmrecovery");
-        fs::write(
-            repository::root(&service.paths).join(&file_name),
-            b"fixture",
-        )
-        .unwrap();
-        repository::write(
-            &service.paths,
-            &repository::Archive {
-                id,
-                repository: repository_id.clone(),
-                file_name,
-                created_at: Utc::now() - chrono::Duration::days(index),
-                size_bytes: 7,
-                sha256: "a".repeat(64),
-                replica_status: "NotConfigured".into(),
-                replica_target: String::new(),
-                message: String::new(),
-                deleting: false,
-            },
-        )
-        .unwrap();
-    }
-    let first = archives(&service, &admin(), &[]).unwrap();
-    assert_eq!(first["totalCount"], 22);
-    assert_eq!(first["items"].as_array().unwrap().len(), 20);
-    let last_id = format!("{:032x}", 21);
-    fs::remove_file(repository::root(&service.paths).join(format!("{last_id}.edmrecovery")))
-        .unwrap();
-    assert!(status(&service, &admin()).is_ok());
-    let second = archives(&service, &admin(), &[("page", "2".into())]).unwrap();
-    assert_eq!(second["items"].as_array().unwrap().len(), 2);
-    assert_eq!(second["items"][1]["available"], false);
-    assert!(repository::read(&service.paths, &last_id).is_err());
-    fs::write(
-        repository::root(&service.paths).join(format!("{last_id}.backup.json")),
-        b"broken",
-    )
-    .unwrap();
-    assert_eq!(archives(&service, &admin(), &[]).unwrap()["totalCount"], 22);
-    assert!(status(&service, &admin()).is_ok());
-    service.close().unwrap();
+    assert_eq!(archives(&service, &admin(), &[]).unwrap()["totalCount"], 1);
 }

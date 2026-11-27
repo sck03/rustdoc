@@ -50,7 +50,7 @@ pub(in crate::engine) fn status(service: &NativeService, actor: &Actor) -> Resul
         }
     }
     Ok(
-        json!({"revision": saved.revision, "settingsRevision": settings["revision"], "plan": saved.plan,
+        json!({"revision": saved.revision, "settingsRevision": settings["revision"], "plan": saved.plan,"repositoryId":saved.repository,"locations":service.paths.file_storage_roots.keys().map(|id|json!({"id":id,"name":id})).collect::<Vec<_>>(),
         "webDav": webdav(&settings), "webDavPasswordSet": protected["/webDav/password"].as_str().is_some_and(|value| !value.is_empty()),
         "s3SecretAccessKeySet": !saved.s3_secret.is_empty(), "s3SessionTokenSet": !saved.s3_token.is_empty(), "s3Available": cfg!(feature = "s3-backup"),
         "encryptionPasswordSet": !saved.password.is_empty(), "timeZone": service.clock.now().map_err(invalid)?.time_zone,
@@ -91,7 +91,7 @@ pub(in crate::engine) fn save(
         service.store.transaction_as(actor, |tx, actor| {
             administrator(actor)?;
             let old: SavedPlan = tx.settings(PLAN)?.map(serde_json::from_value).transpose()
-                .map_err(|_| unavailable("日常灾备设置损坏。"))?.unwrap_or_default();
+                .map_err(|_| unavailable("日常灾备设置损坏。").coded(crate::api::ErrorCode::DependencyUnavailable))?.unwrap_or_default();
             if body["expectedRevision"].as_i64() != Some(old.revision) {
                 return Err(crate::engine::error::concurrency("日常灾备计划已被修改，请重新加载后核对。"));
             }
@@ -99,6 +99,9 @@ pub(in crate::engine) fn save(
             let revision = settings["revision"].as_i64().unwrap_or(0);
             if body["expectedSettingsRevision"].as_i64() != Some(revision) {
                 return Err(crate::engine::error::concurrency("系统连接配置已被修改，请重新加载后核对。"));
+            }
+            if !password.is_empty() && !old.password.is_empty() && service.protector.unprotect(PASSWORD,&old.password).map_err(unavailable)?.as_str()!=password {
+                return Err(invalid("此仓库已有恢复凭证。请使用原凭证；更换凭证须在仓库维护中重新包裹根密钥，不能仅修改计划密码。"));
             }
             let password = if password.is_empty() { old.password } else { service.protector.protect(PASSWORD, password).map_err(unavailable)? };
             if plan.enabled && password.is_empty() { return Err(invalid("启用前请设置并单独保管灾备包密码。")); }
@@ -109,7 +112,7 @@ pub(in crate::engine) fn save(
             let s3_token = retained_secret(service, S3_TOKEN, &old.s3_token, &body["s3SessionToken"])?;
             if plan.replica_mode == "S3" && s3_secret.is_empty() { return Err(invalid("请填写 S3 密钥。")); }
             let mut protected = tx.settings("protected-credentials")?.unwrap_or_else(|| json!({}));
-            if !protected.is_object() { return Err(unavailable("加密凭证存储损坏。")); }
+            if !protected.is_object() { return Err(unavailable("加密凭证存储损坏。").coded(crate::api::ErrorCode::DependencyUnavailable)); }
             let old_webdav = webdav(&settings);
             for key in ["enabled", "url", "userName"] { settings["webDav"][key] = body["webDav"][key].clone(); }
             if !body["webDavPassword"].is_null() {
@@ -120,8 +123,11 @@ pub(in crate::engine) fn save(
                 settings["revision"] = json!(revision + 1);
                 tx.set_settings("settings", revision + 1, &settings)?;
             }
-            let repository = repository::ensure(&service.paths)?;
-            let saved = SavedPlan { revision: old.revision + 1, owner: actor.id, password, s3_secret, s3_token, repository, plan: plan.clone() };
+            let repository = if old.repository.is_empty(){crate::paths::nonce().map_err(unavailable)?}else{old.repository};
+            let writer_identity = if old.writer_identity.is_empty(){crate::paths::nonce().map_err(unavailable)?}else{old.writer_identity};
+            let medium_identity = points::medium(&service.paths,&plan)?;
+            if old.plan.replica_mode==plan.replica_mode && old.plan.backup_location==plan.backup_location && !old.medium_identity.is_empty() && old.medium_identity!=medium_identity {return Err(invalid("备份介质身份改变，请先接回原设备并核验仓库，不能自动重新登记替代设备。"));}
+            let saved = SavedPlan { revision: old.revision + 1, owner: actor.id, password, s3_secret, s3_token, repository, writer_identity, medium_identity, plan: plan.clone() };
             tx.set_settings(PLAN, saved.revision, &serde_json::to_value(&saved)?)?;
             tx.append_audit_details(&AuditWrite { kind: "backup-plan", record_id: 0, version: saved.revision, action: "configure", actor_id: actor.id,
                 occurred_at: &store::timestamp(), note: "" }, &json!({"enabled": plan.enabled, "frequency": plan.frequency, "replicaMode": plan.replica_mode}))?;

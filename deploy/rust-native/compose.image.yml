@@ -98,6 +98,27 @@ services:
     depends_on:
       postgres: {condition: service_healthy}
     networks: [database]
+  maintenance:
+    container_name: '${COMPOSE_PROJECT_NAME}-maintenance'
+    <<: *restricted
+    image: *image
+    profiles: [maintenance]
+    command: [--app-root, /opt/exportdoc, --data-root, /var/lib/exportdoc, --web-root, /opt/exportdoc/Web, --bind, '0.0.0.0:5189', --maintenance-web]
+    environment:
+      EXPORTDOCMANAGER_POSTGRES_CONNECTION_FILE: /run/exportdoc/app-connection.txt
+      EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_CONNECTION_FILE: /run/exportdoc-maintenance/maintenance-connection.txt
+      EXPORTDOCMANAGER_MAINTENANCE_TOKEN_FILE: /run/exportdoc-maintenance/maintenance-token.txt
+      EXPORTDOCMANAGER_POSTGRES_OWNER: exportdoc_owner
+    volumes:
+      - ./data:/var/lib/exportdoc
+      - ./config/application:/run/exportdoc:ro
+      - ./config/maintenance:/run/exportdoc-maintenance:ro
+    ports:
+      - '${NATIVE_MAINTENANCE_BIND_ADDRESS:-127.0.0.1}:${NATIVE_MAINTENANCE_PORT:-5189}:5189'
+    depends_on:
+      postgres: {condition: service_healthy}
+    stop_grace_period: 210s
+    networks: [database, web]
 volumes:
   postgres_data:
 networks:

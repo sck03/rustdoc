@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 pub(super) mod admin;
 mod archive;
 mod cache;
+pub(super) mod capacity;
+mod cleanup;
 mod credentials;
 mod flights;
 pub(super) mod incremental;
@@ -15,13 +17,10 @@ mod journal;
 mod migration;
 pub(super) mod policy;
 mod remote;
+pub(super) mod retention;
 #[cfg(test)]
 mod tests;
 mod verification;
-pub(super) use archive::verify_local_inventory;
-pub(super) use archive::{
-    export as export_archive, export_snapshot, restore_archive, verify_archive,
-};
 use std::{
     fs,
     io::{Read, Seek, SeekFrom, Write},
@@ -66,8 +65,17 @@ pub struct Configuration {
     pub revision: u64,
     pub credential_revision: u64,
     pub identity: String,
+    pub medium_identity: String,
     pub backend: Backend,
     pub policy: Policy,
+    #[serde(default)]
+    pub archive_locations: std::collections::BTreeMap<String, Option<ArchiveLocation>>,
+}
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ArchiveLocation {
+    pub directory: String,
+    pub medium_identity: String,
 }
 pub struct PreparedObject {
     pub object: FileObject,
@@ -87,6 +95,7 @@ pub struct FileStore {
     protector: crate::secrets::Protector,
     state: RwLock<Configuration>,
     uploads: journal::Uploads,
+    pub(in crate::engine) archive_access: super::operation_lock::OperationLock<()>,
     space: std::sync::Arc<crate::temporary_space::Budget>,
     downloads: cache::Cache,
     #[cfg(feature = "s3-storage")]
@@ -102,9 +111,13 @@ impl FileStore {
         let config: Configuration = if path.try_exists()? {
             let file = fs::File::open(&path)?;
             if file.metadata()?.len() > 64 * 1024 {
-                return Err(unavailable("文件存储配置过大。"));
+                return Err(unavailable("文件存储配置过大。")
+                    .coded(crate::api::ErrorCode::DependencyUnavailable));
             }
-            serde_json::from_reader(file).map_err(|_| unavailable("文件存储配置损坏。"))?
+            serde_json::from_reader(file).map_err(|_| {
+                unavailable("文件存储配置损坏。")
+                    .coded(crate::api::ErrorCode::DependencyUnavailable)
+            })?
         } else {
             if registered {
                 return Err(unavailable(
@@ -112,20 +125,23 @@ impl FileStore {
                 ));
             }
             let config = Configuration {
-                version: 1,
+                version: 2,
                 revision: 1,
                 credential_revision: 1,
                 identity: paths::nonce().map_err(unavailable)?,
+                medium_identity: paths::volume_identity(&paths.data_root).map_err(unavailable)?,
                 backend: Backend::Local {
                     directory: "Files".into(),
                 },
                 policy: Policy::default(),
+                archive_locations: Default::default(),
             };
             crate::secrets::private_directory(path.parent().unwrap()).map_err(unavailable)?;
             let root = paths.data_root.join("Files");
             paths::ensure_safe_absolute(&root).map_err(unavailable)?;
             if root.try_exists()? && fs::read_dir(&root)?.next().is_some() {
-                return Err(unavailable("文件存储缺少配置，不能接管现有文件目录。"));
+                return Err(unavailable("文件存储缺少配置，不能接管现有文件目录。")
+                    .coded(crate::api::ErrorCode::DependencyUnavailable));
             }
             crate::secrets::private_directory(&root).map_err(unavailable)?;
             paths::atomic_write(&root.join(".store-id"), config.identity.as_bytes())
@@ -133,11 +149,12 @@ impl FileStore {
             paths::atomic_write(&path, &serde_json::to_vec(&config)?).map_err(unavailable)?;
             config
         };
-        if config.version != 1
+        if config.version != 2
             || config.identity.len() != 32
             || !config.identity.bytes().all(|c| c.is_ascii_hexdigit())
         {
-            return Err(unavailable("文件存储身份无效。"));
+            return Err(unavailable("文件存储身份无效。")
+                .coded(crate::api::ErrorCode::DependencyUnavailable));
         }
         config.policy.validate()?;
         let store = Self {
@@ -148,6 +165,7 @@ impl FileStore {
             protector: crate::secrets::Protector::new(&paths.data_root),
             state: RwLock::new(config),
             uploads: Default::default(),
+            archive_access: Default::default(),
             space: paths.disk_space.clone(),
             downloads: cache::Cache::open(&paths.cache_root.join("FileDownloads"))?,
             #[cfg(feature = "s3-storage")]
@@ -168,22 +186,30 @@ impl FileStore {
         Ok(store)
     }
     pub fn configuration(&self) -> Result<Configuration> {
-        self.state
-            .read()
-            .map(|s| s.clone())
-            .map_err(|_| unavailable("文件存储状态异常。"))
+        self.state.read().map(|s| s.clone()).map_err(|_| {
+            unavailable("文件存储状态异常。").coded(crate::api::ErrorCode::DependencyUnavailable)
+        })
     }
     fn local_identity(&self, config: &Configuration) -> Result<()> {
         let root = self.local_root(config)?;
+        let current = paths::volume_identity(&root)
+            .map_err(|message| unavailable(message).coded(crate::api::ErrorCode::StoreIdentity))?;
+        if current != config.medium_identity {
+            return Err(unavailable("文件库所在介质已改变或挂载已丢失，已停止文件读写。请接回原设备并核对存储位置，禁止在空挂载目录继续业务。").coded(crate::api::ErrorCode::StoreIdentity));
+        }
         let marker = root.join(".store-id");
         paths::ensure_safe_absolute(&marker).map_err(unavailable)?;
         let mut bytes = Vec::new();
         fs::File::open(marker)
-            .map_err(|_| unavailable("文件存储未挂载或身份标记缺失。"))?
+            .map_err(|_| {
+                unavailable("文件存储未挂载或身份标记缺失。")
+                    .coded(crate::api::ErrorCode::DependencyUnavailable)
+            })?
             .take(65)
             .read_to_end(&mut bytes)?;
         if bytes != config.identity.as_bytes() {
-            return Err(unavailable("文件存储身份不匹配。"));
+            return Err(unavailable("文件存储身份不匹配。")
+                .coded(crate::api::ErrorCode::DependencyUnavailable));
         }
         Ok(())
     }
@@ -218,14 +244,15 @@ impl FileStore {
         let state = self.configuration()?;
         self.check_identity(&state)
     }
-    fn check_identity(&self, state: &Configuration) -> Result<()> {
+    pub(in crate::engine) fn check_identity(&self, state: &Configuration) -> Result<()> {
         match &state.backend {
             Backend::Local { .. } => self.local_identity(&state),
             Backend::S3 { .. } => {
                 let mut marker = Vec::new();
                 self.target(state)?.download("store-id", &mut marker, 64)?;
                 if marker != state.identity.as_bytes() {
-                    return Err(unavailable("S3 文件存储身份不匹配。"));
+                    return Err(unavailable("S3 文件存储身份不匹配。")
+                        .coded(crate::api::ErrorCode::DependencyUnavailable));
                 }
                 Ok(())
             }
@@ -242,7 +269,7 @@ impl FileStore {
                 return Ok(());
             }
             for object in objects {
-                self.open_object(&object)?;
+                self.stream_object(&object, &mut std::io::sink())?;
                 cursor = object.digest;
             }
         }
@@ -253,12 +280,13 @@ impl FileStore {
         };
         let (base, directory) = if let Some(alias) = directory.strip_prefix('@') {
             let (name, relative) = alias.split_once('/').unwrap_or((alias, ""));
-            let base = self
-                .roots
-                .get(name)
-                .ok_or_else(|| unavailable("独立文件存储位置未在启动配置中登记。"))?;
+            let base = self.roots.get(name).ok_or_else(|| {
+                unavailable("独立文件存储位置未在启动配置中登记。")
+                    .coded(crate::api::ErrorCode::DependencyUnavailable)
+            })?;
             if !base.is_dir() {
-                return Err(unavailable("独立文件存储未挂载。"));
+                return Err(unavailable("独立文件存储未挂载。")
+                    .coded(crate::api::ErrorCode::DependencyUnavailable));
             }
             (base, relative)
         } else {
@@ -312,7 +340,11 @@ impl FileStore {
         let config = self.configuration()?;
         input.seek(SeekFrom::Start(0))?;
         let (size, digest) = super::backup_io::copy_and_hash(input, &mut std::io::sink(), limit)?;
-        let object = FileObject { size, digest };
+        let object = FileObject {
+            size,
+            digest,
+            archive_identity: String::new(),
+        };
         validate(&object)?;
         let lease = self.begin_upload(&config, &object)?;
         input.seek(SeekFrom::Start(0))?;
@@ -366,7 +398,7 @@ impl FileStore {
     }
     pub fn open_object(&self, object: &FileObject) -> Result<fs::File> {
         validate(object)?;
-        let config = self.configuration()?;
+        let config = self.object_configuration(object)?;
         match &config.backend {
             Backend::Local { .. } => {
                 self.local_identity(&config)?;
@@ -374,6 +406,39 @@ impl FileStore {
             }
             Backend::S3 { .. } => self.downloads.download(self, &config, object),
         }
+    }
+    /// Unpublished backup bytes are validated at the sink, without filling the download cache.
+    pub(in crate::engine) fn stream_object(
+        &self,
+        object: &FileObject,
+        output: &mut impl Write,
+    ) -> Result<()> {
+        validate(object)?;
+        let config = self.object_configuration(object)?;
+        self.check_identity(&config)?;
+        let actual = match &config.backend {
+            Backend::Local { .. } => super::backup_io::copy_and_hash(
+                &mut fs::File::open(self.object_path(&config, object)?)?,
+                output,
+                object.size,
+            )?,
+            Backend::S3 { .. } => {
+                #[cfg(feature = "s3-storage")]
+                {
+                    self.target(&config)?
+                        .download(&object.digest, output, object.size)?
+                }
+                #[cfg(not(feature = "s3-storage"))]
+                {
+                    return Err(super::error::unsupported("此构建未包含 S3 文件存储模块。"));
+                }
+            }
+        };
+        if actual != (object.size, object.digest.clone()) {
+            return Err(unavailable("备份对象长度或摘要不符，未发布本次恢复包。")
+                .coded(crate::api::ErrorCode::ObjectIntegrity));
+        }
+        Ok(())
     }
     pub fn load(&self, info: &FileInfo, limit: usize) -> Result<super::tasks::FileOutput> {
         if info.object.size > limit as u64 {
@@ -405,7 +470,8 @@ fn validate(object: &FileObject) -> Result<()> {
             .bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
     {
-        return Err(unavailable("文件对象长度或摘要无效。"));
+        return Err(unavailable("文件对象长度或摘要无效。")
+            .coded(crate::api::ErrorCode::DependencyUnavailable));
     }
     Ok(())
 }
@@ -414,7 +480,8 @@ fn verify(file: &mut fs::File, object: &FileObject) -> Result<()> {
         || super::backup_io::copy_and_hash(file, &mut std::io::sink(), object.size)?
             != (object.size, object.digest.clone())
     {
-        return Err(unavailable("文件对象完整性校验失败。"));
+        return Err(unavailable("文件对象完整性校验失败。")
+            .coded(crate::api::ErrorCode::DependencyUnavailable));
     }
     Ok(())
 }

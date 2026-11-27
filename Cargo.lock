@@ -1608,6 +1608,7 @@ dependencies = [
  "export-doc-storage",
  "fs2",
  "getrandom 0.4.3",
+ "hmac",
  "image",
  "libc",
  "pbkdf2",

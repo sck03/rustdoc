@@ -153,7 +153,7 @@ pub fn exercise(service: &NativeService, root: &str) {
         super::oa_contract::workflow::save_settings(service, &admin, body).unwrap()
     };
     policy = super::oa_contract::workflow::publish_builtins(service, &admin, policy);
-    let body = |category: &str, key: &str| json!({"requestKey":nonce().unwrap(),"title":format!("{category}分工测试"),"reason":"审批后专岗办理","category":category,"handlingKey":key});
+    let body = |category: &str, key: &str| json!({"requestKey":nonce().unwrap(),"title":format!("{category}分工测试"),"reason":"审批后专岗办理","category":category,"serviceId":key});
     let draft = call(
         service,
         &applicant,
@@ -255,7 +255,12 @@ pub fn exercise(service: &NativeService, root: &str) {
         &applicant,
     );
     assert!(proof.is_err(), "approved attachments remain frozen");
-    policy["handlingServices"][0]["handlerUserIds"] = json!([users[3]["id"]]);
+    policy["handlingServices"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|row| row["key"] == "seal")
+        .unwrap()["handlerUserIds"] = json!([users[3]["id"]]);
     policy = save_policy(policy);
     assert_eq!(
         call(service, &seal, operation("general", "get"), id, None)
@@ -300,7 +305,7 @@ pub fn exercise(service: &NativeService, root: &str) {
         ("garment", "借用样品色卡", &supplies, &seal),
     ] {
         let returnable = key == "garment";
-        let supply = call(service,&admin,CREATE_OFFICE_SUPPLY,0,Some(json!({"name":name,"unit":"件","minimumStock":0,"isActive":true,"isReturnable":returnable,"handlingKey":key}))).unwrap();
+        let supply = call(service,&admin,CREATE_OFFICE_SUPPLY,0,Some(json!({"name":name,"unit":"件","minimumStock":0,"isActive":true,"isReturnable":returnable,"serviceId":key}))).unwrap();
         let supply_id = supply["id"].as_i64().unwrap();
         let catalog = list(service, &applicant, LIST_OFFICE_SUPPLIES, &[]);
         assert!(

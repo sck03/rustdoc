@@ -6,9 +6,9 @@ use super::{
 };
 use crate::generated_api::{
     DOWNLOAD_JOB_RESULT, DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET,
-    DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET, DOWNLOAD_REPORT_TEMPLATE_FILE,
-    DOWNLOAD_REPORT_TEMPLATE_PACKAGE, DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE,
-    DOWNLOAD_SUPPORT_PACKAGE, Operation,
+    DOWNLOAD_REPORT_TEMPLATE_FILE, DOWNLOAD_REPORT_TEMPLATE_PACKAGE,
+    DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE, DOWNLOAD_RETAINED_FILE, DOWNLOAD_SUPPORT_PACKAGE,
+    Operation,
 };
 mod generated;
 
@@ -36,6 +36,9 @@ impl NativeService {
     ) -> Result<export_doc_storage::FileInfo> {
         use crate::generated_api::{DOWNLOAD_BUSINESS_ATTACHMENT, DOWNLOAD_PERSONNEL_ATTACHMENT};
         self.with_download_access(operation, token, |actor| match operation {
+            DOWNLOAD_RETAINED_FILE => {
+                super::file_store::retention::download_info(&self.store, actor, parameters)
+            }
             DOWNLOAD_BUSINESS_ATTACHMENT => {
                 let id = super::records::id(parameters)?;
                 let revision = super::request_values::find(parameters, "revision")
@@ -65,8 +68,19 @@ impl NativeService {
         parameters: &[(&str, String)],
         token: &str,
     ) -> Result<backup_io::Download> {
+        // Keep metadata capture and opening the immutable object in the same archive generation.
+        let _archive_read = self
+            .store
+            .files
+            .archive_access
+            .read(std::time::Duration::from_secs(30))?;
         use crate::generated_api::{DOWNLOAD_BUSINESS_ATTACHMENT, DOWNLOAD_PERSONNEL_ATTACHMENT};
-        if [DOWNLOAD_BUSINESS_ATTACHMENT, DOWNLOAD_PERSONNEL_ATTACHMENT].contains(&operation)
+        if [
+            DOWNLOAD_BUSINESS_ATTACHMENT,
+            DOWNLOAD_PERSONNEL_ATTACHMENT,
+            DOWNLOAD_RETAINED_FILE,
+        ]
+        .contains(&operation)
             || super::oa::is_download(operation)
                 && super::oa::metadata(operation).is_some_and(|m| m["action"] == "download")
             || super::communication::is_download(operation)
@@ -152,12 +166,9 @@ impl NativeService {
         parameters: &[(&str, String)],
         token: &str,
     ) -> Result<backup_io::Download> {
-        self.with_download_access(operation, token, |actor| match operation {
+        self.with_download_access(operation, token, |_actor| match operation {
             DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET => {
                 team_backup::postgres::prepare_download(self, parameters)
-            }
-            DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET => {
-                team_backup::scheduled::download(self, actor, parameters)
             }
             _ => Err(unsupported("此操作不是备份下载。")),
         })

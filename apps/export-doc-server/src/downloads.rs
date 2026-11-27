@@ -4,7 +4,7 @@ use axum::http::HeaderMap;
 use export_doc_contracts::generated_api::{
     DOWNLOAD_BUSINESS_ATTACHMENT, DOWNLOAD_BUSINESS_ATTACHMENT_WITH_TICKET,
     DOWNLOAD_JOB_RESULT_WITH_TICKET, DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET,
-    DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET, Operation,
+    DOWNLOAD_RETAINED_FILE, DOWNLOAD_RETAINED_FILE_WITH_TICKET, Operation,
 };
 use export_doc_engine::{api::ApiError, engine::NativeService, paths::nonce};
 use serde_json::{Value, json};
@@ -20,16 +20,16 @@ const LIFETIME: Duration = Duration::from_secs(300);
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Target {
     Job(String),
+    RetainedFile(String),
     PostgreSqlBackup(String),
-    RecoveryArchive(String),
     BusinessAttachment { id: String, revision: String },
 }
 impl Target {
     fn operation(&self) -> Operation {
         match self {
             Self::Job(_) => DOWNLOAD_JOB_RESULT_WITH_TICKET,
+            Self::RetainedFile(_) => DOWNLOAD_RETAINED_FILE_WITH_TICKET,
             Self::PostgreSqlBackup(_) => DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET,
-            Self::RecoveryArchive(_) => DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET,
             Self::BusinessAttachment { .. } => DOWNLOAD_BUSINESS_ATTACHMENT_WITH_TICKET,
         }
     }
@@ -40,8 +40,16 @@ impl Target {
     ) -> Result<export_doc_engine::engine::backup_io::Download, ApiError> {
         match self {
             Self::Job(id) => service.prepare_job_download(id, session),
-            Self::PostgreSqlBackup(token) | Self::RecoveryArchive(token) => service
-                .prepare_backup_download(self.operation(), &[("token", token.clone())], session),
+            Self::RetainedFile(id) => service.prepare_file_download(
+                DOWNLOAD_RETAINED_FILE,
+                &[("id", id.clone())],
+                session,
+            ),
+            Self::PostgreSqlBackup(token) => service.prepare_backup_download(
+                self.operation(),
+                &[("token", token.clone())],
+                session,
+            ),
             Self::BusinessAttachment { id, revision } => service.prepare_file_download(
                 DOWNLOAD_BUSINESS_ATTACHMENT,
                 &[("id", id.clone()), ("revision", revision.clone())],
@@ -55,8 +63,8 @@ pub fn is_ticket_download(operation: Operation) -> bool {
         operation,
         DOWNLOAD_JOB_RESULT_WITH_TICKET
             | DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET
-            | DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET
             | DOWNLOAD_BUSINESS_ATTACHMENT_WITH_TICKET
+            | DOWNLOAD_RETAINED_FILE_WITH_TICKET
     )
 }
 struct Ticket {
@@ -73,6 +81,7 @@ fn error(status: u16, message: &str) -> ApiError {
         message: message.into(),
         code: None,
         diagnostic: None,
+        ..Default::default()
     }
 }
 pub fn binding(headers: &HeaderMap) -> String {
@@ -279,7 +288,6 @@ mod tests {
         for target in [
             Target::Job("job".into()),
             Target::PostgreSqlBackup("backup-token".into()),
-            Target::RecoveryArchive("archive-token".into()),
             Target::BusinessAttachment {
                 id: "17".into(),
                 revision: "3".into(),
@@ -287,7 +295,7 @@ mod tests {
         ] {
             let operation = target.operation();
             let other = if operation == DOWNLOAD_JOB_RESULT_WITH_TICKET {
-                DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET
+                DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET
             } else {
                 DOWNLOAD_JOB_RESULT_WITH_TICKET
             };

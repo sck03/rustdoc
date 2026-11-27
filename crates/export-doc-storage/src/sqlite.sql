@@ -1,7 +1,12 @@
 PRAGMA foreign_keys = ON;
 CREATE TABLE schema_model (version INTEGER PRIMARY KEY,model TEXT NOT NULL,shape TEXT NOT NULL);
-CREATE TABLE schema_version (version INTEGER PRIMARY KEY CHECK(version = 18));
-INSERT INTO schema_version VALUES (18);
+CREATE TABLE schema_version (version INTEGER PRIMARY KEY CHECK(version = 19));
+INSERT INTO schema_version VALUES (19);
+CREATE TABLE handling_services (company TEXT NOT NULL, service_id TEXT NOT NULL, category TEXT NOT NULL, name_key TEXT NOT NULL, enabled INTEGER NOT NULL CHECK(enabled IN (0,1)), revision INTEGER NOT NULL CHECK(revision>0), body TEXT NOT NULL CHECK(json_valid(body)), PRIMARY KEY(company,service_id));
+CREATE UNIQUE INDEX handling_services_name ON handling_services(company,category,name_key);
+CREATE INDEX handling_services_category ON handling_services(company,category,enabled,service_id);
+CREATE TABLE handling_service_assignees (company TEXT NOT NULL, service_id TEXT NOT NULL, user_id INTEGER NOT NULL REFERENCES records(id), PRIMARY KEY(company,service_id,user_id), FOREIGN KEY(company,service_id) REFERENCES handling_services(company,service_id) ON DELETE CASCADE);
+CREATE INDEX handling_service_accounts ON handling_service_assignees(user_id,company);
 CREATE TABLE records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     kind TEXT NOT NULL,
@@ -223,8 +228,10 @@ END;
 CREATE TABLE file_locations (
     storage_identity TEXT NOT NULL,
     digest TEXT NOT NULL REFERENCES file_objects(digest) ON DELETE CASCADE,
+    archived INTEGER NOT NULL DEFAULT 0 CHECK(archived IN (0,1)),
     PRIMARY KEY(storage_identity,digest)
 );
+CREATE UNIQUE INDEX file_archive_route ON file_locations(digest) WHERE archived=1;
 
 
 CREATE INDEX records_status_page ON records(kind, json_extract(body,'$.status'), id DESC);
@@ -285,3 +292,53 @@ CREATE TABLE unit_access_grants (
 -- Company-owned catalog natural keys are encoded as [company, key]; fresh schema only.
 CREATE INDEX records_invoice_versions ON records(company, json_extract(body,'$.invoiceNo'), id DESC) WHERE kind='invoices';
 CREATE INDEX records_product_code ON records(template_normalize(json_extract(body,'$.productCode')), company, id DESC) WHERE kind='products';
+
+-- Removed permanent file versions remain protected until archival review.
+CREATE TABLE retention_policies (
+    archive_class TEXT PRIMARY KEY,
+    days INTEGER NOT NULL CHECK(days BETWEEN 0 AND 36500),
+    revision BIGINT NOT NULL CHECK(revision>0)
+);
+CREATE TABLE retention_holds (
+    digest TEXT PRIMARY KEY REFERENCES file_objects(digest) ON DELETE CASCADE,
+    active INTEGER NOT NULL CHECK(active IN (0,1)),
+    reason TEXT NOT NULL,
+    revision BIGINT NOT NULL CHECK(revision>0)
+);
+CREATE TABLE file_retention_refs (
+    id TEXT PRIMARY KEY,
+    record_id BIGINT NOT NULL,
+    file_kind TEXT NOT NULL,
+    archive_class TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    company TEXT NOT NULL,
+    digest TEXT NOT NULL REFERENCES file_objects(digest) ON DELETE RESTRICT,
+    basis_date TEXT,
+    revision BIGINT NOT NULL CHECK(revision>0)
+);
+CREATE INDEX file_retention_digest ON file_retention_refs(digest,id);
+CREATE INDEX file_retention_class_date ON file_retention_refs(archive_class,basis_date,id);
+CREATE TABLE file_retention_totals (id INTEGER PRIMARY KEY CHECK(id=1), protected_bytes BIGINT NOT NULL CHECK(protected_bytes>=0));
+INSERT INTO file_retention_totals VALUES(1,0);
+CREATE TABLE capacity_daily (
+    day TEXT NOT NULL,
+    location TEXT NOT NULL,
+    physical_bytes BIGINT NOT NULL CHECK(physical_bytes>=0),
+    logical_bytes BIGINT NOT NULL CHECK(logical_bytes>=0),
+    reclaimable_bytes BIGINT NOT NULL CHECK(reclaimable_bytes>=0),
+    PRIMARY KEY(day,location)
+);
+CREATE TRIGGER retained_file_added AFTER INSERT ON file_retention_refs BEGIN
+    UPDATE file_retention_totals SET protected_bytes=protected_bytes+(SELECT CASE WHEN (SELECT COUNT(*) FROM file_retention_refs WHERE digest=NEW.digest)=1 THEN size_bytes ELSE 0 END FROM file_objects WHERE digest=NEW.digest) WHERE id=1;
+    UPDATE file_storage_totals SET referenced_bytes=referenced_bytes+(SELECT CASE WHEN reference_count=0 THEN size_bytes ELSE 0 END FROM file_objects WHERE digest=NEW.digest) WHERE id=1;
+    UPDATE file_objects SET reference_count=reference_count+1 WHERE digest=NEW.digest;
+END;
+CREATE TRIGGER retained_file_removed AFTER DELETE ON file_retention_refs BEGIN
+    UPDATE file_retention_totals SET protected_bytes=protected_bytes-(SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM file_retention_refs WHERE digest=OLD.digest) THEN size_bytes ELSE 0 END FROM file_objects WHERE digest=OLD.digest) WHERE id=1;
+    UPDATE file_storage_totals SET referenced_bytes=referenced_bytes-(SELECT CASE WHEN reference_count=1 THEN size_bytes ELSE 0 END FROM file_objects WHERE digest=OLD.digest) WHERE id=1;
+    UPDATE file_objects SET reference_count=reference_count-1 WHERE digest=OLD.digest;
+END;
+
+CREATE TRIGGER retain_removed_version BEFORE DELETE ON file_versions BEGIN
+    INSERT INTO file_retention_refs(id,record_id,file_kind,archive_class,file_name,company,digest,basis_date,revision) SELECT CAST(v.record_id AS TEXT)||':'||v.kind||':'||v.digest,v.record_id,v.kind,r.kind,v.file_name,COALESCE(json_extract(r.body,'$.companyScope'),''),v.digest,NULL,1 FROM file_versions v JOIN records r ON r.id=v.record_id WHERE r.kind<>'report-images' AND v.record_id=OLD.record_id AND v.kind=OLD.kind ON CONFLICT(id) DO NOTHING;
+END;

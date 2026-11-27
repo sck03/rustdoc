@@ -11,10 +11,10 @@ use std::{
 pub(super) struct Flights(Mutex<BTreeMap<String, Weak<OperationLock<()>>>>);
 impl Flights {
     pub(super) fn get(&self, key: &str) -> Result<Arc<OperationLock<()>>> {
-        let mut active = self
-            .0
-            .lock()
-            .map_err(|_| unavailable("文件读取协调状态异常。"))?;
+        let mut active = self.0.lock().map_err(|_| {
+            unavailable("文件读取协调状态异常。")
+                .coded(crate::api::ErrorCode::DependencyUnavailable)
+        })?;
         active.retain(|_, value| value.strong_count() > 0);
         if let Some(lock) = active.get(key).and_then(Weak::upgrade) {
             return Ok(lock);

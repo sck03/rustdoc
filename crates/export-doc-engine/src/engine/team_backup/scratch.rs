@@ -45,9 +45,13 @@ pub(super) fn read_json(path: &Path) -> Result<Value> {
         .take(4 * 1024 * 1024 + 1)
         .read_to_end(&mut bytes)?;
     if bytes.len() > 4 * 1024 * 1024 {
-        return Err(unavailable("备份暂存清单过大，已保留现场。"));
+        return Err(unavailable("备份暂存清单过大，已保留现场。")
+            .coded(crate::api::ErrorCode::DependencyUnavailable));
     }
-    serde_json::from_slice(&bytes).map_err(|_| unavailable("备份暂存清单无效，已保留现场。"))
+    serde_json::from_slice(&bytes).map_err(|_| {
+        unavailable("备份暂存清单无效，已保留现场。")
+            .coded(crate::api::ErrorCode::DependencyUnavailable)
+    })
 }
 
 fn recover_root(root: &Path) -> Result<()> {
@@ -61,7 +65,10 @@ fn recover_root(root: &Path) -> Result<()> {
             read_json(&marker)?["stagingDirectoryName"]
                 .as_str()
                 .filter(|name| paths::valid_file_name(name))
-                .ok_or_else(|| unavailable("恢复标记无效，已保留全部暂存内容。"))?
+                .ok_or_else(|| {
+                    unavailable("恢复标记无效，已保留全部暂存内容。")
+                        .coded(crate::api::ErrorCode::DependencyUnavailable)
+                })?
                 .to_owned(),
         )
     } else {
@@ -89,7 +96,8 @@ fn recover_root(root: &Path) -> Result<()> {
         }
         let owner = read_json(&directory.join(OWNER))?;
         if owner != json!({"purpose":"backup-scratch", "version":1, "directory":name}) {
-            return Err(unavailable("备份暂存归属无效，已保留现场。"));
+            return Err(unavailable("备份暂存归属无效，已保留现场。")
+                .coded(crate::api::ErrorCode::DependencyUnavailable));
         }
         let mut known: HashSet<String> = [
             OWNER,
@@ -103,7 +111,6 @@ fn recover_root(root: &Path) -> Result<()> {
             "Database/exportdoc-native.objects.jsonl",
             super::package::POSTGRES,
             super::package::KEY,
-            super::package::OBJECTS,
             "Files/.store-id",
             "Configuration/file-storage.json",
         ]
@@ -165,7 +172,8 @@ fn validate_tree(root: &Path, directory: &Path, known: &HashSet<String>) -> Resu
         {
             validate_tree(root, &path, known)?;
         } else if !kind.is_file() || !(known.contains(&name) || object_file) {
-            return Err(unavailable("备份暂存包含未知内容，已保留现场。"));
+            return Err(unavailable("备份暂存包含未知内容，已保留现场。")
+                .coded(crate::api::ErrorCode::DependencyUnavailable));
         }
     }
     Ok(())

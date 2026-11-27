@@ -52,10 +52,12 @@ await withOfficeUi('oa-advanced-ui', async ({ output, url, operations, invoke, o
   await second.getByLabel('岗位／职责／项目').selectOption(project.id);
   await first.locator('summary').filter({ hasText: '生效条件' }).click();
   await first.getByLabel('条件组合').selectOption('Any');
-  for (const [field, value] of [['Department', 'GENERAL'], ['Category', 'Other']]) {
+  for (const [field, value] of [['Department', 'GENERAL'], ['Category', 'IT 支持']]) {
     await first.getByRole('button', { name: '添加条件', exact: true }).click();
     await first.getByLabel('条件字段').last().selectOption(field);
-    await first.getByLabel('条件值', { exact: true }).last().fill(value);
+    const control = first.getByLabel('条件值', { exact: true }).last();
+    if (field === 'Category') await control.selectOption({ label: value });
+    else await control.fill(value);
   }
   await first.locator('summary').filter({ hasText: '超时升级' }).click();
   await first.getByRole('button', { name: '添加升级级次', exact: true }).click();
@@ -78,32 +80,39 @@ await withOfficeUi('oa-advanced-ui', async ({ output, url, operations, invoke, o
   await picker.getByRole('button', { name: '搜索', exact: true }).click();
   await picker.getByRole('button').filter({ hasText: '高级申请人' }).click();
   await picker.waitFor({ state: 'hidden' });
-  await simulation.getByLabel('类别代码', { exact: true }).fill('Other');
+  const category = simulation.getByRole('combobox', { name: '申请类别', exact: true });
+  assert.equal(await category.inputValue(), 'Other');
+  await category.selectOption({ label: 'IT 支持' });
   await simulation.locator('summary').filter({ hasText: '项目审批范围' }).click();
   await simulation.getByLabel('申请项目').selectOption(project.id);
   const simulated = admin.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith(operations.get('SimulateOaDefinition').route));
   await simulation.getByRole('button', { name: '解析模拟路线', exact: true }).click();
-  assert.equal((await simulated).status(), 200);
+  const simulationResponse = await simulated;
+  assert.equal(simulationResponse.status(), 200, await simulationResponse.text());
+  assert.equal(simulationResponse.request().postDataJSON().category, 'IT');
   await simulation.getByRole('button', { name: '保留此发布样例', exact: true }).click();
+  await simulation.getByRole('listitem').filter({ hasText: '高级申请人' }).filter({ hasText: 'IT 支持' }).waitFor();
   await admin.screenshot({ path: path.join(output, 'advanced-publication.png'), fullPage: true });
   const published = admin.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith(operations.get('PublishOaDefinition').route));
   await simulation.getByRole('button', { name: '保存并发布此流程', exact: true }).click();
   const publication = await published;
   assert.equal(publication.status(), 200, await publication.text());
   assert.equal(publication.request().postDataJSON().samples[0].projectId, project.id);
+  assert.equal(publication.request().postDataJSON().samples[0].category, 'IT');
   await simulation.waitFor({ state: 'hidden' });
   const saved = await invoke('GetOaApprovalSettings', undefined, {}, token);
   const rule = saved.rules.find(rule => rule.key === 'general');
   assert.equal(rule.stages[0].source, 'Responsibility');
   assert.equal(rule.stages[0].conditionLogic, 'Any');
   assert.equal(rule.stages[0].conditions.length, 2);
+  assert.equal(rule.stages[0].conditions.find(condition => condition.field === 'Category').value, 'IT');
   assert.equal(rule.stages[0].escalations[0].afterHours, 24);
   assert.equal(rule.stages[1].source, 'ProjectLeader');
   assert(rule.stages.some(stage => stage.phase === 'Fulfillment' && stage.kind === 'Handling'));
 
   const applicantToken = (await invoke('Login', { username: applicant.user.username, password })).accessToken;
   let request = await invoke('CreateGeneralRequest', {
-    requestKey: randomUUID(), title: '高级职责与项目实际审批', reason: '按发布图办理', category: 'Other', projectId: project.id,
+    requestKey: randomUUID(), title: '高级职责与项目实际审批', reason: '按发布图办理', category: 'IT', projectId: project.id,
   }, {}, applicantToken);
   request = await invoke('SubmitGeneralRequest', { expectedVersion: request.versionNumber, note: '实际提交' }, { id: request.id }, applicantToken);
   const requestUrl = `${url}/#/office/requests/general?requestId=${request.id}`;

@@ -41,6 +41,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         .map(|(name, content)| (web_root.join(name), content))
         .collect();
     files.extend([
+        (
+            web_root.join("generalCategories.ts"),
+            format!("// Generated from native_contract; do not edit.\nexport const generalCategories = {} as const;\n", serde_json::to_string_pretty(
+                &export_doc_contracts::native_contract::general_categories::CATEGORIES.iter().copied().collect::<std::collections::BTreeMap<_, _>>()
+            )?),
+        ),
         (web_path, generated.web),
         (
             root.join("crates/export-doc-contracts/src/generated_api.rs"),

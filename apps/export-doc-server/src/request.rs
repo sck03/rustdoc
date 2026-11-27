@@ -18,8 +18,9 @@ pub(super) fn error(status: u16, message: &str) -> ApiError {
     ApiError {
         status: Some(status),
         message: message.into(),
-        code: None,
+        code: Some(export_doc_engine::api::ErrorCode::for_status(status)),
         diagnostic: (status >= 500).then_some("http-processing"),
+        ..Default::default()
     }
 }
 
@@ -80,7 +81,7 @@ pub async fn handle(state: ServerState, operation: Operation, request: Request) 
         }
         Err(error) => {
             span.failure(&error);
-            response::error(error)
+            response::error_with_id(error, &request_id)
         }
     };
     response.headers_mut().insert(
@@ -96,6 +97,11 @@ async fn execute(
     operation: Operation,
     request: Request,
 ) -> Result<response::Reply, ApiError> {
+    if contracts::contract()["operations"][operation.id]["policy"]["authenticationContext"]
+        == "Maintenance"
+    {
+        return Err(error(403, "此操作须在独立维护服务中执行。"));
+    }
     let local_operation =
         export_doc_engine::engine::NativeService::requires_local_transport(operation);
     if local_operation && state.desktop_token.is_none() {
@@ -375,6 +381,7 @@ async fn execute(
                     DOWNLOAD_JOB_RESULT,
                     CREATE_JOB_DOWNLOAD_TICKET,
                     CREATE_BUSINESS_ATTACHMENT_DOWNLOAD_TICKET,
+                    CREATE_RETAINED_FILE_DOWNLOAD_TICKET,
                 ]
                 .contains(&operation)
                 {
@@ -392,6 +399,19 @@ async fn execute(
                     let target = if operation == CREATE_JOB_DOWNLOAD_TICKET {
                         state.service.authorize_job_download(id, &token)?;
                         downloads::Target::Job(id.into())
+                    } else if operation == CREATE_RETAINED_FILE_DOWNLOAD_TICKET {
+                        state.service.authorize_file_download(
+                            DOWNLOAD_RETAINED_FILE,
+                            &parameters,
+                            &token,
+                        )?;
+                        downloads::Target::RetainedFile(
+                            parameters
+                                .iter()
+                                .find(|(name, _)| *name == "id")
+                                .map(|(_, v)| v.clone())
+                                .unwrap_or_default(),
+                        )
                     } else {
                         state.service.authorize_file_download(
                             DOWNLOAD_BUSINESS_ATTACHMENT,
@@ -499,8 +519,12 @@ async fn execute(
                             )
                             .map(response::Reply::download);
                     }
-                    if [DOWNLOAD_PERSONNEL_ATTACHMENT, DOWNLOAD_BUSINESS_ATTACHMENT]
-                        .contains(&operation)
+                    if [
+                        DOWNLOAD_PERSONNEL_ATTACHMENT,
+                        DOWNLOAD_BUSINESS_ATTACHMENT,
+                        DOWNLOAD_RETAINED_FILE,
+                    ]
+                    .contains(&operation)
                         || export_doc_engine::engine::oa::is_download(operation)
                         || export_doc_engine::engine::communication::is_download(operation)
                         || [DOWNLOAD_REPORT_TEMPLATE_PACKAGE, DOWNLOAD_SUPPORT_PACKAGE]
@@ -561,23 +585,14 @@ async fn execute(
                         reply.transfer_permit = preview_permit;
                         return Ok(reply);
                     }
-                    if [
-                        CREATE_POSTGRE_SQL_PHYSICAL_BACKUP_DOWNLOAD_TICKET,
-                        CREATE_RECOVERY_ARCHIVE_DOWNLOAD_TICKET,
-                    ]
-                    .contains(&operation)
-                    {
+                    if operation == CREATE_POSTGRE_SQL_PHYSICAL_BACKUP_DOWNLOAD_TICKET {
                         let original: Value = serde_json::from_slice(&result)
                             .map_err(|_| error(503, "备份下载票据无效。"))?;
                         let id = original["token"]
                             .as_str()
                             .ok_or_else(|| error(503, "备份下载票据缺失。"))?;
                         let (ticket, cookie) = state.tickets.issue(
-                            if operation == CREATE_RECOVERY_ARCHIVE_DOWNLOAD_TICKET {
-                                downloads::Target::RecoveryArchive(id.into())
-                            } else {
-                                downloads::Target::PostgreSqlBackup(id.into())
-                            },
+                            downloads::Target::PostgreSqlBackup(id.into()),
                             &token,
                             &cookie_binding,
                             secure_cookie,

@@ -95,9 +95,9 @@ pub(crate) fn build(q: &OfficeQuery<'_>, pg: bool) -> Result<QuerySql> {
         sql::bind(&mut values, q.company, pg)
     )];
     let state = sql::field("status", pg);
-    let handling = sql::field("handlingKey", pg);
+    let handling = sql::field("serviceId", pg);
     let assigned = if !directory || q.handling_only {
-        keys("handlingKey", q.handling_keys, &mut values, pg)
+        keys("serviceId", q.handling_keys, &mut values, pg)
     } else {
         "FALSE".into()
     };
@@ -241,12 +241,7 @@ pub(crate) fn build(q: &OfficeQuery<'_>, pg: bool) -> Result<QuerySql> {
                 )
             })
             .collect::<Vec<_>>();
-        choices.push(keys(
-            "handlingKey",
-            q.keyword_handling_keys,
-            &mut values,
-            pg,
-        ));
+        choices.push(keys("serviceId", q.keyword_handling_keys, &mut values, pg));
         clauses.push(format!("({})", choices.join(" OR ")));
     }
     for (value, path, operator) in [

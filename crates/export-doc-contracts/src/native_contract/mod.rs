@@ -1,4 +1,6 @@
 //! Single native API definition. The served document and all clients are projections.
+pub mod error_catalog;
+pub mod general_categories;
 mod model;
 mod sheet_fields;
 pub use sheet_fields::{DETAIL_FIELDS, SHEET_FIELDS};
@@ -47,6 +49,7 @@ mod metadata_configuration;
 mod metadata_permissions;
 mod metadata_values;
 mod policies;
+mod recovery_maintenance;
 mod responses;
 mod route_parameters;
 mod scheduler_metrics;
@@ -54,6 +57,7 @@ mod schema_shapes;
 mod schemas_hs_1;
 mod schemas_invoices_1;
 mod schemas_maintenance_1;
+mod schemas_oa_deployment;
 mod schemas_oa_forms;
 mod schemas_personnel_1;
 mod schemas_platform_1;
@@ -63,12 +67,16 @@ mod schemas_sales_1;
 mod schemas_single_window_1;
 mod schemas_workflow_1;
 mod single_window_sources;
+mod storage_governance;
 use serde_json::Value;
 use std::collections::BTreeMap;
 
 pub(super) fn document() -> Value {
     let mut schemas = Vec::new();
+    schemas.extend(error_catalog::schemas());
+    schemas.extend(recovery_maintenance::schemas());
     schemas.extend(file_storage::schemas());
+    schemas.extend(storage_governance::schemas());
     schemas.extend(hs_import::schemas());
     schemas.extend(schemas_platform_1::entries());
     schemas.extend(schemas_platform_2::entries());
@@ -82,9 +90,12 @@ pub(super) fn document() -> Value {
     schemas.extend(schemas_personnel_1::entries());
     schemas.extend(schemas_workflow_1::entries());
     schemas.extend(schemas_oa_forms::entries());
+    schemas.extend(schemas_oa_deployment::entries());
     let schemas: BTreeMap<_, _> = schemas.into_iter().collect();
     let mut endpoints = Vec::new();
+    endpoints.extend(recovery_maintenance::endpoints());
     endpoints.extend(file_storage::endpoints());
+    endpoints.extend(storage_governance::endpoints());
     endpoints.extend(hs_import::endpoints());
     endpoints.extend(endpoints_session::entries());
     endpoints.extend(endpoints_system::entries());

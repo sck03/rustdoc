@@ -134,7 +134,7 @@ pub(in crate::engine::oa) fn origin_available(
             });
         }
         Handlers => {
-            let key = text(row, "handlingKey");
+            let key = text(row, "serviceId");
             if !key.is_empty() {
                 let employee = store::get(tx, "people", person)?;
                 return Ok(handling::services(tx, &text(row, "companyScope"))?

@@ -18,3 +18,9 @@ services:
     volumes:
       - *file-store
     networks: [database, web]
+  maintenance:
+    environment:
+      EXPORTDOCMANAGER_FILE_STORE_ROOTS: '{"attachments":"/srv/exportdoc-files"}'
+    volumes:
+      - *file-store
+    networks: [database, web]

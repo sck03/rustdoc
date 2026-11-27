@@ -296,14 +296,16 @@ pub(in crate::engine) fn progress(
     Ok(completed)
 }
 pub(super) fn business_complete(plan: &ApprovalPlan) -> bool {
-    plan.nodes
-        .iter()
-        .enumerate()
-        .filter(|(_, n)| {
-            n.phase == Phase::Fulfillment
-                && n.system_action != SystemAction::GenerateApprovalDocument
-        })
-        .all(|(i, n)| n.skipped || plan.completed(i))
+    plan.outcome() == "Approved"
+        && plan
+            .nodes
+            .iter()
+            .enumerate()
+            .filter(|(_, n)| {
+                n.phase == Phase::Fulfillment
+                    && n.system_action != SystemAction::GenerateApprovalDocument
+            })
+            .all(|(i, n)| n.skipped || plan.completed(i))
 }
 pub(super) fn state(plan: &ApprovalPlan) -> &'static str {
     if !plan.suspended_at.is_empty() {

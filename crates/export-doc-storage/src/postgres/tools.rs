@@ -69,6 +69,18 @@ impl MaintenanceLease {
     pub fn validate(&mut self) -> Result<()> {
         validate_schema(&mut self.client)
     }
+    /// Query through the original locked connection. A lost lease never reconnects.
+    pub fn fingerprint(&mut self) -> Result<String> {
+        let row = self.client.query_one(
+            "SELECT current_database(),oid::text FROM pg_database WHERE datname=current_database()",
+            &[],
+        )?;
+        Ok(format!(
+            "{}:{}",
+            row.try_get::<_, String>(0)?,
+            row.try_get::<_, String>(1)?
+        ))
+    }
     pub fn recovery_job_succeeded(&mut self, id: &str) -> Result<bool> {
         self.validate()?;
         let row = self
@@ -81,8 +93,8 @@ impl MaintenanceLease {
         Ok(row.try_get::<_, String>(0)? == "Succeeded")
     }
     pub fn file_objects(&mut self, after: &str) -> Result<Vec<crate::FileObject>> {
-        self.client.query("SELECT digest,size_bytes FROM file_objects WHERE digest>$1 ORDER BY digest LIMIT 200", &[&after])?
-            .into_iter().map(|row| Ok(crate::FileObject { digest: row.try_get(0)?, size: u64::try_from(row.try_get::<_,i64>(1)?).map_err(|_| Error::unavailable("文件对象长度无效。"))? })).collect()
+        self.client.query("SELECT digest,size_bytes,COALESCE((SELECT storage_identity FROM file_locations l WHERE l.digest=file_objects.digest AND l.archived=1),'') FROM file_objects WHERE digest>$1 ORDER BY digest LIMIT 200", &[&after])?
+            .into_iter().map(|row| Ok(crate::FileObject { digest: row.try_get(0)?, archive_identity: row.try_get(2)?, size: u64::try_from(row.try_get::<_,i64>(1)?).map_err(|_| Error::unavailable("文件对象长度无效。"))? })).collect()
     }
     pub fn finish(&mut self, owner: &str, application: &str) -> Result<()> {
         crate::postgres_privileges::role_name(owner)?;

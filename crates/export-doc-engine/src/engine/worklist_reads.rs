@@ -34,13 +34,7 @@ pub(super) fn visit(
             "contractEndsOn",
             "organization",
         ][..],
-        "bookings" => &[
-            "title",
-            "applicantName",
-            "startsAt",
-            "endsAt",
-            "handlingKey",
-        ][..],
+        "bookings" => &["title", "applicantName", "startsAt", "endsAt", "serviceId"][..],
         _ => &[
             "applicantName",
             "purpose",
@@ -49,7 +43,7 @@ pub(super) fn visit(
             "returnedQuantity",
             "isReturnable",
             "returnDueDate",
-            "handlingKey",
+            "serviceId",
         ][..],
     };
     let fields: Vec<_> = ["id", "status", "kind", "approvalPlan", "applicantAccountId"]

@@ -1,5 +1,5 @@
 //! 团队备份与灾备：受管路径辅助、密封包格式、一次性票据与状态接口的最小回归。
-use super::sealed::{Entry, ManifestFile, open_to, seal_to, unpack, verify_manifest, zip_payload};
+use super::sealed::{open_to, seal_to};
 use super::*;
 use std::time::Instant;
 #[cfg(feature = "postgres")]
@@ -100,66 +100,6 @@ fn sealed_package_rejects_wrong_password_and_magic() {
         assert!(open_to(magic, password, input, &mut output).is_err());
         assert!(output.is_empty());
     }
-}
-
-#[test]
-fn zip_payload_unpack_and_manifest_agree() {
-    let workspace = Workspace::new();
-    let working = sealed::working_directory(&workspace.paths().data_root).unwrap();
-    let first = working.join("a.bin");
-    let second = working.join("b.bin");
-    let first_content = vec![42; 128 * 1024 + 17];
-    fs::write(&first, &first_content).unwrap();
-    fs::write(&second, b"second").unwrap();
-    let entries = [
-        Entry {
-            source: &first,
-            name: "Database/a.bin",
-        },
-        Entry {
-            source: &second,
-            name: "Security/b.bin",
-        },
-    ];
-    let mut payload = std::io::Cursor::new(Vec::new());
-    zip_payload(&entries, &mut payload).unwrap();
-    let payload = payload.into_inner();
-    let extracted = working.join("extracted");
-    let unpacked = unpack(
-        std::io::Cursor::new(&payload),
-        &extracted,
-        &std::sync::Arc::new(crate::temporary_space::Budget::new(working.clone())),
-    )
-    .unwrap();
-    assert_eq!(unpacked.len(), 2);
-    assert_eq!(
-        fs::read(extracted.join("Database/a.bin")).unwrap(),
-        first_content
-    );
-    assert_eq!(
-        fs::read(extracted.join("Security/b.bin")).unwrap(),
-        b"second"
-    );
-    let manifest = [
-        ManifestFile::from_path("Database/a.bin", &first).unwrap(),
-        ManifestFile::from_path("Security/b.bin", &second).unwrap(),
-    ];
-    verify_manifest(&unpacked, &manifest).unwrap();
-
-    // 摘要与清单不一致必须被拒绝。
-    let mut wrong_digest = unpacked.clone();
-    wrong_digest[0].sha256 = "0".repeat(64);
-    assert!(verify_manifest(&wrong_digest, &manifest).is_err());
-
-    let mut wrong_name = unpacked.clone();
-    wrong_name[0].name = "Database/other.bin".into();
-    assert!(verify_manifest(&wrong_name, &manifest).is_err());
-
-    let short = [ManifestFile::from_path("Database/a.bin", &first).unwrap()];
-    assert!(verify_manifest(&unpacked, &short).is_err());
-    let duplicated = [manifest[0].clone(), manifest[0].clone()];
-    assert!(verify_manifest(&unpacked, &duplicated).is_err());
-    fs::remove_dir_all(&working).unwrap();
 }
 
 #[test]

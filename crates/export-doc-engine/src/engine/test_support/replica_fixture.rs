@@ -106,21 +106,21 @@ impl Fixture {
                 let length = headers
                     .get("content-length")
                     .map_or(0, |value| value.parse::<u64>().unwrap());
+                let object_path = root.join(hex(&Sha256::digest(uri.path().as_bytes())));
+                let conditional_conflict = method == "PUT"
+                    && headers.get("if-none-match").is_some_and(|v| v == "*")
+                    && object_path.exists();
                 let mut reader = Read::by_ref(&mut stream).take(length);
                 let mut hash = Sha256::new();
                 let mut buffer = [0; 64 * 1024];
-                let mut file = if method == "PUT" {
+                let mut file = if method == "PUT" && !conditional_conflict {
                     Some(
                         fs::OpenOptions::new()
                             .create(true)
                             .write(true)
                             .truncate(parameters.get("partNumber").is_none_or(|part| part == "1"))
                             .append(parameters.get("partNumber").is_some_and(|part| part != "1"))
-                            .open(root.join(if s3 {
-                                hex(&Sha256::digest(uri.path().as_bytes()))
-                            } else {
-                                "remote-object.bin".into()
-                            }))
+                            .open(&object_path)
                             .unwrap(),
                     )
                 } else {
@@ -155,12 +155,7 @@ impl Fixture {
                     b""
                 };
                 if method == "GET" {
-                    let mut file = fs::File::open(root.join(if s3 {
-                        hex(&Sha256::digest(uri.path().as_bytes()))
-                    } else {
-                        "remote-object.bin".into()
-                    }))
-                    .unwrap();
+                    let mut file = fs::File::open(&object_path).unwrap();
                     write!(
                         stream,
                         "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
@@ -182,7 +177,9 @@ impl Fixture {
                             cancel.store(true, Ordering::Release);
                         }
                     }
-                    let code = if matches!(method, "MKCOL" | "MOVE") {
+                    let code = if conditional_conflict {
+                        412
+                    } else if matches!(method, "MKCOL" | "MOVE") {
                         201
                     } else if method == "DELETE" {
                         deletion_started.store(true, Ordering::Release);

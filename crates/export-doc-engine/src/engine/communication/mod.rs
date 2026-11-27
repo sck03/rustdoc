@@ -1,6 +1,7 @@
 //! Company announcements and personal, transactional OA notifications.
 mod announcements;
 mod notifications;
+pub(in crate::engine) use notifications::capacity_alert;
 mod recipients;
 use super::{
     NativeService, auth,

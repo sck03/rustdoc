@@ -4,12 +4,17 @@ use std::{fs, io::ErrorKind, path::Path};
 
 pub const DATA_ROOT_MIGRATION_PENDING_FILE: &str = ".exportdoc-data-root-migration-pending.json";
 pub const DATA_ROOT_MIGRATION_REDIRECT_FILE: &str = ".exportdoc-data-root-migration-redirect.json";
+pub const RECOVERY_MAINTENANCE_PENDING_FILE: &str = ".exportdoc-recovery-maintenance.json";
 
 /// Call after acquiring the data root's instance lock, before opening or moving its database.
 /// Marker contents are interpreted only by the maintenance owner; even a damaged marker
 /// must prevent an ordinary open from initializing an empty or partially copied database.
 pub fn ensure_data_root_available(data_root: &Path) -> Result<()> {
     for (name, message) in [
+        (
+            RECOVERY_MAINTENANCE_PENDING_FILE,
+            "灾备维护尚未完成，业务启动已停止。请打开独立维护服务核对恢复阶段并继续处理。",
+        ),
         (
             DATA_ROOT_MIGRATION_PENDING_FILE,
             "业务数据目录正在迁移，请使用安排迁移的原程序完成恢复后再打开。",

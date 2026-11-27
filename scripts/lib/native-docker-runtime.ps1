@@ -81,6 +81,7 @@ function Initialize-ExportDocDockerRuntime {
         $maintenancePassword = Get-NativeSecret -Name 'maintenance-password.txt'
         [void](Get-NativeSecret -Name 'postgres-bootstrap-password.txt')
         [void](Get-NativeSecret -Name 'bootstrap-token.txt')
+        [void](Get-NativeSecret -Name 'maintenance-token.txt')
         Write-NativeSecret -Name 'app-connection.txt' -Value "host=postgres port=5432 dbname=exportdoc_native user=exportdoc_app password=$appPassword connect_timeout=10 sslmode=disable"
         Write-NativeSecret -Name 'maintenance-connection.txt' -Value "host=postgres port=5432 dbname=exportdoc_native user=exportdoc_maintenance password=$maintenancePassword connect_timeout=10 sslmode=disable"
         $appPassword = $null

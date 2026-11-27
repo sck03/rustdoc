@@ -18,6 +18,8 @@ pub struct Configuration {
     pub initialize_schema: bool,
     pub initialize_only: bool,
     pub restore_pending: bool,
+    pub maintenance_web: bool,
+    pub maintenance_token: String,
     pub migration_package: Option<PathBuf>,
     pub migration_password: String,
     pub business_clock: export_doc_engine::clock::BusinessClock,
@@ -69,6 +71,7 @@ impl Configuration {
         let mut initialize_schema = false;
         let mut initialize_only = false;
         let mut restore_pending = false;
+        let mut maintenance_web = false;
         let mut migration_package = None;
         let mut migration_password_file = None;
         let mut args = env::args().skip(1);
@@ -96,6 +99,7 @@ impl Configuration {
                 }
                 "--initialize-schema" => initialize_schema = true,
                 "--restore-pending" => restore_pending = true,
+                "--maintenance-web" => maintenance_web = true,
                 "--import-migration" => {
                     migration_package =
                         Some(PathBuf::from(args.next().ok_or("缺少迁移包文件路径。")?));
@@ -188,7 +192,7 @@ impl Configuration {
         if initialize_schema && restore_pending {
             return Err("建表与恢复不能同时执行。".into());
         }
-        let maintenance_connection = if initialize_schema || restore_pending {
+        let maintenance_connection = if initialize_schema || restore_pending || maintenance_web {
             secret(
                 "EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_CONNECTION",
                 fallback("maintenance-connection.txt").as_deref(),
@@ -196,10 +200,25 @@ impl Configuration {
         } else {
             String::new()
         };
-        if (initialize_schema || restore_pending) && maintenance_connection.is_empty() {
+        if (initialize_schema || restore_pending || maintenance_web)
+            && maintenance_connection.is_empty()
+        {
             return Err("建表需要独立的 PostgreSQL 维护连接。".into());
         }
         Ok(Self {
+            maintenance_web,
+            maintenance_token: if maintenance_web {
+                let token = secret(
+                    "EXPORTDOCMANAGER_MAINTENANCE_TOKEN",
+                    fallback("maintenance-token.txt").as_deref(),
+                )?;
+                if token.len() < 32 || token.len() > 256 {
+                    return Err("维护一次性凭证须为 32–256 个字符。".into());
+                }
+                token
+            } else {
+                String::new()
+            },
             pool: export_doc_storage::pool::PoolOptions {
                 size: env::var("EXPORTDOCMANAGER_POSTGRES_POOL_SIZE")
                     .unwrap_or_else(|_| "4".into())
@@ -222,7 +241,7 @@ impl Configuration {
             maintenance_connection,
             owner: env::var("EXPORTDOCMANAGER_POSTGRES_OWNER")
                 .unwrap_or_else(|_| "exportdoc_owner".into()),
-            bootstrap_token: if initialize_only || restore_pending {
+            bootstrap_token: if initialize_only || restore_pending || maintenance_web {
                 String::new()
             } else {
                 secret(

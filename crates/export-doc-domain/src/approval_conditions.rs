@@ -10,6 +10,7 @@ pub enum ConditionField {
     Duration,
     Department,
     Category,
+    ServiceId,
     PersonnelAction,
     Returnable,
     FormText,
@@ -41,6 +42,7 @@ pub struct ConditionContext {
     pub duration: Option<Decimal>,
     pub department: String,
     pub category: String,
+    pub service_id: String,
     pub personnel_action: String,
     pub returnable: String,
 }
@@ -109,6 +111,7 @@ impl ApprovalCondition {
                     ConditionField::Currency => &context.currency,
                     ConditionField::Department => &context.department,
                     ConditionField::Category => &context.category,
+                    ConditionField::ServiceId => &context.service_id,
                     ConditionField::PersonnelAction => &context.personnel_action,
                     ConditionField::Returnable => &context.returnable,
                     _ => unreachable!(),

@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiBackupPlan, ApiBackupPlanSaveRequest, ApiBackupPlanStatus, ApiBackupS3Settings, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
-import { startDownloadFromTicket } from "../../ui/downloadJobResult.ts";
 import { isDesktopBridgeAvailable, selectSaveFilePath } from "../../desktop/desktopBridge.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
@@ -94,12 +93,11 @@ export function useBackupPlan(client: ExportDocManagerApiClient, canManage: bool
         if (!destinationPath) return;
         return client.startRecoveryArchiveSaveToPathJob({ id, body: { destinationPath } }, { signal });
       }
-      const ticket = await client.createRecoveryArchiveDownloadTicket({ id }, { signal });
-      signal.throwIfAborted(); startDownloadFromTicket(client, ticket, name);
+      return client.startRecoveryArchiveSaveToPathJob({ id, body: {} }, { signal });
     },
     onSuccess: (job) => {
       if (!job) return;
-      setLastJobId(job.jobId); setMessage(null); setSuccess("保存任务已启动。");
+      setLastJobId(job.jobId); setMessage(null); setSuccess("便携导出任务已启动，完成后可在任务结果中下载。");
     },
     refreshKeys: () => [queryKeys.jobsRoot()],
     onError: fail,

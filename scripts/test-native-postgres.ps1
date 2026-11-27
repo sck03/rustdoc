@@ -2,7 +2,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$PostgresBin,
     [ValidateRange(60, 7200)][int]$TimeoutSeconds = 3600,
-    [ValidateSet('All', 'Storage', 'Engine', 'Workflows', 'Capacity', 'Maintenance', 'QueryPerformance', 'AuditStatistics', 'Organization')][string]$Scope = 'All',
+    [ValidateSet('All', 'Storage', 'Engine', 'Workflows', 'Capacity', 'Maintenance', 'QueryPerformance', 'AuditStatistics', 'Organization', 'DeploymentRecovery', 'RecoveryUi')][string]$Scope = 'All',
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Debug',
     [ValidateRange(200, 100000)][int]$HistoryRows = 10000,
     [ValidateRange(50, 1000)][int]$Rounds = 200
@@ -42,18 +42,20 @@ $environment['EXPORTDOC_TEST_PG_BIN'] = $PostgresBin
 $databaseTargets = @()
 [string[]]$cargoProfile = @()
 if ($Configuration -eq 'Release') { $cargoProfile = @('--release') }
-if ($Scope -in @('All', 'Storage', 'Workflows', 'AuditStatistics', 'Organization')) { $databaseTargets += ,@('POSTGRES', 'native_storage') }
-if ($Scope -in @('All', 'Engine', 'Workflows', 'QueryPerformance')) {
+if ($Scope -in @('All', 'Storage', 'Workflows', 'AuditStatistics', 'Organization', 'DeploymentRecovery')) { $databaseTargets += ,@('POSTGRES', 'native_storage') }
+if ($Scope -in @('All', 'Engine', 'Workflows', 'QueryPerformance', 'DeploymentRecovery')) {
     $databaseTargets += ,@('ENGINE', 'native_engine')
 }
-if ($Scope -in @('All', 'Engine')) {
+if ($Scope -in @('All', 'Engine', 'DeploymentRecovery')) {
     $databaseTargets += ,@('RECOVERY', 'native_recovery')
+    $databaseTargets += ,@('RECOVERY_TARGET', 'native_recovery_target')
     $databaseTargets += ,@('PUBLICATION', 'native_publication')
 }
 if ($Scope -eq 'Capacity') {
     $databaseTargets += ,@('CAPACITY_ONE', 'native_capacity_1')
     $databaseTargets += ,@('CAPACITY_FOUR', 'native_capacity_4')
 }
+if ($Scope -in @('DeploymentRecovery', 'RecoveryUi')) { $databaseTargets += ,@('MAINTENANCE_WEB', 'native_maintenance_web') }
 if ($Scope -eq 'Maintenance') {
     $databaseTargets += ,@('MAINTENANCE_UI', 'native_maintenance_ui')
     $databaseTargets += ,@('MAINTENANCE_TARGET', 'native_maintenance_target')
@@ -94,6 +96,15 @@ ALTER DEFAULT PRIVILEGES FOR ROLE native_owner IN SCHEMA public GRANT USAGE, SEL
     }
     if ($Scope -eq 'Organization') {
         Invoke-ExportDocExternal -FilePath 'cargo' -Arguments (@('test', '--locked', '-p', 'export-doc-storage', '--features', 'postgres', '--test', 'organization_references') + $cargoProfile + @('--', '--ignored', '--test-threads=1')) -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Organization ownership references on isolated PostgreSQL 18'
+    }
+    if ($Scope -eq 'DeploymentRecovery') {
+        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments (@('test', '--locked', '-p', 'export-doc-storage', '--features', 'postgres', '--test', 'retention') + $cargoProfile + @('--', 'postgres_retention', '--ignored', '--test-threads=1', '--nocapture')) -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Formal archive retention and cascade accounting on PostgreSQL 18'
+        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments (@('test', '--locked', '-p', 'export-doc-engine', '--features', 'postgres', '--test', 'oa_deployment') + $cargoProfile + @('--', 'postgres_batch', '--ignored', '--test-threads=1', '--nocapture')) -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Atomic workflow deployment on isolated PostgreSQL 18'
+        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments (@('test', '--locked', '-p', 'export-doc-engine', '--features', 'postgres', '--lib') + $cargoProfile + @('--', 'postgres_migration_and_physical_restore', '--ignored', '--test-threads=1', '--nocapture')) -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Snapshot-aligned PostgreSQL recovery package'
+    }
+    if ($Scope -in @('DeploymentRecovery', 'RecoveryUi')) {
+        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments (@('build', '--locked', '-p', 'export-doc-server') + $cargoProfile) -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Build independent recovery maintenance host'
+        Invoke-ExportDocExternal -FilePath 'node' -Arguments @('scripts/test_recovery_maintenance_ui.mjs') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds 180 -DisplayName 'Independent recovery React HTTP authentication and empty-database startup'
     }
     if ($Scope -eq 'AuditStatistics') {
         Invoke-ExportDocExternal -FilePath 'cargo' -Arguments (@('test', '--locked', '-p', 'export-doc-storage', '--features', 'postgres', '--test', 'audit_statistics') + $cargoProfile + @('--', 'postgres_audit', '--ignored', '--test-threads=1')) -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Exact read-only audit statistics on isolated PostgreSQL 18'

@@ -24,6 +24,7 @@ pub fn exercise(service: &NativeService, token: &str, day: &str) {
                     message: e.to_string(),
                     code: None,
                     diagnostic: None,
+                    ..Default::default()
                 }
             })
         };

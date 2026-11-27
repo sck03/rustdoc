@@ -55,6 +55,7 @@ fn decode(bytes: &[u8]) -> Result<String, ApiError> {
         message: failure.message,
         code: None,
         diagnostic: Some("pdf-credit-worker"),
+        ..Default::default()
     })
 }
 

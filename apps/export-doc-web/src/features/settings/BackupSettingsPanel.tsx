@@ -1,3 +1,4 @@
+import { readJobMessage } from "../jobs/jobPresentation.ts";
 import { lazy, Suspense, useEffect } from "react";
 import { RefreshCw, Save } from "lucide-react";
 import type { ApiBackupPlanStatus, ExportDocManagerApiClient } from "../../api/index.ts";
@@ -11,6 +12,7 @@ import { BackupSchedulePanel } from "./BackupSchedulePanel.tsx";
 import { BackupReplicaPanel } from "./BackupReplicaPanel.tsx";
 import { BackupArchivesPanel } from "./BackupArchivesPanel.tsx";
 import { BackupArchiveRestorePanel } from "./BackupArchiveRestorePanel.tsx";
+import { RecoveryRepositoryPanel } from "./RecoveryRepositoryPanel.tsx";
 import { useBackupPlan } from "./useBackupPlan.ts";
 import { backupResultLabel } from "./backupPlanModel.ts";
 import { formatRuntimeDate } from "./settingsFormatters.ts";
@@ -49,12 +51,16 @@ export default function BackupSettingsPanel({ client, databaseProvider, disabled
       action={<div className="toolbar-actions"><ViewJobButton jobId={c.jobId} />{c.activeJob && <button className="command-button secondary" type="button" disabled={c.busy} onClick={c.cancel}>取消任务</button>}
         {c.jobError && <><button className="command-button secondary" type="button" disabled={c.jobFetching} onClick={c.retryJob}>重试查询</button><button className="command-button secondary" type="button" onClick={c.dismissJob}>停止跟踪</button></>}
       </div>}>
-      {c.jobError || c.job?.errorMessage || c.job?.detailText || c.job?.statusText || "正在读取任务状态"}
+      {c.jobError || (c.job ? readJobMessage(c.job) : "正在读取任务状态")}
     </InlineNotice>}
     {section === "plan" && <BackupSchedulePanel controller={c} disabled={busy} />}
     {section === "archives" && <BackupArchivesPanel controller={c} disabled={busy} onRestore={(id) => setSection("recovery", id)} />}
+    {section === "archives" && <RecoveryRepositoryPanel client={client} disabled={busy} />}
     {section === "replica" && <BackupReplicaPanel controller={c} disabled={busy} />}
-    {section === "recovery" && databaseProvider && <BackupArchiveRestorePanel client={client} controller={c} disabled={busy} postgres={postgres} selectedId={selectedId} />}
+    {section === "recovery" && databaseProvider && <>
+      {postgres && <InlineNotice tone="warning" title="恢复前须隔离旧实例">请选择接回原文件库或重建到新位置。核验通过后，在维护期间切换数据库与配置。</InlineNotice>}
+      <BackupArchiveRestorePanel client={client} controller={c} disabled={busy} postgres={postgres} selectedId={selectedId} />
+    </>}
     <Suspense fallback={<PageState tone="loading" title="正在加载迁移与恢复工具" />}>
       {(section === "migration" || section === "recovery") && databaseProvider && (postgres
         ? <PostgreSqlMaintenancePanel client={client} canManageSettings={!busy} onPathError={onPathError} view={section} />

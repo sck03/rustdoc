@@ -50,7 +50,7 @@ function MeetingRoomsDirectory({ client, user }: { client: ExportDocManagerApiCl
       <p className="office-muted office-card-description">{room.equipment || "暂无设备说明"}</p>
       {room.handlingName && <p>办理分工：{room.handlingName} · {room.handlerNames}</p>}
       <footer className="office-card-actions"><Button disabled={query.isFetching} onClick={() => setBooking(room)}>查看日程{access.allows("create") && room.isActive ? "与预约" : ""}</Button>
-        {access.allows("manage") && (!room.handlingKey || room.canHandle) && <><button className="command-button secondary" type="button" disabled={query.isFetching} onClick={() => setEditing(room)}>编辑</button>
+        {access.allows("manage") && (!room.serviceId || room.canHandle) && <><button className="command-button secondary" type="button" disabled={query.isFetching} onClick={() => setEditing(room)}>编辑</button>
           <button className="command-button secondary" type="button" disabled={query.isFetching} onClick={() => setDeleting(room)}>删除</button></>}</footer>
     </article>)}</div>}
     <OfficePager page={query.data} paging={paging} busy={query.isFetching} />

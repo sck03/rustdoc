@@ -89,6 +89,27 @@ services:
     depends_on:
       postgres: {condition: service_healthy}
     networks: [database, web]
+  maintenance:
+    image: '${NATIVE_IMAGE:-exportdoc-rust-native:local}'
+    profiles: [maintenance]
+    command: [--app-root, /opt/exportdoc, --data-root, /var/lib/exportdoc, --web-root, /opt/exportdoc/Web, --bind, '0.0.0.0:5189', --maintenance-web]
+    environment:
+      EXPORTDOCMANAGER_POSTGRES_CONNECTION_FILE: /run/secrets/app_connection
+      EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_CONNECTION_FILE: /run/secrets/maintenance_connection
+      EXPORTDOCMANAGER_MAINTENANCE_TOKEN_FILE: /run/secrets/maintenance_token
+      EXPORTDOCMANAGER_POSTGRES_OWNER: exportdoc_owner
+    secrets: [app_connection, maintenance_connection, maintenance_token]
+    volumes:
+      - app_data:/var/lib/exportdoc
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    ports:
+      - '${NATIVE_MAINTENANCE_BIND_ADDRESS:-127.0.0.1}:${NATIVE_MAINTENANCE_PORT:-5189}:5189'
+    depends_on:
+      postgres: {condition: service_healthy}
+    stop_grace_period: 210s
+    networks: [database, web]
 secrets:
   bootstrap_password:
     file: '${NATIVE_RUNTIME_ROOT:?Use scripts/run-native-docker.ps1}/postgres-bootstrap-password.txt'
@@ -102,6 +123,8 @@ secrets:
     file: '${NATIVE_RUNTIME_ROOT:?Use scripts/run-native-docker.ps1}/app-connection.txt'
   bootstrap_token:
     file: '${NATIVE_RUNTIME_ROOT:?Use scripts/run-native-docker.ps1}/bootstrap-token.txt'
+  maintenance_token:
+    file: '${NATIVE_RUNTIME_ROOT:?Use scripts/run-native-docker.ps1}/maintenance-token.txt'
 volumes:
   postgres_data:
   app_data:

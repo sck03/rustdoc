@@ -1,6 +1,6 @@
 import type { OaApprovalSettings } from "../../api/index.ts";
 
-export const editableFields = ["rules", "delegations", "handlingServices", "sheetTemplates", "calendar"] as const;
+export const editableFields = ["rules", "delegations", "sheetTemplates", "calendar"] as const;
 export type ApprovalSettingsField = typeof editableFields[number];
 
 /** Only the submitted section may advance a draft's concurrency baseline. */

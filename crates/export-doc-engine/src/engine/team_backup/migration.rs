@@ -1,7 +1,7 @@
 //! Encrypted PostgreSQL migration packages include credentials and managed user templates.
 use super::{
     MIGRATION_STORAGE_POLICY, NativeService, auth,
-    error::{Result, invalid, unavailable},
+    error::{Result, invalid},
     package, postgres, sealed,
     store::Actor,
     tasks::TaskOutput,
@@ -9,7 +9,6 @@ use super::{
 use crate::{contracts, generated_api::*, paths::RuntimePaths};
 use serde_json::{Value, json};
 use std::{fs, path::PathBuf};
-pub(super) const MAGIC: &[u8] = b"EDM-SERVER-MIGRATION-2";
 /// Offline administrator import. A database maintenance lease proves the API has stopped.
 #[cfg(feature = "postgres")]
 pub fn stage_file(
@@ -21,23 +20,21 @@ pub fn stage_file(
 ) -> Result<()> {
     super::validate_package_password(password)?;
     crate::paths::ensure_safe_absolute(source).map_err(invalid)?;
-    if source
-        .extension()
-        .is_none_or(|value| value != "edmmigration")
-    {
-        return Err(invalid("请选择 .edmmigration 文件。"));
+    if source.extension().is_none_or(|value| value != "edmpoint") {
+        return Err(invalid("请选择本版本 .edmpoint 文件。"));
     }
     let _gate = package::lock(paths)?;
     postgres::ensure_no_pending(paths)?;
     let _lease = export_doc_storage::PostgresMaintenanceLease::acquire(maintenance, owner)?;
-    package::stage(
+    let prepared = super::portable::prepare(
         paths,
         &marker_path(paths)?,
-        MAGIC,
         password,
         fs::File::open(source)?,
-        package::POSTGRES,
-    )
+        "PostgreSQL",
+    )?;
+    prepared.verify_postgres(paths)?;
+    sealed::atomic_write(&marker_path(paths)?, &prepared.marker_content(None)?)
 }
 pub(super) fn root(paths: &RuntimePaths) -> Result<PathBuf> {
     super::migration_root(paths)
@@ -64,7 +61,7 @@ pub(super) fn status(service: &NativeService, actor: &Actor) -> Result<Value> {
     } else if !ready {
         "PostgreSQL 客户端工具未就绪。"
     } else {
-        "迁移包包含数据库、凭据主密钥和用户模板；新包使用 ZIP64 和分块加密，不设固定总容量上限；请预留足够磁盘空间。"
+        "便携恢复点包含数据库、主密钥、模板和全部文件。独立维护可流式重建本机、登记位置或 S3 文件库。"
     });
     response["storagePolicy"] = json!(MIGRATION_STORAGE_POLICY);
     Ok(response)
@@ -139,22 +136,15 @@ pub(super) fn create_package(
             let result = (|| {
                 let dump = working.join("database.dump");
                 postgres::dump_to(&store, &protector, &tools.pg_dump, &dump, &paths.disk_space)?;
-                let package = package::create(
+                let target = super::portable::create(
                     &store,
                     &paths,
                     &protector,
                     &dump,
-                    package::POSTGRES,
-                    &working,
-                    MAGIC,
+                    "PostgreSQL",
                     &password,
                 )?;
-                let target = root(&paths)?.join(format!(
-                    "edm-migration-{}.edmmigration",
-                    crate::paths::nonce().map_err(unavailable)?
-                ));
                 crate::operation::check()?;
-                fs::rename(package, &target)?;
                 super::audit(
                     &store,
                     &actor,
@@ -173,7 +163,7 @@ pub(super) fn stage_restore(
     _actor: &Actor,
     _parameters: &[(&str, String)],
 ) -> Result<Value> {
-    Err(invalid("请选择并上传 .edmmigration 迁移包。"))
+    Err(invalid("请选择并上传 .edmpoint 恢复点文件。"))
 }
 pub(super) fn stage_restore_upload(
     service: &NativeService,
@@ -185,7 +175,7 @@ pub(super) fn stage_restore_upload(
     auth::authorize(actor, "system.disaster-recovery", "manage")?;
     postgres::require_ready(service)?;
     super::confirmation(parameters, "MIGRATE")?;
-    super::managed_file(&root(&service.paths)?, file_name, "edmmigration")?;
+    super::managed_file(&root(&service.paths)?, file_name, "edmpoint")?;
     let password = zeroize::Zeroizing::new(
         super::header(parameters, super::MIGRATION_PASSWORD_HEADER).to_owned(),
     );
@@ -202,13 +192,12 @@ pub(super) fn stage_restore_upload(
             auth::authorize_operation(&actor, STAGE_SERVER_MIGRATION_RESTORE, &[])?;
             let lock = package::lock(&paths)?;
             postgres::ensure_no_pending(&paths)?;
-            let prepared = package::prepare(
-                &paths.disk_space,
+            let prepared = super::portable::prepare(
+                &paths,
                 &marker_path(&paths)?,
-                MAGIC,
                 &password,
                 input,
-                package::POSTGRES,
+                "PostgreSQL",
             )?;
             prepared.verify_postgres(&paths)?;
             Ok(prepared.into_task(

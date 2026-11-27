@@ -19,9 +19,12 @@ pub use crm_query::{CrmFollowUpCounts, CrmList, CrmQuery};
 mod attachment_history;
 mod invoice_status_history;
 pub use invoice_status_history::InvoiceStatusEvent;
+mod capacity;
 mod communication;
+mod file_archive;
 mod file_catalog;
 mod generic_query;
+mod retention;
 pub use business_query::{BusinessList, BusinessQuery};
 pub use file_catalog::{FileInfo, FileObject, FileWrite};
 mod hs_query;
@@ -140,13 +143,18 @@ impl std::fmt::Display for Error {
 }
 impl std::error::Error for Error {}
 impl From<serde_json::Error> for Error {
-    fn from(e: serde_json::Error) -> Self {
-        Self::unavailable(format!("数据库记录不符合契约：{e}"))
+    fn from(_e: serde_json::Error) -> Self {
+        Self::unavailable("数据库记录不符合当前契约，请核验数据库版本和数据完整性。")
     }
 }
 impl From<std::io::Error> for Error {
     fn from(e: std::io::Error) -> Self {
-        Self::unavailable(format!("存储文件操作失败：{e}"))
+        Self::unavailable(match e.kind() {
+            std::io::ErrorKind::NotFound => "存储文件不存在，请核对目录和挂载状态。",
+            std::io::ErrorKind::PermissionDenied => "存储文件访问被拒绝，请核对服务目录权限。",
+            std::io::ErrorKind::StorageFull => "存储卷空间已用尽，请扩容或清理无用临时文件。",
+            _ => "存储文件读写未完成，请核对介质状态和目录权限。",
+        })
     }
 }
 
@@ -389,6 +397,21 @@ delegate! {
     delete_files(record:i64,kind:Option<&str>)->();
     file_objects(after:&str,limit:i64,unused:bool)->Vec<FileObject>;
     file_statistics()->Value;
+    retained_files(after:&str,limit:i64)->Value;
+    retained_file(id:&str)->Option<Value>;
+    save_retention_policy(class:&str,days:i64,revision:i64)->();
+    classify_retained_file(id:&str,class:&str,basis:&str,revision:i64)->();
+    hold_retained_file(digest:&str,active:bool,reason:&str,revision:i64)->();
+    remove_retained_file(id:&str,revision:i64)->();
+    sample_capacity(day:&str,location:&str,physical:u64,logical:u64,reclaimable:u64,oldest:&str)->();
+    capacity_history(since:&str)->Value;
+    capacity_administrators()->Value;
+    export_database_snapshot()->String;
+    handling_service_page(company:&str,category:&str,after:&str,limit:i64)->Vec<Value>;
+    search_handling_services(company:&str,category:&str,resource:&str,keyword:&str,state:&str,after:&str,limit:i64)->Vec<Value>;
+    get_handling_service(company:&str,id:&str)->Option<Value>;
+    save_handling_service(company:&str,service:&Value)->();
+    remove_handling_service(company:&str,id:&str)->();
     verify_file_accounting()->();
     begin_file_migration(identity:&str)->();
     end_file_migration(identity:&str)->();
@@ -396,6 +419,7 @@ delegate! {
     file_owner_company(record:i64)->String;
     pending_file_copies(identity:&str)->Vec<FileObject>;
     locate_file(identity:&str,digest:&str)->();
+    archive_file(identity:&str,digest:&str)->();
     query_resources(query:&ResourceQuery<'_>)->(i64,Vec<Value>);
     append_attachment_history(record:i64,kind:&str,body:&Value)->();
     append_invoice_status(event:&InvoiceStatusEvent)->();
@@ -535,3 +559,4 @@ delegate! {
     delete_blob(record_id:i64,kind:&str)->();
     backup(path:&Path,capacity:&mut dyn FnMut(u64)->Result<()>)->();
 }
+mod handling_services;

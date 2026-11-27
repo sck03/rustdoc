@@ -12,6 +12,32 @@ pub(super) fn registry(tx: &Connection, company: &str) -> Result<Value> {
         .find_identity(settings::STORAGE_KIND, &store::normalize(company))?
         .unwrap_or(json!({"versionNumber":0,"publications":[]})))
 }
+pub(super) fn advance_services(tx: &Connection, actor: &Actor) -> Result<()> {
+    let identity = identity(&actor.company, "handlingServices");
+    let previous = tx.find_identity(SECTION, &identity)?;
+    let id = previous
+        .as_ref()
+        .and_then(|v| v["id"].as_i64())
+        .unwrap_or(0);
+    let revision = previous.as_ref().map(store::expected).unwrap_or(0);
+    store::save(
+        tx,
+        SECTION,
+        id,
+        json!({"key":"handlingServices","value":null,"expectedVersion":revision}),
+        Some(identity),
+        actor,
+        "change-handling-service",
+    )?;
+    Ok(())
+}
+pub(super) fn service_revision(tx: &Connection, company: &str) -> Result<i64> {
+    Ok(tx
+        .find_identity(SECTION, &identity(company, "handlingServices"))?
+        .as_ref()
+        .map(store::expected)
+        .unwrap_or(0))
+}
 fn default_section(tx: &Connection, key: &str) -> Result<Value> {
     Ok(match key {
         "calendar" => {
@@ -62,10 +88,14 @@ pub(super) fn load(tx: &Connection, company: &str) -> Result<Value> {
         "sheetTemplates",
     ] {
         if let Some(record) = tx.find_identity(SECTION, &identity(company, key))? {
-            value[key] = record["value"].clone();
+            if key != "handlingServices" {
+                value[key] = record["value"].clone();
+            }
             value["revisions"][key] = record["versionNumber"].clone();
         } else {
-            value[key] = default_section(tx, key)?;
+            if key != "handlingServices" {
+                value[key] = default_section(tx, key)?;
+            }
             value["revisions"][key] = json!(0);
         }
     }

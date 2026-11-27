@@ -39,16 +39,38 @@ await withOfficeUi('file-storage-ui', async ({ output, url, invoke, operations, 
     assert.equal(response.headers.get('content-range'), `bytes ${from}-${to - 1}/${whole.length}`);
   }
   assert.equal((await request('DownloadPersonnelAttachment', parameters, { headers: { Range: 'bytes=99999-' } })).status, 416);
+  const archived = second.items[0];
+  person = await invoke('DeletePersonnelAttachment', {expectedVersion:person.versionNumber,note:'专项验证归档保留'}, {id:person.employee.id,attachmentId:archived.id}, token);
   const page = await openPage('oa-review', 'Review-2026-Test');
   await page.goto(`${url}/#/settings`);
   const panel = page.getByRole('region', { name: '文件与存储', exact: true });
-  await panel.getByText('正常', { exact: true }).waitFor();
+  await panel.getByText('正常', { exact: true }).first().waitFor();
+  const retention = panel.locator('details').filter({has:page.locator('summary').filter({hasText:'正式档案保留'})});
+  await retention.locator('summary').click();
+  const retainedRow = retention.getByRole('row').filter({hasText:archived.fileName});
+  await retainedRow.getByText('长期保留',{exact:true}).waitFor();
+  const downloading = page.waitForEvent('download');
+  await retainedRow.getByRole('button',{name:'取回',exact:true}).click();
+  const downloaded = await downloading;
+  assert.equal(downloaded.suggestedFilename(),archived.fileName);
+  const retainedPath = path.join(output,'retrieved.pdf');
+  await downloaded.saveAs(retainedPath);
+  assert.equal(fs.readFileSync(retainedPath).length,archived.sizeBytes);
+  await retainedRow.getByRole('button',{name:'管理保留',exact:true}).click();
+  await retention.getByLabel('结案或归档日期',{exact:true}).fill('2026-11-01');
+  await retention.getByLabel('依据或暂停原因',{exact:true}).fill('隔离专项结案');
+  await retention.getByRole('button',{name:'确认归档日期',exact:true}).click();
+  await retainedRow.getByRole('cell',{name:'2026-11-01',exact:true}).waitFor();
+  await page.screenshot({path:path.join(output,'retention-ui.png'),fullPage:true});
+  await retention.locator('summary').click();
   await panel.locator('summary').filter({ hasText: '容量策略' }).click();
   await panel.getByLabel('单文件上限（MiB）', { exact: true }).fill('80');
   await panel.getByRole('button', { name: '保存容量策略', exact: true }).click();
   await panel.getByText('容量策略已保存。', { exact: true }).waitFor();
   assert.equal((await invoke('GetFileStoragePolicy', undefined, {}, token)).fileBytes, 80 * 1024 * 1024);
   await panel.locator('summary').filter({ hasText: '迁移存储' }).click();
+  await panel.getByText('尚未登记独立位置。使用 NAS 共享目录时，请先在部署端挂载并登记。', { exact: true }).waitFor();
+  assert.equal(await panel.getByRole('combobox', { name: '已登记的独立位置', exact: true }).isDisabled(), true);
   await panel.getByLabel('目标目录', { exact: true }).fill('AttachmentArchive');
   await panel.getByRole('button', { name: '核验并迁移', exact: true }).click();
   const deadline = Date.now() + 60000;
@@ -68,7 +90,7 @@ await withOfficeUi('file-storage-ui', async ({ output, url, invoke, operations, 
     assert.equal((await request('DownloadPersonnelAttachment', parameters)).status, 503);
   } finally { fs.writeFileSync(marker, original); }
   await panel.getByRole('button', { name: '检查状态', exact: true }).click();
-  await panel.getByText('正常', { exact: true }).waitFor();
+  await panel.getByText('正常', { exact: true }).first().waitFor();
   await page.evaluate(require('axe-core').source);
   await withS3Fixture(async remote => {
     const migration = panel.locator('details').filter({ has: page.locator('summary').filter({ hasText: '迁移存储' }) });

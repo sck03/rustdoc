@@ -65,7 +65,10 @@ impl Scheduler {
             operation::check()?;
             match self.gate.try_lock() {
                 Ok(guard) => return Ok(guard),
-                Err(TryLockError::Poisoned(_)) => return Err(unavailable("灾备执行状态异常。")),
+                Err(TryLockError::Poisoned(_)) => {
+                    return Err(unavailable("灾备执行状态异常。")
+                        .coded(crate::api::ErrorCode::DependencyUnavailable));
+                }
                 Err(TryLockError::WouldBlock) => {
                     if std::time::Instant::now() >= deadline {
                         return Err(error(429, "灾备计划正在处理中，请稍后重试。"));
@@ -76,10 +79,9 @@ impl Scheduler {
         }
     }
     pub(in crate::engine) fn health(&self) -> Result<()> {
-        let worker = self
-            .worker
-            .lock()
-            .map_err(|_| unavailable("灾备调度器状态异常。"))?;
+        let worker = self.worker.lock().map_err(|_| {
+            unavailable("灾备调度器状态异常。").coded(crate::api::ErrorCode::DependencyUnavailable)
+        })?;
         if worker
             .as_ref()
             .is_some_and(|worker| worker.handle.is_finished())
@@ -92,15 +94,14 @@ impl Scheduler {
     }
 
     pub(in crate::engine) fn bind(service: &Arc<NativeService>) -> Result<()> {
+        super::maintenance::recover_rotation(service)?;
         drop(package::lock(&service.paths)?);
         let _ = service
             .backup_scheduler
             .service
             .set(Arc::downgrade(service));
         let mut saved = load(&service.store)?;
-        if saved.plan.enabled
-            && !repository::identity(&service.paths).is_ok_and(|id| id == saved.repository)
-        {
+        if saved.plan.enabled && super::super::repository::valid_id(&saved.repository).is_err() {
             // Restoring a machine must not inherit active cleanup for its source's repository.
             saved.plan.enabled = false;
             saved.revision += 1;
@@ -116,14 +117,10 @@ impl Scheduler {
         }
         service.backup_scheduler.refresh(service)
     }
-    pub(in crate::engine) fn refresh(&self, service: &NativeService) -> Result<()> {
-        if !load(&service.store)?.plan.enabled {
-            return self.stop();
-        }
-        let mut worker = self
-            .worker
-            .lock()
-            .map_err(|_| unavailable("灾备调度器状态异常。"))?;
+    pub(in crate::engine) fn refresh(&self, _service: &NativeService) -> Result<()> {
+        let mut worker = self.worker.lock().map_err(|_| {
+            unavailable("灾备调度器状态异常。").coded(crate::api::ErrorCode::DependencyUnavailable)
+        })?;
         if worker
             .as_ref()
             .is_some_and(|worker| !worker.handle.is_finished())
@@ -131,14 +128,18 @@ impl Scheduler {
             return Ok(());
         }
         if let Some(old) = worker.take() {
-            old.handle
-                .join()
-                .map_err(|_| unavailable("灾备调度线程异常退出。"))?;
+            old.handle.join().map_err(|_| {
+                unavailable("灾备调度线程异常退出。")
+                    .coded(crate::api::ErrorCode::DependencyUnavailable)
+            })?;
         }
         let weak = self
             .service
             .get()
-            .ok_or_else(|| unavailable("灾备调度器未绑定。"))?
+            .ok_or_else(|| {
+                unavailable("灾备调度器未绑定。")
+                    .coded(crate::api::ErrorCode::DependencyUnavailable)
+            })?
             .clone();
         let stop = Arc::new((Mutex::new(Control::default()), Condvar::new()));
         let signal = stop.clone();
@@ -167,7 +168,10 @@ impl Scheduler {
                             control.active = Some(scope.clone());
                         }
                         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                            scope.run(|| service.backup_scheduler.run(&service, None, Utc::now()))
+                            scope.run(|| {
+                                crate::engine::file_store::capacity::observe(&service, false)?;
+                                service.backup_scheduler.run(&service, None, Utc::now())
+                            })
                         }));
                         let stopping = {
                             let mut control = signal.0.lock().unwrap_or_else(|p| p.into_inner());
@@ -199,15 +203,17 @@ impl Scheduler {
                     );
                 }
             })
-            .map_err(|_| unavailable("无法启动日常灾备调度器。"))?;
+            .map_err(|_| {
+                unavailable("无法启动日常灾备调度器。")
+                    .coded(crate::api::ErrorCode::DependencyUnavailable)
+            })?;
         *worker = Some(Worker { stop, handle });
         Ok(())
     }
     pub(in crate::engine) fn stop(&self) -> Result<()> {
-        let mut worker = self
-            .worker
-            .lock()
-            .map_err(|_| unavailable("灾备调度器状态异常。"))?;
+        let mut worker = self.worker.lock().map_err(|_| {
+            unavailable("灾备调度器状态异常。").coded(crate::api::ErrorCode::DependencyUnavailable)
+        })?;
         if let Some(active) = worker.as_ref() {
             signal(active)?;
             if active.handle.thread().id() == std::thread::current().id() {
@@ -216,24 +222,24 @@ impl Scheduler {
             let deadline = std::time::Instant::now() + Duration::from_secs(10);
             while !active.handle.is_finished() {
                 if std::time::Instant::now() >= deadline {
-                    return Err(unavailable("灾备调度线程未在关闭时限内退出。"));
+                    return Err(unavailable("灾备调度线程未在关闭时限内退出。")
+                        .coded(crate::api::ErrorCode::DependencyUnavailable));
                 }
                 std::thread::sleep(Duration::from_millis(10));
             }
         }
         if let Some(finished) = worker.take() {
-            finished
-                .handle
-                .join()
-                .map_err(|_| unavailable("灾备调度线程异常退出。"))?;
+            finished.handle.join().map_err(|_| {
+                unavailable("灾备调度线程异常退出。")
+                    .coded(crate::api::ErrorCode::DependencyUnavailable)
+            })?;
         }
         Ok(())
     }
     pub(in crate::engine) fn request_stop(&self) -> Result<()> {
-        let worker = self
-            .worker
-            .lock()
-            .map_err(|_| unavailable("灾备调度器状态异常。"))?;
+        let worker = self.worker.lock().map_err(|_| {
+            unavailable("灾备调度器状态异常。").coded(crate::api::ErrorCode::DependencyUnavailable)
+        })?;
         if let Some(worker) = worker.as_ref() {
             signal(worker)?;
         }
@@ -289,9 +295,7 @@ impl Scheduler {
             if saved.password.is_empty() {
                 return Err(invalid("请先保存灾备包密码。"));
             }
-            if repository::identity(&service.paths)? != saved.repository {
-                return Err(unavailable("灾备目录与计划不匹配，请复核后重新保存。"));
-            }
+            super::super::repository::valid_id(&saved.repository)?;
             let password = service
                 .protector
                 .unprotect(PASSWORD, &saved.password)
@@ -346,11 +350,9 @@ impl Scheduler {
     }
 }
 fn signal(worker: &Worker) -> Result<()> {
-    let mut control = worker
-        .stop
-        .0
-        .lock()
-        .map_err(|_| unavailable("灾备停止状态异常。"))?;
+    let mut control = worker.stop.0.lock().map_err(|_| {
+        unavailable("灾备停止状态异常。").coded(crate::api::ErrorCode::DependencyUnavailable)
+    })?;
     control.stopping = true;
     if let Some(scope) = &control.active {
         scope.cancel();

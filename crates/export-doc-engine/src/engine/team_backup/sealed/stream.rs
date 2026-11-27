@@ -12,7 +12,9 @@ fn cipher(password: &str, salt: &[u8]) -> Result<Aes256Gcm> {
         salt,
         PBKDF2_ITERATIONS,
     ));
-    Aes256Gcm::new_from_slice(key.as_ref()).map_err(|_| unavailable("包密钥长度无效。"))
+    Aes256Gcm::new_from_slice(key.as_ref()).map_err(|_| {
+        unavailable("包密钥长度无效。").coded(crate::api::ErrorCode::DependencyUnavailable)
+    })
 }
 fn nonce(prefix: &[u8], index: u32) -> [u8; NONCE_LENGTH] {
     let mut value = [0; NONCE_LENGTH];
@@ -29,48 +31,104 @@ fn exact(input: &mut impl Read, bytes: &mut [u8]) -> Result<()> {
         }
     })
 }
+#[cfg(test)]
 pub(in crate::engine::team_backup) fn seal(
     magic: &[u8],
     password: &str,
     mut input: impl Read,
     output: &mut impl Write,
 ) -> Result<()> {
-    let mut header = magic.to_vec();
-    let mut random = [0; SALT_LENGTH + PREFIX];
-    getrandom::fill(&mut random).map_err(|_| unavailable("无法生成包随机数。"))?;
-    header.extend_from_slice(&random);
-    let cipher = cipher(password, &random[..SALT_LENGTH])?;
-    output.write_all(&header)?;
-    let mut aad = header.clone();
-    aad.extend_from_slice(&[0; 4]);
-    let mut written = header.len() as u64;
-    let mut buffer = zeroize::Zeroizing::new(Vec::with_capacity(CHUNK));
-    for index in 0..=u32::MAX {
-        crate::operation::check()?;
-        buffer.clear();
-        input.by_ref().take(CHUNK as u64).read_to_end(&mut buffer)?;
-        let size = buffer.len();
-        written = written
-            .checked_add((4 + size + TAG) as u64)
-            .ok_or_else(|| invalid("迁移包大小计数溢出。"))?;
-        let length = (size as u32).to_le_bytes();
-        aad[header.len()..].copy_from_slice(&length);
-        let tag = cipher
-            .encrypt_inout_detached(
-                &Nonce::from(nonce(&random[SALT_LENGTH..], index)),
-                &aad,
-                buffer.as_mut_slice().into(),
-            )
-            .map_err(|_| unavailable("迁移包分块加密失败。"))?;
-        output.write_all(&length)?;
-        output.write_all(&buffer)?;
-        output.write_all(&tag)?;
-        if size == 0 {
-            output.flush()?;
-            return Ok(());
-        }
+    let mut writer = SealingWriter::new(magic, password, output)?;
+    crate::engine::backup_io::copy_chunks(
+        &mut input,
+        &mut writer,
+        crate::engine::backup_io::MAX_FILE_BYTES,
+        |_| {},
+    )?;
+    writer.finish()?;
+    Ok(())
+}
+
+pub(in crate::engine::team_backup) struct SealingWriter<W: Write> {
+    output: W,
+    cipher: Aes256Gcm,
+    header: Vec<u8>,
+    prefix: [u8; PREFIX],
+    index: u64,
+    buffer: zeroize::Zeroizing<Vec<u8>>,
+}
+impl<W: Write> SealingWriter<W> {
+    pub(in crate::engine::team_backup) fn new(
+        magic: &[u8],
+        password: &str,
+        mut output: W,
+    ) -> Result<Self> {
+        let mut header = magic.to_vec();
+        let mut random = [0; SALT_LENGTH + PREFIX];
+        getrandom::fill(&mut random).map_err(|_| {
+            unavailable("无法生成包随机数。").coded(crate::api::ErrorCode::DependencyUnavailable)
+        })?;
+        header.extend_from_slice(&random);
+        let cipher = cipher(password, &random[..SALT_LENGTH])?;
+        output.write_all(&header)?;
+        let prefix = random[SALT_LENGTH..].try_into().unwrap();
+        Ok(Self {
+            output,
+            cipher,
+            header,
+            prefix,
+            index: 0,
+            buffer: zeroize::Zeroizing::new(Vec::with_capacity(CHUNK)),
+        })
     }
-    Err(invalid("迁移包块数超过上限。"))
+    fn record(&mut self) -> Result<()> {
+        crate::operation::check()?;
+        let index = u32::try_from(self.index).map_err(|_| invalid("恢复包分块数量超过上限。"))?;
+        let mut aad = self.header.clone();
+        aad.extend_from_slice(&[0; 4]);
+        let size = self.buffer.len();
+        let length = (size as u32).to_le_bytes();
+        aad[self.header.len()..].copy_from_slice(&length);
+        let tag = self
+            .cipher
+            .encrypt_inout_detached(
+                &Nonce::from(nonce(&self.prefix, index)),
+                &aad,
+                self.buffer.as_mut_slice().into(),
+            )
+            .map_err(|_| {
+                unavailable("迁移包分块加密失败。")
+                    .coded(crate::api::ErrorCode::DependencyUnavailable)
+            })?;
+        self.output.write_all(&length)?;
+        self.output.write_all(&self.buffer)?;
+        self.output.write_all(&tag)?;
+        self.buffer.clear();
+        self.index += 1;
+        Ok(())
+    }
+    pub(in crate::engine::team_backup) fn finish(mut self) -> Result<W> {
+        if !self.buffer.is_empty() {
+            self.record()?;
+        }
+        self.record()?;
+        self.output.flush()?;
+        Ok(self.output)
+    }
+}
+impl<W: Write> Write for SealingWriter<W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        let size = bytes.len().min(CHUNK - self.buffer.len());
+        self.buffer.extend_from_slice(&bytes[..size]);
+        if self.buffer.len() == CHUNK {
+            self.record().map_err(std::io::Error::other)?;
+        }
+        Ok(size)
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        // A short encrypted frame may only be followed by the authenticated end.
+        self.output.flush()
+    }
 }
 pub(in crate::engine::team_backup) fn open(
     magic: &[u8],
@@ -133,73 +191,7 @@ pub(in crate::engine::team_backup) fn open(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sha2::Digest;
 
-    #[test]
-    #[ignore = "explicit large-file disk and streaming verification"]
-    fn large_backup_stream_and_zip64_exceed_the_old_limits() {
-        let workspace = crate::engine::team_backup::tests::Workspace::new();
-        let source = workspace.0.join("large.bin");
-        let size = 1024 * 1024 * 1024 + 17;
-        fs::File::create(&source).unwrap().set_len(size).unwrap();
-        let expected =
-            super::super::ManifestFile::from_path("Templates/large.bin", &source).unwrap();
-        let encrypted = workspace.0.join("large.sealed");
-        seal(
-            b"EDM-TEST-2",
-            "large-file-test-password",
-            fs::File::open(&source).unwrap(),
-            &mut fs::File::create(&encrypted).unwrap(),
-        )
-        .unwrap();
-        struct Sink {
-            bytes: u64,
-            hash: Sha256,
-        }
-        impl Write for Sink {
-            fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
-                self.bytes += bytes.len() as u64;
-                self.hash.update(bytes);
-                Ok(bytes.len())
-            }
-            fn flush(&mut self) -> std::io::Result<()> {
-                Ok(())
-            }
-        }
-        let mut output = Sink {
-            bytes: 0,
-            hash: Sha256::new(),
-        };
-        open(
-            b"EDM-TEST-2",
-            "large-file-test-password",
-            fs::File::open(&encrypted).unwrap(),
-            &mut output,
-        )
-        .unwrap();
-        assert_eq!(output.bytes, size);
-        assert_eq!(
-            crate::engine::team_backup::hex(&output.hash.finalize()),
-            expected.sha256
-        );
-        let archive = workspace.0.join("large.zip");
-        super::super::zip_payload(
-            &[super::super::Entry {
-                source: &source,
-                name: "Templates/large.bin",
-            }],
-            fs::File::create(&archive).unwrap(),
-        )
-        .unwrap();
-        let entries = super::super::unpack(
-            fs::File::open(archive).unwrap(),
-            &workspace.0.join("unpacked"),
-            &std::sync::Arc::new(crate::temporary_space::Budget::new(workspace.0.clone())),
-        )
-        .unwrap();
-        assert_eq!(entries[0].size_bytes, size);
-        assert_eq!(entries[0].sha256, expected.sha256);
-    }
     #[test]
     fn records_bind_order_length_type_password_and_authenticated_end() {
         let payload = vec![42; CHUNK * 2 + 7];

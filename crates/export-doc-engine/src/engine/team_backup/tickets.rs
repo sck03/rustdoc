@@ -21,10 +21,9 @@ impl<T> Default for Pool<T> {
 }
 impl<T> Pool<T> {
     fn issue(&self, value: T, limit: usize) -> Result<(String, String)> {
-        let mut tickets = self
-            .0
-            .lock()
-            .map_err(|_| unavailable("备份票据状态异常。"))?;
+        let mut tickets = self.0.lock().map_err(|_| {
+            unavailable("备份票据状态异常。").coded(crate::api::ErrorCode::DependencyUnavailable)
+        })?;
         let now = Instant::now();
         tickets.retain(|_, ticket| ticket.expires >= now);
         if tickets.len() >= limit {
@@ -48,10 +47,9 @@ impl<T> Pool<T> {
         ))
     }
     fn take(&self, token: &str) -> Result<Option<T>> {
-        let mut tickets = self
-            .0
-            .lock()
-            .map_err(|_| unavailable("备份票据状态异常。"))?;
+        let mut tickets = self.0.lock().map_err(|_| {
+            unavailable("备份票据状态异常。").coded(crate::api::ErrorCode::DependencyUnavailable)
+        })?;
         Ok(tickets
             .remove(token)
             .filter(|ticket| ticket.expires >= Instant::now())

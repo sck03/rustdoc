@@ -13,16 +13,16 @@ import { attachmentUploadForm } from "../../ui/documentAttachments.ts";
 
 export function OfficeSupplyEditor({ client, user, supply, onClose, onSaved }: { client: ExportDocManagerApiClient; user: ApiUserDto; supply?: OfficeSupplyRecord; onClose: () => void; onSaved: (saved: OfficeSupplyRecord) => void }) {
   const operation = useOfficeResourceOperation("supplies", client);
-  const [handlingKey, setHandlingKey] = useState(supply?.handlingKey ?? "");
+  const [serviceId, setHandlingKey] = useState(supply?.serviceId ?? "");
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const body = { ...readOfficeSupplyForm(new FormData(event.currentTarget), supply?.versionNumber ?? 0), handlingKey };
+    const body = { ...readOfficeSupplyForm(new FormData(event.currentTarget), supply?.versionNumber ?? 0), serviceId };
     void operation.run((signal) => supply ? client.updateOfficeSupply({ id: supply.id, body }, { signal }) : client.createOfficeSupply({ body }, { signal }), onSaved);
   }
   return <OfficeDialog title={supply ? "编辑物品" : "添加物品"} onClose={onClose} {...operation} protectChanges>
     <form onSubmit={submit}><fieldset disabled={operation.busy} className="office-form-grid">
       <OfficeField label="物品名称" wide><input name="name" required maxLength={120} defaultValue={supply?.name} /></OfficeField>
-      <HandlingServicePicker client={client} user={user} category="Supply" value={handlingKey} onChange={setHandlingKey} />
+      <HandlingServicePicker client={client} user={user} category="Supply" value={serviceId} onChange={setHandlingKey} />
       <OfficeField label="计量单位"><input name="unit" required maxLength={20} defaultValue={supply?.unit ?? "件"} placeholder="支、本、盒、件" /></OfficeField>
       <OfficeField label="最低可用库存"><input name="minimumStock" type="number" required min={0} max={1000000} defaultValue={supply?.minimumStock ?? 0} /></OfficeField>
       <OfficeField label="存放／领取位置" wide><input name="location" maxLength={200} defaultValue={supply?.location} /></OfficeField>

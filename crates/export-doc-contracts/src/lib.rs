@@ -4,6 +4,7 @@ pub mod generated_api;
 pub mod hs_maintenance;
 pub mod invoice_editing;
 pub mod openapi;
+pub use openapi::native as native_contract;
 pub mod permission_actions;
 pub mod report_batches;
 pub mod report_pages;

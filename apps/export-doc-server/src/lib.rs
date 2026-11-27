@@ -1,6 +1,10 @@
 mod admission;
 #[cfg(feature = "postgres")]
 pub mod configuration;
+#[cfg(feature = "postgres")]
+pub mod maintenance;
+mod signal;
+pub use signal::shutdown_signal;
 pub mod desktop;
 mod download_body;
 mod downloads;

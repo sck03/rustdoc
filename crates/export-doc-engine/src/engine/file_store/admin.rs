@@ -18,6 +18,16 @@ pub(in crate::engine) const OPERATIONS: &[Operation] = &[
     UPDATE_FILE_STORAGE_CREDENTIALS,
     START_FILE_STORAGE_MIGRATION,
     VERIFY_FILE_STORAGE,
+    PREVIEW_FILE_COLLECTION,
+    QUERY_FILE_RETENTION,
+    SAVE_RETENTION_POLICY,
+    CLASSIFY_RETAINED_FILE,
+    HOLD_RETAINED_FILE,
+    PREVIEW_RETENTION_DELETION,
+    APPROVE_RETENTION_DELETION,
+    GET_STORAGE_CAPACITY,
+    SAVE_STORAGE_CAPACITY_POLICY,
+    ARCHIVE_RETAINED_FILES,
 ];
 
 pub(in crate::engine) fn handle(
@@ -28,6 +38,21 @@ pub(in crate::engine) fn handle(
 ) -> Result<Value> {
     let actor = service.store.read(|tx| auth::refresh_actor_in(tx, actor))?;
     auth::authorize_operation(&actor, operation, &[])?;
+    if [
+        QUERY_FILE_RETENTION,
+        SAVE_RETENTION_POLICY,
+        CLASSIFY_RETAINED_FILE,
+        HOLD_RETAINED_FILE,
+        PREVIEW_RETENTION_DELETION,
+        APPROVE_RETENTION_DELETION,
+    ]
+    .contains(&operation)
+    {
+        return super::retention::handle(service, &actor, operation, body);
+    }
+    if [GET_STORAGE_CAPACITY, SAVE_STORAGE_CAPACITY_POLICY].contains(&operation) {
+        return super::capacity::handle(service, &actor, operation, body);
+    }
     if operation == GET_FILE_STORAGE_POLICY {
         return serde_json::to_value(service.store.files.configuration()?.policy)
             .map_err(Into::into);
@@ -37,6 +62,9 @@ pub(in crate::engine) fn handle(
     }
     if operation == GET_FILE_STORAGE {
         return status(&service.store);
+    }
+    if operation == PREVIEW_FILE_COLLECTION {
+        return super::cleanup::preview(service, &actor);
     }
     if operation == UPDATE_FILE_STORAGE_CREDENTIALS {
         super::credentials::rotate(&service.store, &actor, body)?;
@@ -84,6 +112,8 @@ pub(in crate::engine) fn handle(
             "FileReconcile"
         } else if operation == VERIFY_FILE_STORAGE {
             "FileIntegrity"
+        } else if operation == ARCHIVE_RETAINED_FILES {
+            "FileArchive"
         } else {
             "FileMigration"
         },
@@ -91,6 +121,8 @@ pub(in crate::engine) fn handle(
             "回收无引用文件"
         } else if operation == VERIFY_FILE_STORAGE {
             "检查文件完整性"
+        } else if operation == ARCHIVE_RETAINED_FILES {
+            "迁移正式档案"
         } else {
             "迁移文件存储"
         },
@@ -115,7 +147,11 @@ pub(in crate::engine) fn handle(
                     }
                     Ok(())
                 })?;
-                bytes = store.files.reconcile(&store)?;
+                bytes = super::cleanup::execute(
+                    &store,
+                    &administrator,
+                    body["token"].as_str().unwrap_or(""),
+                )?;
             } else if operation == VERIFY_FILE_STORAGE {
                 store.read(|tx| {
                     tx.verify_file_accounting()?;
@@ -127,6 +163,8 @@ pub(in crate::engine) fn handle(
                     bytes += object.size;
                     Ok(())
                 })?;
+            } else if operation == ARCHIVE_RETAINED_FILES {
+                (count, bytes) = super::archive::run(&store, &administrator, &body)?;
             } else {
                 (count, bytes) = super::migration::run(&store, &administrator, &body)?;
             }
@@ -200,10 +238,9 @@ fn status(store: &Store) -> Result<Value> {
 impl FileStore {
     pub(super) fn activate(&self, config: Configuration) -> Result<()> {
         config.policy.validate()?;
-        let mut state = self
-            .state
-            .write()
-            .map_err(|_| unavailable("文件存储状态异常。"))?;
+        let mut state = self.state.write().map_err(|_| {
+            unavailable("文件存储状态异常。").coded(crate::api::ErrorCode::DependencyUnavailable)
+        })?;
         paths::atomic_write(&self.configuration_path, &serde_json::to_vec(&config)?)
             .map_err(unavailable)?;
         *state = config;

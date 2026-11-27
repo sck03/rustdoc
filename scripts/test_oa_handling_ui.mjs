@@ -1,4 +1,4 @@
-import { approvalStage, fulfillNodeInUi, publishDefinitions, approveResourceTask, linkBusinessPerson, openDefinitionInUi, saveApprovalPartInUi } from './lib/approval-fixtures.mjs';
+import { listHandlingServices, approvalStage, fulfillNodeInUi, publishDefinitions, approveResourceTask, linkBusinessPerson, openDefinitionInUi, saveApprovalPartInUi } from './lib/approval-fixtures.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -32,10 +32,10 @@ await withOfficeUi('oa-handling-ui', async ({ output, require, url, invoke, open
   await saveApprovalPartInUi(admin, '保存当前流程');
   await admin.getByRole('tab', { name: '办理分工', exact: true }).click();
   for (const [i,[category,name,handler]] of [['Seal','公章',2],['Seal','合同章',3],['Certificate','在职证明',3],['Supply','日常用品',2],['Supply','服装辅料',3],['Room','会议接待',2]].entries()) {
-    await admin.getByRole('button', { name: '添加办理分工', exact: true }).click();
-    const group = admin.getByRole('group', { name: `办理分工 ${i+1}`, exact: true });
-    await group.getByLabel('分工类别').selectOption(category);
-    await group.getByLabel('事项或资源分工名称').fill(name);
+    await admin.getByRole('button', { name: '添加办理事项', exact: true }).click();
+    const group = admin.getByRole('dialog', { name: '添加办理事项', exact: true });
+    await group.getByLabel('类别', {exact:true}).selectOption(category);
+    await group.getByLabel('事项名称').fill(name);
     await group.getByRole('combobox', { name: /^办理人员 1/u }).selectOption(String(users[handler].id));
     if (category === 'Room') {
       await group.getByRole('button', { name: '添加办理人员', exact: true }).click();
@@ -44,18 +44,19 @@ await withOfficeUi('oa-handling-ui', async ({ output, require, url, invoke, open
       assert(await secondHandler.locator(`option[value="${users[2].id}"]`).evaluate(option => option.disabled), 'duplicate handlers cannot be selected');
       await secondHandler.selectOption(String(users[3].id));
     }
+    await group.getByRole('button', {name:'保存事项',exact:true}).click();
+    await group.waitFor({state:'hidden'});
   }
-  await saveApprovalPartInUi(admin, '保存办理分工');
   await admin.screenshot({ path: path.join(output,'handling-settings.png'),fullPage:true });
   const policy = await invoke('GetOaApprovalSettings',undefined,{},token);
   for (const rule of policy.rules.filter(r => ['room', 'supply'].includes(r.key))) rule.stages = [approvalStage('review', [users[0].id])];
   await publishDefinitions(invoke, token, policy, ['general', 'room', 'supply']);
   const reviewerToken = (await invoke('Login', { username: 'handling-leader', password })).accessToken;
-  const keys = Object.fromEntries(policy.handlingServices.map(row => [row.name,row.key]));
+  const keys = Object.fromEntries((await listHandlingServices(invoke,token)).map(row => [row.name,row.key]));
   const saveDuringDirectoryLoad = async (routeName, directory, name, label, key) => {
     let release;
     const gate = new Promise(resolve => { release = resolve; });
-    const pattern = `**/api/office/${directory}-handling-services`;
+    const pattern = `**/api/office/${directory}-handling-services*`;
     const started = admin.waitForRequest(pattern);
     await admin.route(pattern, async route => { await gate; await route.continue(); });
     try {
@@ -70,7 +71,7 @@ await withOfficeUi('oa-handling-ui', async ({ output, require, url, invoke, open
       await dialog.getByRole('button', { name:'保存',exact:true }).click();
       const saved = await response;
       assert.equal(saved.status(),200);
-      assert.equal(saved.request().postDataJSON().handlingKey,key,'loading a disabled picker must preserve the saved assignment');
+      assert.equal(saved.request().postDataJSON().serviceId,key,'loading a disabled picker must preserve the saved assignment');
       release(); await dialog.waitFor({state:'hidden'});
     } finally { release(); await admin.unroute(pattern); }
   };

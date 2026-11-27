@@ -142,9 +142,11 @@ fn prepare(root: &Path, docker: bool) -> Result<()> {
     let app_name = format!("{database}app_password");
     let maintenance_name = format!("{database}maintenance_password");
     let token_name = format!("{application}bootstrap-token.txt");
+    let recovery_token_name = format!("{maintenance}maintenance-token.txt");
     let app = secret(root, &app_name, existing)?;
     let maintenance_password = secret(root, &maintenance_name, existing)?;
     let token = secret(root, &token_name, existing)?;
+    let recovery_token = secret(root, &recovery_token_name, existing)?;
     let host = if docker { "postgres" } else { "127.0.0.1" };
     let connection = |role: &str, password: &str| {
         format!(
@@ -155,6 +157,7 @@ fn prepare(root: &Path, docker: bool) -> Result<()> {
         (app_name, app.clone()),
         (maintenance_name, maintenance_password.clone()),
         (token_name, token),
+        (recovery_token_name, recovery_token),
         (
             format!("{application}app-connection.txt"),
             connection("exportdoc_app", &app),

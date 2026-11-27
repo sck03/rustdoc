@@ -122,6 +122,7 @@ pub fn publish_builtins(service: &NativeService, token: &str, mut settings: Valu
             Some(json!({"expectedVersion":saved["versionNumber"],"definitionKey":key})),
         );
     }
+    saved["handlingServices"] = json!(services(service, token).unwrap());
     saved
 }
 /// Configure test scenarios through the same independent mutations as the editor.
@@ -131,6 +132,38 @@ pub fn save_settings(
     desired: Value,
 ) -> Result<Value, export_doc_engine::api::ApiError> {
     let mut saved = call(service, token, GET_OA_APPROVAL_SETTINGS, 0, None)?;
+    if let Some(desired_services) = desired["handlingServices"].as_array() {
+        let current = services(service, token)?;
+        for old in &current {
+            if !desired_services.iter().any(|row| row["key"] == old["key"]) {
+                call(
+                    service,
+                    token,
+                    REMOVE_HANDLING_SERVICE,
+                    0,
+                    Some(json!({"service":old,"commandKey":nonce().unwrap()})),
+                )?;
+            }
+        }
+        for row in desired_services {
+            let mut row = row.clone();
+            if row.get("revision").is_none() {
+                row["revision"] = current
+                    .iter()
+                    .find(|old| old["key"] == row["key"])
+                    .map(|old| old["revision"].clone())
+                    .unwrap_or(json!(0));
+            }
+            call(
+                service,
+                token,
+                SAVE_HANDLING_SERVICE,
+                0,
+                Some(json!({"service":row,"commandKey":nonce().unwrap()})),
+            )?;
+        }
+        saved = call(service, token, GET_OA_APPROVAL_SETTINGS, 0, None)?;
+    }
     for rule in desired["rules"].as_array().into_iter().flatten() {
         if saved["rules"]
             .as_array()
@@ -149,12 +182,7 @@ pub fn save_settings(
             ),
         )?;
     }
-    for section in [
-        "delegations",
-        "handlingServices",
-        "sheetTemplates",
-        "calendar",
-    ] {
+    for section in ["delegations", "sheetTemplates", "calendar"] {
         if desired
             .get(section)
             .is_some_and(|value| !value.is_null() && value != &saved[section])
@@ -170,7 +198,31 @@ pub fn save_settings(
             )?;
         }
     }
+    saved["handlingServices"] = json!(services(service, token)?);
     Ok(saved)
+}
+/// Test setup composes separate public directories, never an obsolete settings payload.
+pub fn services(
+    service: &NativeService,
+    token: &str,
+) -> Result<Vec<Value>, export_doc_engine::api::ApiError> {
+    let mut result = vec![];
+    let mut after = String::new();
+    loop {
+        let page = query(
+            service,
+            token,
+            LIST_MANAGED_HANDLING_SERVICES,
+            &[],
+            &[("after", after), ("pageSize", "100".into())],
+            None,
+        )?;
+        result.extend(page["items"].as_array().unwrap().iter().cloned());
+        after = page["nextCursor"].as_str().unwrap().into();
+        if after.is_empty() {
+            return Ok(result);
+        }
+    }
 }
 pub fn configure(service: &NativeService, admin: &str, reviewer: i64) -> Value {
     // A published sample needs an applicant independent of the signing person.
@@ -185,6 +237,9 @@ pub fn configure(service: &NativeService, admin: &str, reviewer: i64) -> Value {
         ),
     );
     let mut settings = request(service, admin, GET_OA_APPROVAL_SETTINGS, None);
+    if services(service, admin).unwrap().is_empty() {
+        settings["handlingServices"] = json!(export_doc_contracts::native_contract::general_categories::CATEGORIES.iter().map(|(category,name)| json!({"key":format!("fixture-{category}"),"name":name,"category":category,"handlerUserIds":[reviewer],"isActive":true})).collect::<Vec<_>>());
+    }
     for rule in settings["rules"]
         .as_array_mut()
         .unwrap()
@@ -519,6 +574,20 @@ pub fn publication_body(service: &NativeService, token: &str, mut body: Value) -
             })
     {
         let sample = json!({"employeeId":person["id"],"appointmentId":appointment["id"],"amount":"0","currency":"CNY","duration":"1","category":if rule["kind"]=="leave"{"Annual"}else{"Other"},"isReturnable":true});
+        if rule["kind"] == "general" {
+            let checked = dispatch(service, token, PREVIEW_OA_DEPLOYMENT, &[], &[], Some(json!({"action":"Publish","items":[{"definitionKey":body["definitionKey"]}],"sample":sample}))).unwrap();
+            if checked["items"][0]["ready"] == true {
+                body["samples"] = checked["items"][0]["samples"].clone();
+                return body;
+            }
+            failures.push(
+                checked["items"][0]["failure"]["message"]
+                    .as_str()
+                    .unwrap_or("未知失败")
+                    .to_owned(),
+            );
+            continue;
+        }
         let mut simulation = sample.clone();
         simulation["definition"] = rule.clone();
         match service.dispatch(SIMULATE_OA_DEFINITION, &[], &[], Some(simulation), token) {

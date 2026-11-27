@@ -27,8 +27,8 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("appointmentId",s()),("title",s()),("reason",s()),
         ("definitionKey",s().max_length(80)),("definitionVersion",i().format("int64")),("formValues",r("OaFormValues")),("formDisplayValues",r("OaFormValues").read_only(true)),("formDefinition",r("OaFormDefinition").read_only(true)),("applicationName",s().read_only(true)),
         ("personnelChange",r("OaPersonnelChange")),("leave",r("OaLeave")),("travel",r("OaTravel")),
-        ("overtime",r("OaOvertime")),("category",s().enumeration(Enumeration::Values(vec![serde_json::json!("Seal"),serde_json::json!("Certificate"),serde_json::json!("IT"),serde_json::json!("Repair"),serde_json::json!("Other")]))),("currency",s().enumeration(Enumeration::Values(vec![serde_json::json!("CNY"),serde_json::json!("USD"),serde_json::json!("EUR"),serde_json::json!("HKD"),serde_json::json!("JPY"),serde_json::json!("GBP")]))),
-        ("lines",a(r("OaExpenseLine")).max_items(100)),("purchaseLines",a(r("OaPurchaseLine")).max_items(100)),("handlingKey",s()),
+        ("overtime",r("OaOvertime")),("category",super::general_categories::category()),("currency",s().enumeration(Enumeration::Values(vec![serde_json::json!("CNY"),serde_json::json!("USD"),serde_json::json!("EUR"),serde_json::json!("HKD"),serde_json::json!("JPY"),serde_json::json!("GBP")]))),
+        ("lines",a(r("OaExpenseLine")).max_items(100)),("purchaseLines",a(r("OaPurchaseLine")).max_items(100)),("serviceId",s()),("serviceRevision",i().minimum(num("0")).format("int64")),
         ("projectId",Schema::default().kind(Types::Many(vec![Primitive::String,Primitive::Null])).pattern("^[1-9][0-9]*$")),("departmentId",s().description("Choose an active primary or additional assignment when creating a request; defaults to the primary department.").max_length(50))
     ]).required(vec!["requestKey","title","reason"])),
     ("OaAction",o(vec![
@@ -49,7 +49,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("appointmentId",s()),("title",s()),("reason",s()),
         ("definitionKey",s().max_length(80)),("definitionVersion",i().format("int64")),("formValues",r("OaFormValues")),("formDisplayValues",r("OaFormValues").read_only(true)),("formDefinition",r("OaFormDefinition").read_only(true)),("applicationName",s().read_only(true)),
         ("personnelChange",r("OaMaterialOaPersonnelChangeProjection")),("leave",r("OaMaterialOaLeave")),("travel",r("OaMaterialOaTravel")),
-        ("overtime",r("OaMaterialOaOvertime")),("category",s().enumeration(Enumeration::Values(vec![serde_json::json!("Seal"),serde_json::json!("Certificate"),serde_json::json!("IT"),serde_json::json!("Repair"),serde_json::json!("Other")]))),("currency",s().enumeration(Enumeration::Values(vec![serde_json::json!("CNY"),serde_json::json!("USD"),serde_json::json!("EUR"),serde_json::json!("HKD"),serde_json::json!("JPY"),serde_json::json!("GBP")]))),
+        ("overtime",r("OaMaterialOaOvertime")),("category",super::general_categories::category()),("currency",s().enumeration(Enumeration::Values(vec![serde_json::json!("CNY"),serde_json::json!("USD"),serde_json::json!("EUR"),serde_json::json!("HKD"),serde_json::json!("JPY"),serde_json::json!("GBP")]))),
         ("lines",a(r("OaMaterialOaExpenseLine")).max_items(100)),("purchaseLines",a(r("OaMaterialOaPurchaseLine")).max_items(100)),("id",i().format("int64")),
         ("versionNumber",i().format("int64")),("employeeName",s()),("departmentId",s()),("departmentName",s().read_only(true)),
         ("ownerUserId",i().format("int64")),("status",s().enumeration(Enumeration::Values(vec![serde_json::json!("Draft"),serde_json::json!("Pending"),serde_json::json!("Approved"),serde_json::json!("Rejected"),serde_json::json!("Cancelled"),serde_json::json!("Completed"),serde_json::json!("HandedOff"),serde_json::json!("Returned"),serde_json::json!("Suspended"),serde_json::json!("Terminated")]))),("kind",s().enumeration(Enumeration::Values(vec![serde_json::json!("leave"),serde_json::json!("expense"),serde_json::json!("travel"),serde_json::json!("overtime"),serde_json::json!("purchase"),serde_json::json!("general"),serde_json::json!("personnel")]))),
@@ -57,7 +57,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("createdAt",s()),("updatedAt",s()),("attachments",a(r("OaAttachment"))),
         ("applicantAppointmentId",s().read_only(true)),("applicantJobTitle",s().read_only(true)),("approvalPlan",r("OaApprovalPlan")),
         ("canReview",b()),("canDeleteDraft",b().read_only(true)),("reviewTaskKeys",a(s())),("approvalRoutingNotes",a(s())),
-        ("lastRemindedAt",s()),("handlingKey",s()),("handlingName",s()),
+        ("lastRemindedAt",s()),("serviceId",s()),("serviceRevision",i().minimum(num("0")).format("int64")),("handlingName",s()),
         ("handlerNames",s()),("canHandle",b()),("submissionId",i().format("int64")),
         ("submissionNumber",i().format("int64")),("approvalDocument",r("OaSubmission")),("personnelExecution",Schema::default().any_of(vec![r("OaPersonnelExecution"),ty(Primitive::Null)])),
         ("workflowActions",a(s().enumeration(Enumeration::Values(vec![serde_json::json!("AddBefore"),serde_json::json!("AddAfter"),serde_json::json!("AddParallel"),serde_json::json!("RemoveSigner"),serde_json::json!("ReturnToNode"),serde_json::json!("Suspend"),serde_json::json!("Resume"),serde_json::json!("Terminate"),serde_json::json!("RetryNode"),serde_json::json!("CancelSubflow"),serde_json::json!("RetrySubflow"),serde_json::json!("CompensateSubflow")]))).unique_items(true)),("workflowTasks",a(r("OaFulfillmentTask")).max_items(32)),("fulfillmentState",s().enumeration(Enumeration::Values(vec![serde_json::json!("Pending"),serde_json::json!("Active"),serde_json::json!("Completed"),serde_json::json!("Blocked"),serde_json::json!("Suspended"),serde_json::json!("Cancelled")]))),
@@ -67,7 +67,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ("OaRequestPage",super::schema_shapes::office_page("OaRequest")),
     ("OaEventPage",super::schema_shapes::office_page("OaEvent")),
     ("OaOrganizationRoute",o(vec![("mode",s().enumeration(Enumeration::Values(vec![serde_json::json!("Current"),serde_json::json!("Specified"),serde_json::json!("Ancestor")]))),("unitId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::Null])).minimum(num("1")).format("int64"))]).required(vec!["mode"])),
-    ("OaApprovalCondition",o(vec![("field",s().enumeration(Enumeration::Values(vec![serde_json::json!("Amount"),serde_json::json!("Currency"),serde_json::json!("Duration"),serde_json::json!("Department"),serde_json::json!("Category"),serde_json::json!("PersonnelAction"),serde_json::json!("Returnable"),serde_json::json!("FormText"),serde_json::json!("FormNumber")]))),("fieldKey",s().max_length(40)),("operator",s().enumeration(Enumeration::Values(vec![serde_json::json!("Equal"),serde_json::json!("NotEqual"),serde_json::json!("Greater"),serde_json::json!("GreaterOrEqual"),serde_json::json!("Less"),serde_json::json!("LessOrEqual")]))),("value",s())]).required(vec!["field","operator","value"])),
+    ("OaApprovalCondition",o(vec![("field",s().enumeration(Enumeration::Values(vec![serde_json::json!("Amount"),serde_json::json!("Currency"),serde_json::json!("Duration"),serde_json::json!("Department"),serde_json::json!("Category"),serde_json::json!("ServiceId"),serde_json::json!("PersonnelAction"),serde_json::json!("Returnable"),serde_json::json!("FormText"),serde_json::json!("FormNumber")]))),("fieldKey",s().max_length(40)),("operator",s().enumeration(Enumeration::Values(vec![serde_json::json!("Equal"),serde_json::json!("NotEqual"),serde_json::json!("Greater"),serde_json::json!("GreaterOrEqual"),serde_json::json!("Less"),serde_json::json!("LessOrEqual")]))),("value",s())]).required(vec!["field","operator","value"])),
     ("OaApprovalStage",o(vec![
         ("key",s()),("name",s()),("dependsOn",a(s()).max_items(32).unique_items(true)),
         ("organizationRoute",r("OaOrganizationRoute")),("reviewPoints",a(s().min_length(1).max_length(200)).max_items(12)),("source",s().enumeration(Enumeration::Values(vec![serde_json::json!("Named"),serde_json::json!("DepartmentManager"),serde_json::json!("DepartmentLeaders"),serde_json::json!("LineManager"),serde_json::json!("FunctionalManagers"),serde_json::json!("CompanyExecutive"),serde_json::json!("CompanyLeaders"),serde_json::json!("Position"),serde_json::json!("Responsibility"),serde_json::json!("ProjectLeader"),serde_json::json!("Handlers"),serde_json::json!("Requester")]))),
@@ -108,6 +108,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("calendars",ty(Primitive::Object).additional(Additional::Schema(Box::new(r("OaBusinessCalendar"))))),("subflowProgress",ty(Primitive::Object).additional(Additional::Schema(Box::new(r("OaSubflowProgress")))))
     ]).required(vec!["definitionKey","policyVersion","nodes","steps","notifyUserIds"])),
     ("OaApprovalRule",o(vec![
+        ("generalHandling",super::general_categories::requirements()),
         ("key",s()),("kind",s().enumeration(Enumeration::Values(vec![serde_json::json!("leave"),serde_json::json!("overtime"),serde_json::json!("expense"),serde_json::json!("travel"),serde_json::json!("purchase"),serde_json::json!("general"),serde_json::json!("personnel"),serde_json::json!("room"),serde_json::json!("supply")]))),("variant",s()),
         ("name",s()),("stages",a(r("OaApprovalStage")).min_items(1).max_items(32)),("notifyUserIds",a(i().format("int64")).max_items(50).unique_items(true)),
         ("calendar",Schema::default().any_of(vec![r("OaBusinessCalendar"),ty(Primitive::Null)])),("form",Schema::default().any_of(vec![r("OaFormDefinition"),ty(Primitive::Null)]))
@@ -119,7 +120,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ]).required(vec!["key","principalUserId","delegateUserId","startsAt","endsAt","isActive"])),
     ("OaApprovalSettings",o(vec![
         ("expectedVersion",i().format("int64")),("rules",a(r("OaApprovalRule")).min_items(13)),("delegations",a(r("OaApprovalDelegation"))),
-        ("versionNumber",i().format("int64")),("revisions",ty(Primitive::Object).additional(Additional::Schema(Box::new(i().format("int64"))))),("publications",a(r("OaPublication"))),("handlingServices",a(r("OfficeHandlingService")).max_items(100)),
+        ("versionNumber",i().format("int64")),("revisions",ty(Primitive::Object).additional(Additional::Schema(Box::new(i().format("int64"))))),("publications",a(r("OaPublication"))),
         ("sheetTemplates",a(r("OaSheetTemplate")).max_items(18)),("sheetFieldCatalog",r("ApiReportTemplateFieldCatalogResponse")),("sheetDefaultContent",s()),
         ("calendar",r("OaBusinessCalendar")),("activations",a(r("OaActivation")).max_items(100))
     ]).required(vec!["versionNumber","rules","delegations","publications"])),
@@ -129,7 +130,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("appointmentId",s()),("title",s()),("reason",s()),
         ("definitionKey",s().max_length(80)),("definitionVersion",i().format("int64")),("formValues",r("OaFormValues")),("formDisplayValues",r("OaFormValues").read_only(true)),("formDefinition",r("OaFormDefinition").read_only(true)),("applicationName",s().read_only(true)),
         ("personnelChange",r("OaMaterialOaPersonnelChange")),("leave",r("OaMaterialOaLeave")),("travel",r("OaMaterialOaTravel")),
-        ("overtime",r("OaMaterialOaOvertime")),("category",s().enumeration(Enumeration::Values(vec![serde_json::json!("Seal"),serde_json::json!("Certificate"),serde_json::json!("IT"),serde_json::json!("Repair"),serde_json::json!("Other")]))),("currency",s().enumeration(Enumeration::Values(vec![serde_json::json!("CNY"),serde_json::json!("USD"),serde_json::json!("EUR"),serde_json::json!("HKD"),serde_json::json!("JPY"),serde_json::json!("GBP")]))),
+        ("overtime",r("OaMaterialOaOvertime")),("category",super::general_categories::category()),("currency",s().enumeration(Enumeration::Values(vec![serde_json::json!("CNY"),serde_json::json!("USD"),serde_json::json!("EUR"),serde_json::json!("HKD"),serde_json::json!("JPY"),serde_json::json!("GBP")]))),
         ("lines",a(r("OaMaterialOaExpenseLine")).max_items(100)),("purchaseLines",a(r("OaMaterialOaPurchaseLine")).max_items(100)),("id",i().format("int64")),
         ("versionNumber",i().format("int64")),("employeeName",s()),("departmentId",s()),
         ("ownerUserId",i().format("int64")),("status",s().enumeration(Enumeration::Values(vec![serde_json::json!("Draft"),serde_json::json!("Pending"),serde_json::json!("Approved"),serde_json::json!("Rejected"),serde_json::json!("Cancelled"),serde_json::json!("Completed"),serde_json::json!("HandedOff"),serde_json::json!("Returned")]))),("kind",s().enumeration(Enumeration::Values(vec![serde_json::json!("leave"),serde_json::json!("expense"),serde_json::json!("travel"),serde_json::json!("overtime"),serde_json::json!("purchase"),serde_json::json!("general"),serde_json::json!("personnel")]))),
@@ -137,7 +138,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("createdAt",s()),("updatedAt",s()),("attachments",a(r("OaAttachment"))),
         ("applicantAppointmentId",s().read_only(true)),("applicantJobTitle",s().read_only(true)),("approvalPlan",r("OaApprovalPlan")),
         ("canReview",b()),("reviewTaskKeys",a(s())),("approvalRoutingNotes",a(s())),
-        ("lastRemindedAt",s()),("handlingKey",s()),("handlingName",s()),
+        ("lastRemindedAt",s()),("serviceId",s()),("serviceRevision",i().minimum(num("0")).format("int64")),("handlingName",s()),
         ("handlerNames",s()),("canHandle",b()),("projectId",Schema::default().kind(Types::Many(vec![Primitive::String,Primitive::Null])).pattern("^[1-9][0-9]*$")),
         ("projectName",s().read_only(true)),("projectCode",s().read_only(true))
     ]).required(vec!["id","versionNumber","requestKey","employeeId","employeeName","departmentId","ownerUserId","kind","status","createdAt","updatedAt","attachments"])),
@@ -229,7 +230,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("userId",i().format("int64")),("personId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::Null])).minimum(num("1")).format("int64")),("context",s()),
         ("occurredAt",s().format("date-time")),("note",s()),("verificationValues",ty(Primitive::Object).additional(Additional::Allowed(true)).max_properties(32))
     ]).required(vec!["userId","personId","context","occurredAt","note"])),
-    ("OaSubflowInput",o(vec![("sourcePath",s().enumeration(Enumeration::Values(vec![serde_json::json!("totalAmount"),serde_json::json!("currency"),serde_json::json!("durationDays"),serde_json::json!("durationHours"),serde_json::json!("departmentId"),serde_json::json!("category"),serde_json::json!("personnelChange.action"),serde_json::json!("isReturnable")]))),("target",s().enumeration(Enumeration::Values(vec![serde_json::json!("Amount"),serde_json::json!("Currency"),serde_json::json!("Duration"),serde_json::json!("Department"),serde_json::json!("Category"),serde_json::json!("PersonnelAction"),serde_json::json!("Returnable")])))]).required(vec!["sourcePath","target"])),
+    ("OaSubflowInput",o(vec![("sourcePath",s().enumeration(Enumeration::Values(vec![serde_json::json!("totalAmount"),serde_json::json!("currency"),serde_json::json!("durationDays"),serde_json::json!("durationHours"),serde_json::json!("departmentId"),serde_json::json!("category"),serde_json::json!("serviceId"),serde_json::json!("personnelChange.action"),serde_json::json!("isReturnable")]))),("target",s().enumeration(Enumeration::Values(vec![serde_json::json!("Amount"),serde_json::json!("Currency"),serde_json::json!("Duration"),serde_json::json!("Department"),serde_json::json!("Category"),serde_json::json!("ServiceId"),serde_json::json!("PersonnelAction"),serde_json::json!("Returnable")])))]).required(vec!["sourcePath","target"])),
     ("OaSubflowOutput",o(vec![
         ("nodeKey",s()),("verificationKey",s()),("target",s()),
         ("aggregation",s().default_value(serde_json::json!("AllEqual")).enumeration(Enumeration::Values(vec![serde_json::json!("AllEqual"),serde_json::json!("Sum"),serde_json::json!("AllTrue"),serde_json::json!("AnyTrue")]))),("required",b().default_value(serde_json::json!(false)))
@@ -254,6 +255,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("functionalManagerAssignmentIds",a(s()).max_items(10))
     ]).required(vec![])),
     ("OaSimulationSample",o(vec![
+        ("serviceId",s().max_length(100)),("serviceRevision",i().format("int64")),("catalogRevision",i().format("int64")),
         ("employeeId",i().format("int64")),("appointmentId",s()),("amount",s()),
         ("currency",s()),("duration",s()),("category",s()),
         ("isReturnable",b()),("projectId",Schema::default().kind(Types::Many(vec![Primitive::String,Primitive::Null])).pattern("^[1-9][0-9]*$")),("reporting",r("OaSimulationReporting")),("formValues",r("OaFormValues"))
@@ -330,12 +332,13 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ]).required(vec!["id","code","name"])),
     ("OaRoutingUnits",super::schema_shapes::item_collection("OaRoutingUnit")),
     ("OaSimulationRequest",o(vec![
+        ("serviceId",s().max_length(100)),("serviceRevision",i().format("int64")),("catalogRevision",i().format("int64")),
         ("definition",r("OaApprovalRule")),("employeeId",i().format("int64")),("appointmentId",s()),
         ("amount",s()),("currency",s()),("duration",s()),
         ("category",s()),("isReturnable",b()),("projectId",Schema::default().kind(Types::Many(vec![Primitive::String,Primitive::Null])).pattern("^[1-9][0-9]*$")),
         ("reporting",r("OaSimulationReporting")),("formValues",r("OaFormValues"))
     ]).required(vec!["definition","employeeId","appointmentId","amount","currency","duration","category"])),
-    ("OaSimulationResult",o(vec![("approvalPlan",r("OaApprovalPlan")),("notes",a(s()))]).required(vec!["approvalPlan","notes"])),
+    ("OaSimulationResult",o(vec![("approvalPlan",r("OaApprovalPlan")),("notes",a(s())),("catalogRevision",i().format("int64"))]).required(vec!["approvalPlan","notes","catalogRevision"])),
     ("OaVerificationField",o(vec![
         ("key",s().min_length(1).max_length(40)),("label",s().min_length(1).max_length(120)),("kind",s().enumeration(Enumeration::Values(vec![serde_json::json!("Text"),serde_json::json!("Decimal"),serde_json::json!("Date"),serde_json::json!("Boolean")]))),
         ("required",b()),("restricted",b().default_value(serde_json::json!(false)))

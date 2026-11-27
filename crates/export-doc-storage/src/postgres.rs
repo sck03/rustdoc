@@ -28,9 +28,16 @@ impl From<::tokio_postgres::Error> for Error {
                 ErrorKind::Conflict => "记录重复、被引用或事务并发冲突。",
                 ErrorKind::Busy => "PostgreSQL 正在处理其他请求。",
                 ErrorKind::Timeout => "PostgreSQL 操作超过时限。",
-                _ => "PostgreSQL 数据库操作失败。",
+                _ => match db.code().code() {
+                    "28P01" | "28000" => "PostgreSQL 身份验证失败，请管理员核对部署凭据。",
+                    "42501" => "PostgreSQL 数据库账号缺少本次操作权限，请核对业务角色授权。",
+                    "53100" => "PostgreSQL 数据卷空间已用尽，请管理员扩容后核验服务。",
+                    "53300" => "PostgreSQL 连接数量已达上限，请检查连接池和服务器容量。",
+                    "57P01" | "57P02" | "57P03" => "PostgreSQL 正在关闭或恢复，暂时不能处理请求。",
+                    _ => "PostgreSQL 数据库操作未完成，请凭追踪编号联系管理员。",
+                },
             };
-            return Self::new(kind, format!("{message} SQLSTATE={}", db.code().code()));
+            return Self::new(kind, message);
         }
         Self::unavailable("PostgreSQL 连接或协议故障，已停止本次操作。")
     }

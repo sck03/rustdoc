@@ -206,7 +206,7 @@ fn resolve_in(
             .into_iter()
             .collect(),
         ApproverSource::Handlers => {
-            let key = text(row, "handlingKey");
+            let key = text(row, "serviceId");
             if !key.is_empty() {
                 handling::services(tx, &actor.company)?
                     .into_iter()
@@ -218,6 +218,13 @@ fn resolve_in(
                     .map(|id| id.as_i64().ok_or_else(|| invalid("办理人员编号无效。")))
                     .collect::<Result<Vec<_>>>()?
             } else {
+                if row["kind"] == "general" {
+                    return Err(
+                        invalid("此办理节点没有指定办理事项，请选择事项后重新解析流程。")
+                            .coded(crate::api::ErrorCode::HandlingRequired)
+                            .at("serviceId", "在申请中选择当前类别的办理事项。"),
+                    );
+                }
                 let mut ids = vec![];
                 let mut cursor = None;
                 let today = super::super::units::today(tx)?.to_string();

@@ -51,6 +51,13 @@ fn install_selected(
     ];
     if database_only {
         targets.clear();
+    } else {
+        let config: crate::engine::file_store::Configuration =
+            serde_json::from_slice(&fs::read(staging.join("Configuration/file-storage.json"))?)?;
+        if !matches!(config.backend,crate::engine::file_store::Backend::Local{ref directory} if directory=="Files")
+        {
+            targets.retain(|(target, _)| *target != "Files");
+        }
     }
     if sqlite {
         targets.extend([
@@ -128,6 +135,9 @@ fn install_selected(
             export_doc_storage::verify_sqlite_backup(&database)?;
             // Keep upgrades inside the installation journal so failure restores all original files.
             export_doc_storage::Connection::sqlite(&database)?.checkpoint()?;
+        }
+        if !database_only {
+            super::maintenance_artifacts::complete_active(paths)?;
         }
         Ok(())
     })();

@@ -6,15 +6,7 @@ pub(super) fn revision(settings: &Value, key: &str) -> i64 {
 }
 pub(super) fn merge(previous: &Value, body: &Value) -> Result<Value> {
     let section = text(body, "section");
-    if ![
-        "rules",
-        "calendar",
-        "delegations",
-        "handlingServices",
-        "sheetTemplates",
-    ]
-    .contains(&section.as_str())
-    {
+    if !["rules", "calendar", "delegations", "sheetTemplates"].contains(&section.as_str()) {
         return Err(invalid("设置分区无效。"));
     }
     let key = text(body, "definitionKey");

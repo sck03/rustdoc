@@ -29,18 +29,27 @@ pub(crate) fn dump_to(
     target: &Path,
     space: &std::sync::Arc<crate::temporary_space::Budget>,
 ) -> Result<()> {
-    dump(
-        &Endpoint::read_parts(store, protector)?,
-        tool,
-        target,
-        space,
-    )
+    let endpoint = Endpoint::read_parts(store, protector)?;
+    store.read(|tx| {
+        let snapshot = tx.export_database_snapshot()?;
+        dump_snapshot(&endpoint, tool, target, space, Some(&snapshot))?;
+        super::super::capture::write(target, |cursor| Ok(tx.file_objects(cursor, 100, false)?))
+    })
 }
 pub(super) fn dump(
     endpoint: &Endpoint,
     tool: &Path,
     target: &Path,
     space: &std::sync::Arc<crate::temporary_space::Budget>,
+) -> Result<()> {
+    dump_snapshot(endpoint, tool, target, space, None)
+}
+fn dump_snapshot(
+    endpoint: &Endpoint,
+    tool: &Path,
+    target: &Path,
+    space: &std::sync::Arc<crate::temporary_space::Budget>,
+    snapshot: Option<&str>,
 ) -> Result<()> {
     crate::paths::ensure_safe_absolute(target).map_err(invalid)?;
     crate::paths::ensure_safe_absolute(tool).map_err(invalid)?;
@@ -51,6 +60,9 @@ pub(super) fn dump(
     crate::paths::ensure_safe_absolute(&temporary).map_err(invalid)?;
     let mut command = Command::new(tool);
     endpoint.apply(&mut command);
+    if let Some(snapshot) = snapshot {
+        command.arg("--snapshot").arg(snapshot);
+    }
     command.args([
         "--format",
         "custom",
@@ -91,7 +103,8 @@ pub(super) fn dump(
     }
     if fs::metadata(&temporary)?.len() == 0 {
         let _ = fs::remove_file(&temporary);
-        return Err(unavailable("pg_dump 没有生成有效备份。"));
+        return Err(unavailable("pg_dump 没有生成有效备份。")
+            .coded(crate::api::ErrorCode::DependencyUnavailable));
     }
     if target.try_exists()? {
         let _ = fs::remove_file(&temporary);
@@ -144,113 +157,130 @@ pub fn apply_pending(
     }
     #[cfg(feature = "postgres")]
     {
-        let _gate = package::lock(paths)?;
-        let physical_marker = restart_marker(paths)?;
-        let migration_marker = migration::marker_path(paths)?;
-        if physical_marker.try_exists()? && migration_marker.try_exists()? {
-            return Err(invalid("发现相互冲突的恢复计划，已停止恢复。"));
-        }
-        if !physical_marker.try_exists()? && !migration_marker.try_exists()? {
+        if !has_pending(paths)? {
             return Ok(());
         }
         let mut lease = export_doc_storage::PostgresMaintenanceLease::acquire(maintenance, owner)?;
-        for marker in [&migration_marker, &physical_marker] {
-            if marker.try_exists()?
-                && !package::confirm_task_marker(&paths.cache_root, marker, |job| {
-                    Ok(lease.recovery_job_succeeded(job)?)
-                })?
-            {
-                return Ok(());
-            }
-        }
-        let migrated = package::staged(&migration_marker, package::POSTGRES, &paths.disk_space)?;
-        let (marker, source, staging) = if let Some(staging) = migrated.as_ref() {
-            (
-                migration_marker,
-                staging.join(package::POSTGRES),
-                staging.clone(),
-            )
-        } else if physical_marker.try_exists()? {
-            let Some(package::SnapshotRestore::Postgres { file_name, sha256 }) =
-                package::snapshot(&physical_marker)?
-            else {
-                return Err(invalid("数据库恢复标记无效。"));
-            };
-            let staging = package::staging_directory(&physical_marker)?;
-            let source = if let Some(name) = file_name {
-                super::super::managed_file(&postgres_root(paths)?, &name, "dump")?
-            } else {
-                staging.join(package::POSTGRES)
-            };
-            if crate::engine::backup_io::digest_file(&source)?.1 != sha256 {
-                return Err(invalid("备份文件已变化，恢复已拒绝。"));
-            }
-            (physical_marker, source, staging)
-        } else {
-            return Ok(());
-        };
-        let endpoint = Endpoint::parse_url(maintenance)?;
-        let application = Endpoint::parse_url(application)?;
-        if (
-            endpoint.host.as_str(),
-            endpoint.port.as_str(),
-            endpoint.database.as_str(),
-        ) != (
-            application.host.as_str(),
-            application.port.as_str(),
-            application.database.as_str(),
-        ) {
-            return Err(invalid("维护连接与业务连接必须指向同一数据库。"));
-        }
-        let tools = Tools::resolve(paths);
-        if !tools.ready() {
-            return Err(unavailable("PostgreSQL 18 客户端工具缺失。"));
-        }
-        package::private_directory(&staging)?;
-        let safety = staging.join("before-restore.dump");
-        if !safety.try_exists()? {
-            dump(&endpoint, &tools.pg_dump, &safety, &paths.disk_space)?;
-        }
-        // Recover an interrupted filesystem install before trying the same plan again.
-        if staging.join("install-journal.json").try_exists()? {
-            restore_files::rollback(paths, &staging)?;
-            restore(&endpoint, &tools.pg_restore, &safety, owner)?;
-            lease.finish(owner, &application.username)?;
-        }
-        let result = (|| {
-            restore(&endpoint, &tools.pg_restore, &source, owner)?;
-            lease.finish(owner, &application.username)?;
-            if migrated.is_some() {
-                crate::engine::file_store::verify_local_inventory(&staging, |cursor| {
-                    Ok(lease.file_objects(cursor)?)
-                })?;
-                restore_files::install(paths, &staging, false, |cursor| {
-                    Ok(lease.file_objects(cursor)?)
-                })?;
-            } else {
-                let registered = !lease.file_objects("")?.is_empty();
-                let files = crate::engine::file_store::FileStore::open(paths, registered)?;
-                if source.with_extension("objects.jsonl").try_exists()? {
-                    crate::engine::file_store::incremental::restore(&files, &source)?;
-                }
-                files.verify_inventory(|cursor| Ok(lease.file_objects(cursor)?))?;
-            }
-            Ok(())
-        })();
-        if let Err(cause) = result {
-            let rollback = restore(&endpoint, &tools.pg_restore, &safety, owner).and_then(|_| {
-                lease
-                    .finish(owner, &application.username)
-                    .map_err(Into::into)
-            });
-            if let Err(rollback) = rollback {
-                return Err(unavailable(format!(
-                    "恢复和数据库回滚均失败：{cause}；{rollback}。保留安全备份并停止服务。"
-                )));
-            }
-            return Err(cause);
-        }
-        fs::remove_file(marker)?;
-        Ok(())
+        apply_pending_with_lease(paths, maintenance, owner, application, &mut lease)
     }
+}
+#[cfg(feature = "postgres")]
+pub(in crate::engine::team_backup) fn apply_pending_with_lease(
+    paths: &RuntimePaths,
+    maintenance: &str,
+    owner: &str,
+    application: &str,
+    lease: &mut export_doc_storage::PostgresMaintenanceLease,
+) -> Result<()> {
+    let _gate = package::lock(paths)?;
+    let physical_marker = restart_marker(paths)?;
+    let migration_marker = migration::marker_path(paths)?;
+    if physical_marker.try_exists()? && migration_marker.try_exists()? {
+        return Err(invalid("发现相互冲突的恢复计划，已停止恢复。"));
+    }
+    if !physical_marker.try_exists()? && !migration_marker.try_exists()? {
+        return Ok(());
+    }
+    for marker in [&migration_marker, &physical_marker] {
+        if marker.try_exists()?
+            && !package::confirm_task_marker(&paths.cache_root, marker, |job| {
+                Ok(lease.recovery_job_succeeded(job)?)
+            })?
+        {
+            return Ok(());
+        }
+    }
+    let migrated = package::staged(
+        paths,
+        &migration_marker,
+        package::POSTGRES,
+        &paths.disk_space,
+    )?;
+    let (marker, source, staging) = if let Some(staging) = migrated.as_ref() {
+        (
+            migration_marker,
+            staging.join(package::POSTGRES),
+            staging.clone(),
+        )
+    } else if physical_marker.try_exists()? {
+        let Some(package::SnapshotRestore::Postgres { file_name, sha256 }) =
+            package::snapshot(&physical_marker)?
+        else {
+            return Err(invalid("数据库恢复标记无效。"));
+        };
+        let staging = package::staging_directory(&physical_marker)?;
+        let source = if let Some(name) = file_name {
+            super::super::managed_file(&postgres_root(paths)?, &name, "dump")?
+        } else {
+            staging.join(package::POSTGRES)
+        };
+        if crate::engine::backup_io::digest_file(&source)?.1 != sha256 {
+            return Err(invalid("备份文件已变化，恢复已拒绝。"));
+        }
+        (physical_marker, source, staging)
+    } else {
+        return Ok(());
+    };
+    let endpoint = Endpoint::parse_url(maintenance)?;
+    let application = Endpoint::parse_url(application)?;
+    if (
+        endpoint.host.as_str(),
+        endpoint.port.as_str(),
+        endpoint.database.as_str(),
+    ) != (
+        application.host.as_str(),
+        application.port.as_str(),
+        application.database.as_str(),
+    ) {
+        return Err(invalid("维护连接与业务连接必须指向同一数据库。"));
+    }
+    let tools = Tools::resolve(paths);
+    if !tools.ready() {
+        return Err(unavailable("PostgreSQL 18 客户端工具缺失。")
+            .coded(crate::api::ErrorCode::DependencyUnavailable));
+    }
+    package::private_directory(&staging)?;
+    let safety = staging.join("before-restore.dump");
+    if !safety.try_exists()? {
+        dump(&endpoint, &tools.pg_dump, &safety, &paths.disk_space)?;
+    }
+    // Recover an interrupted filesystem install before trying the same plan again.
+    if staging.join("install-journal.json").try_exists()? {
+        restore_files::rollback(paths, &staging)?;
+        restore(&endpoint, &tools.pg_restore, &safety, owner)?;
+        lease.finish(owner, &application.username)?;
+    }
+    let result = (|| {
+        restore(&endpoint, &tools.pg_restore, &source, owner)?;
+        lease.finish(owner, &application.username)?;
+        if migrated.is_some() {
+            package::verify_inventory(paths, &staging, |cursor| Ok(lease.file_objects(cursor)?))?;
+            restore_files::install(paths, &staging, false, |cursor| {
+                Ok(lease.file_objects(cursor)?)
+            })?;
+        } else {
+            let registered = !lease.file_objects("")?.is_empty();
+            let files = crate::engine::file_store::FileStore::open(paths, registered)?;
+            if source.with_extension("objects.jsonl").try_exists()? {
+                crate::engine::file_store::incremental::restore(&files, &source)?;
+            }
+            files.verify_inventory(|cursor| Ok(lease.file_objects(cursor)?))?;
+        }
+        Ok(())
+    })();
+    if let Err(cause) = result {
+        let rollback = restore(&endpoint, &tools.pg_restore, &safety, owner).and_then(|_| {
+            lease
+                .finish(owner, &application.username)
+                .map_err(Into::into)
+        });
+        if let Err(rollback) = rollback {
+            return Err(unavailable(format!(
+                "恢复和数据库回滚均失败：{cause}；{rollback}。保留安全备份并停止服务。"
+            )));
+        }
+        return Err(cause);
+    }
+    fs::remove_file(marker)?;
+    Ok(())
 }

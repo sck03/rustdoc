@@ -54,7 +54,7 @@ export function DisasterRecoveryPanel({
       {view === "recovery" && <div className="backup-action-grid">
         <label>
           <span>待恢复文件</span>
-          <input value={controller.recoveryPackagePath} readOnly placeholder="请选择 .edmrecovery 文件" />
+          <input value={controller.recoveryPackagePath} readOnly placeholder="请选择 .edmpoint 文件" />
         </label>
         <button className="command-button secondary" type="button" disabled={!controller.canManageSettings || controller.isBusy || !status?.supported} onClick={() => void controller.chooseRecoveryPackage()}>
           选择恢复包

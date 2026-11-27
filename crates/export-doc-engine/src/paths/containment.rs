@@ -1,9 +1,23 @@
 //! Existing host paths are compared using the platform's path identity rules.
 use std::{fs, path::Path};
 
-pub(super) fn overlaps(left: &Path, right: &Path) -> Result<bool, String> {
-    let left = fs::canonicalize(left).map_err(|error| error.to_string())?;
-    let right = fs::canonicalize(right).map_err(|error| error.to_string())?;
+pub(crate) fn overlaps(left: &Path, right: &Path) -> Result<bool, String> {
+    fn resolved(path: &Path) -> Result<std::path::PathBuf, String> {
+        super::ensure_safe_absolute(path)?;
+        let mut ancestor = path;
+        let mut suffix = Vec::new();
+        while !ancestor.try_exists().map_err(|e| e.to_string())? {
+            suffix.push(ancestor.file_name().ok_or("路径没有有效父目录。")?);
+            ancestor = ancestor.parent().ok_or("路径没有有效父目录。")?;
+        }
+        let mut result = fs::canonicalize(ancestor).map_err(|e| e.to_string())?;
+        for part in suffix.into_iter().rev() {
+            result.push(part);
+        }
+        Ok(result)
+    }
+    let left = resolved(left)?;
+    let right = resolved(right)?;
     // Equal prefixes in either direction mean the roots share a managed subtree.
     Ok(left.components().zip(right.components()).all(|(a, b)| {
         #[cfg(windows)]

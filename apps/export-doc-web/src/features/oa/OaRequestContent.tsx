@@ -2,7 +2,7 @@ import type { ApiUserDto, OaSubmittedRequest, OaRequest } from "../../api/index.
 import { formatBusinessDateTime } from "../../ui/businessTime.ts";
 import { personnelChangeLabels } from "./oaModel.ts";
 import { expenseCategories } from "./OaLineEditor.tsx";
-import { generalCategories, leaveCategories } from "./OaTemporalFields.tsx";
+import { generalCategories, leaveCategories } from "./oaCategories.ts";
 import { PersonnelOrganizationFacts } from "../office/PersonnelOrganizationEditor.tsx";
 import { OaFormFields } from "./OaFormFields.tsx";
 

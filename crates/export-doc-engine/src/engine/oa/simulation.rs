@@ -83,6 +83,7 @@ pub(super) fn simulate_in(tx: &Connection, actor: &Actor, body: &Value) -> Resul
         duration: decimal("duration")?,
         department: appointment.department_id.clone(),
         category: text(&body, "category"),
+        service_id: text(&body, "serviceId"),
         personnel_action: rule.variant.clone(),
         returnable: body["isReturnable"]
             .as_bool()
@@ -102,9 +103,14 @@ pub(super) fn simulate_in(tx: &Connection, actor: &Actor, body: &Value) -> Resul
         row["ownerUserId"] = json!(actor.id);
     }
     row["projectId"] = body["projectId"].clone();
+    row["category"] = body["category"].clone();
+    row["serviceId"] = body["serviceId"].clone();
+    row["serviceRevision"] = body["serviceRevision"].clone();
     super::approval_routing::build_plan(tx, &actor, &mut row, &person, &rule, 1, &context)?;
     row["approvalPlan"]["policyVersion"] = json!(0);
-    Ok(json!({"approvalPlan":row["approvalPlan"],"notes":row["approvalRoutingNotes"]}))
+    Ok(
+        json!({"approvalPlan":row["approvalPlan"],"notes":row["approvalRoutingNotes"],"catalogRevision":super::publication_coverage::revision(tx,&actor.company)?}),
+    )
 }
 
 pub(in crate::engine) fn units(store: &store::Store, actor: &Actor) -> Result<Value> {

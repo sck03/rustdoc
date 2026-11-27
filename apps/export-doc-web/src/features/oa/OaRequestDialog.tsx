@@ -15,12 +15,14 @@ import { OfficeApplicantIdentity, canIdentifyOfficeApplicant } from "../office/O
 import { requestPersonLabel } from "../office/requestIdentity.ts";
 import { OaLineEditor } from "./OaLineEditor.tsx";
 import { OaTemporalFields } from "./OaTemporalFields.tsx";
+import { defaultGeneralCategory } from "./oaCategories.ts";
 import { oaApi } from "./oaApi.ts";
 import { oaDraft, oaModules, type OaKind } from "./oaModel.ts";
 import { useOaOperation } from "./useOaOperation.ts";
 import { useAttachmentDraft } from "../../ui/useAttachmentDraft.ts";
 import { AttachmentDraftFields } from "../../ui/AttachmentDraftFields.tsx";
 import { HandlingServicePicker } from "./HandlingServicePicker.tsx";
+import { useQuery } from "@tanstack/react-query";
 import { PersonnelChangeFields } from "./PersonnelChangeFields.tsx";
 import { personnelChangeLabels } from "./oaModel.ts";
 import { OaDepartmentPicker } from "./OaDepartmentPicker.tsx";
@@ -88,7 +90,7 @@ function RequestEditor({
       draft.definitionKey = application.key;
       draft.definitionVersion = application.version;
       draft.formValues = {};
-      draft.category = "Other";
+      draft.category = defaultGeneralCategory;
     }
     const action = params.get("change");
     if (kind === "personnel" && action && action !== "Hire" && Object.hasOwn(personnelChangeLabels, action)) {
@@ -103,6 +105,7 @@ function RequestEditor({
   });
   const [employee, setEmployee] = useState<PersonnelDirectoryRecord | null>(null);
   const [dirty, setDirty] = useState(false);
+  const handlingPolicy = useQuery({queryKey:["office","general-handling-policy",user.id,user.companyScope,user.contextId,draft.definitionKey],enabled:kind==="general",queryFn:({signal})=>client.getGeneralHandlingPolicy({definitionKey:draft.definitionKey || "general"},{signal})});
   const form = record?.formDefinition ?? application?.form;
   const setDraft: Dispatch<SetStateAction<OaRequestSave>> = (value) => {
     setDirty(true);
@@ -244,13 +247,15 @@ function RequestEditor({
           ) : (
             <OaTemporalFields draft={draft} setDraft={setDraft} timeZone={user.businessTimeZone} />
           )}
-          {draft.category && (
-            <HandlingServicePicker
+          {kind === "general" && handlingPolicy.isError && <PageState tone="error" title="无法读取办理规则" description={readApiError(handlingPolicy.error)} />}
+          {draft.category && !handlingPolicy.isError && (
+            handlingPolicy.data?.requirements[draft.category] === "ApprovalOnly" ? <p className="office-muted">此类别审批通过后办结，无需办理。</p> : <HandlingServicePicker
               client={client}
               user={user}
               category={draft.category}
-              value={draft.handlingKey ?? ""}
-              onChange={(handlingKey) => setDraft({ ...draft, handlingKey })}
+              value={draft.serviceId ?? ""}
+              autoSelect={!record || draft.category !== record.category}
+              onChange={(serviceId, serviceRevision) => setDraft({ ...draft, serviceId, serviceRevision })}
             />
           )}
           {(kind === "expense" || kind === "purchase") && (

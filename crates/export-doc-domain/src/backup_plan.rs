@@ -11,6 +11,8 @@ pub struct BackupPlan {
     pub retention_count: usize,
     pub retention_days: u32,
     pub replica_mode: String,
+    #[serde(default)]
+    pub backup_location: String,
     pub verify_replica: bool,
     pub s3: S3Settings,
 }
@@ -53,6 +55,7 @@ impl Default for BackupPlan {
             retention_count: 14,
             retention_days: 0,
             replica_mode: "None".into(),
+            backup_location: String::new(),
             verify_replica: true,
             s3: Default::default(),
         }
@@ -72,8 +75,21 @@ impl BackupPlan {
         if time.format("%H:%M").to_string() != self.time {
             return Err("备份时间须为 HH:MM。".into());
         }
-        if !matches!(self.replica_mode.as_str(), "None" | "WebDav" | "S3") {
+        if !matches!(
+            self.replica_mode.as_str(),
+            "None" | "Directory" | "WebDav" | "S3"
+        ) {
             return Err("备份副本目标无效。".into());
+        }
+        if self.replica_mode == "Directory"
+            && (self.backup_location.is_empty()
+                || self.backup_location.len() > 80
+                || !self
+                    .backup_location
+                    .bytes()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_')))
+        {
+            return Err("请选择已登记的备份位置。".into());
         }
         if self.replica_mode == "S3"
             && (self.s3.endpoint.is_empty()

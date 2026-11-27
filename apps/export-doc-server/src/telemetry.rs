@@ -201,6 +201,7 @@ mod tests {
             message: "password=SECRET; SELECT private-customer-data".into(),
             code: None,
             diagnostic: Some("storage"),
+            ..Default::default()
         });
         span.finish(503);
         drop(telemetry);

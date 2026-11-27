@@ -181,7 +181,7 @@ pub(crate) fn decode_response(bytes: &[u8], source: &str) -> Result<Value> {
         return Err(if result["errorKind"] == "invalid_input" {
             invalid(message)
         } else {
-            unavailable(message)
+            unavailable(message.to_owned())
         });
     }
     let full_text = result["fullText"]

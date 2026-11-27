@@ -40,11 +40,15 @@ export function useFileStorage(client: ExportDocManagerApiClient, enabled: boole
   });
   const start = useScopedMutation("file-storage-task", client, {
     mutationFn: async (action: "verify" | "reconcile" | "migrate" | "resume" | "discardMigration", signal) => {
-      if (action === "reconcile" && !await requestConfirmation({ title: "回收无引用文件", description: "将删除当前存储中没有业务引用的文件；历史材料和备份文件保留。", confirmLabel: "回收" })) return null;
+      if (action === "reconcile") {
+        const preview = await client.previewFileCollection({ signal });
+        if (!preview.count) { setSuccess(`本轮无可删除对象；${preview.waitingObjects ?? 0} 个对象仍在 24 小时隔离期。`); return null; }
+        if (!await requestConfirmation({ title: "回收无引用文件", description: `将回收预检通过的 ${preview.count} 个对象，共 ${preview.bytes ?? 0} 字节。执行前将再次核对引用和文件库身份。`, confirmLabel: "确认回收" })) return null;
+        return client.reconcileFileStorage({ body: { token: preview.token! } }, { signal });
+      }
       if (action === "discardMigration" && !await requestConfirmation({ title: "撤销未完成迁移", description: "保留当前存储及已复制文件，撤销这次迁移计划。", confirmLabel: "撤销迁移" })) return null;
       signal.throwIfAborted();
       if (action === "verify") return client.verifyFileStorage({ signal });
-      if (action === "reconcile") return client.reconcileFileStorage({ signal });
       const body = action === "discardMigration" ? { cancel: true } : action === "resume" ? { resume: true } : { ...target, expectedVersion: query.data!.versionNumber };
       setTarget(current => ({ ...current, secret: "", token: "" }));
       return client.startFileStorageMigration({ body }, { signal });

@@ -88,13 +88,18 @@ pub(in crate::engine) fn capture(
 pub(in crate::engine) fn restore(files: &FileStore, snapshot: &Path) -> Result<()> {
     let root = repository(snapshot)?;
     inventory(snapshot, |object| {
-        let mut source = fs::File::open(object_path(&root, &object)?)
-            .map_err(|_| unavailable("备份对象缺失。"))?;
+        let mut source = fs::File::open(object_path(&root, &object)?).map_err(|_| {
+            unavailable("备份对象缺失。").coded(crate::api::ErrorCode::DependencyUnavailable)
+        })?;
         verify(&mut source, &object)?;
         source.seek(SeekFrom::Start(0))?;
+        if !object.archive_identity.is_empty() {
+            return files.restore_archived(&object, &mut source);
+        }
         let prepared = files.prepare_reader(&mut source, object.size)?;
         if prepared.object != object {
-            return Err(unavailable("恢复对象摘要不符。"));
+            return Err(unavailable("恢复对象摘要不符。")
+                .coded(crate::api::ErrorCode::DependencyUnavailable));
         }
         Ok(())
     })
@@ -102,17 +107,18 @@ pub(in crate::engine) fn restore(files: &FileStore, snapshot: &Path) -> Result<(
 fn inventory(snapshot: &Path, mut visit: impl FnMut(FileObject) -> Result<()>) -> Result<()> {
     let manifest = snapshot.with_extension("objects.jsonl");
     paths::ensure_safe_absolute(&manifest).map_err(unavailable)?;
-    let mut input = BufReader::new(
-        fs::File::open(manifest)
-            .map_err(|_| unavailable("备份文件对象清单缺失，请使用完整恢复包。"))?,
-    );
+    let mut input = BufReader::new(fs::File::open(manifest).map_err(|_| {
+        unavailable("备份文件对象清单缺失，请使用完整恢复包。")
+            .coded(crate::api::ErrorCode::DependencyUnavailable)
+    })?);
     let header: serde_json::Value = serde_json::from_str(&line(&mut input)?)?;
     let (size, digest) = backup_io::digest_file(snapshot)?;
     if header["format"] != MAGIC
         || header["databaseSize"] != size
         || header["databaseDigest"] != digest
     {
-        return Err(unavailable("数据库备份与文件清单不匹配。"));
+        return Err(unavailable("数据库备份与文件清单不匹配。")
+            .coded(crate::api::ErrorCode::DependencyUnavailable));
     }
     let mut previous = String::new();
     loop {
@@ -122,7 +128,8 @@ fn inventory(snapshot: &Path, mut visit: impl FnMut(FileObject) -> Result<()>) -
         }
         let object: FileObject = serde_json::from_str(&entry)?;
         if object.digest <= previous {
-            return Err(unavailable("备份对象顺序无效。"));
+            return Err(unavailable("备份对象顺序无效。")
+                .coded(crate::api::ErrorCode::DependencyUnavailable));
         }
         crate::operation::check()?;
         validate(&object)?;
@@ -130,7 +137,8 @@ fn inventory(snapshot: &Path, mut visit: impl FnMut(FileObject) -> Result<()>) -
         visit(object)?;
     }
     if !input.fill_buf()?.is_empty() {
-        return Err(unavailable("备份对象清单存在额外数据。"));
+        return Err(unavailable("备份对象清单存在额外数据。")
+            .coded(crate::api::ErrorCode::DependencyUnavailable));
     }
     Ok(())
 }
@@ -138,10 +146,13 @@ fn line(reader: &mut impl BufRead) -> Result<String> {
     let mut bytes = vec![];
     reader.take(4097).read_until(b'\n', &mut bytes)?;
     if bytes.len() > 4096 || bytes.last() != Some(&b'\n') {
-        return Err(unavailable("备份对象清单损坏或未完成。"));
+        return Err(unavailable("备份对象清单损坏或未完成。")
+            .coded(crate::api::ErrorCode::DependencyUnavailable));
     }
     bytes.pop();
-    String::from_utf8(bytes).map_err(|_| unavailable("备份对象清单编码无效。"))
+    String::from_utf8(bytes).map_err(|_| {
+        unavailable("备份对象清单编码无效。").coded(crate::api::ErrorCode::DependencyUnavailable)
+    })
 }
 
 /// Stage exactly the snapshot inventory; later garbage collection cannot remove recovery bytes.

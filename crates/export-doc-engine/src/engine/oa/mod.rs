@@ -18,6 +18,7 @@ mod custom_forms;
 mod decisions;
 mod definition_queries;
 mod definitions;
+mod deployment;
 mod document_schedule;
 mod documents;
 mod draft_deletion;
@@ -28,6 +29,7 @@ mod hub;
 mod live_assignments;
 pub(in crate::engine) mod materials;
 pub(in crate::engine) mod personnel_changes;
+mod publication_coverage;
 mod publication_schedule;
 mod queries;
 pub(in crate::engine) mod queue_authority;
@@ -37,6 +39,7 @@ mod request_projects;
 mod reservation_schedule;
 mod resource_requests;
 pub(in crate::engine) mod runtime;
+mod service_management;
 mod settings_patch;
 pub(in crate::engine) mod settings_store;
 mod subflows;
@@ -341,8 +344,40 @@ pub(super) fn handle(
             return hub::list(tx, &actor);
         }
         if meta["kind"] == "approval-settings" {
+            if action == "general-catalog" {
+                let key = crate::engine::request_values::find(query, "definitionKey")
+                    .unwrap_or("general");
+                let variant = if key.is_empty() || key == "general" {
+                    ""
+                } else {
+                    key.strip_prefix("general:")
+                        .filter(|v| export_doc_domain::oa_form::field_key(v))
+                        .ok_or_else(|| invalid("流程编号无效。"))?
+                };
+                let (rule, version) =
+                    definitions::published(tx, &actor.company, "general", variant)?;
+                if rule
+                    .form
+                    .as_ref()
+                    .is_some_and(|form| !custom_forms::audience(form, &actor.department))
+                {
+                    return Err(error(403, "当前任职不在该事项的申请范围内。"));
+                }
+                return Ok(
+                    json!({"definitionVersion":version,"catalogRevision":publication_coverage::revision(tx,&actor.company)?,"requirements":rule.general_handling}),
+                );
+            }
+            if action.starts_with("service-") {
+                return service_management::handle(tx, &actor, &action, body, query);
+            }
+            if action == "deployment-preview" {
+                return deployment::preview(tx, &actor, body);
+            }
+            if action == "deployment-apply" {
+                return deployment::apply(tx, &actor, body);
+            }
             if action.starts_with("handling-") {
-                return handling::directory(tx, &actor, &text(meta, "resource"));
+                return handling::directory(tx, &actor, &text(meta, "resource"), query);
             }
             return settings::handle(tx, &actor, &action, body, parameters, query);
         }
@@ -476,7 +511,7 @@ pub(super) fn handle(
             custom_forms::validate(tx, &actor, &mut row, false)?;
             if meta["kind"] == "general" {
                 let category = text(&row, "category");
-                handling::select(tx, &actor, &mut row, &category, false)?;
+                handling::select(tx, &actor, &mut row, &category, false, false)?;
             }
             if meta["kind"] == "personnel" {
                 personnel_changes::validate(tx, &actor, &row, today)?;
@@ -539,16 +574,6 @@ pub(super) fn handle(
             validation::submission(tx, &row)?;
         }
         if action == "submit" {
-            if row["kind"] == "general" {
-                let category = text(&row, "category");
-                handling::select(
-                    tx,
-                    &actor,
-                    &mut row,
-                    &category,
-                    matches!(category.as_str(), "Seal" | "Certificate"),
-                )?;
-            }
             approval::submit(tx, &actor, &mut row)?;
             submissions::begin(tx, &actor, &mut row)?;
         }
@@ -583,9 +608,12 @@ pub(super) fn handle(
         } else {
             &action
         };
+        if next == "Approved" && row["kind"] == "general" {
+            return fulfillment::advance(tx, &actor, meta, row, today, event, &note);
+        }
         save(tx, &actor, meta, row, event, &note)
     };
-    if operation.method == "GET" {
+    if operation.method == "GET" || action == "deployment-preview" {
         service.store.read(execute)
     } else {
         let mut result = service.store.transaction(execute)?;
@@ -678,7 +706,7 @@ fn create(
     row["_requesterContext"] = json!(actor.context);
     if meta["kind"] == "general" {
         let category = text(&row, "category");
-        handling::select(tx, actor, &mut row, &category, false)?;
+        handling::select(tx, actor, &mut row, &category, false, false)?;
     }
     access(tx, actor, meta, &row)?;
     row["submissionDigest"] = json!(submitted);

@@ -49,7 +49,23 @@ impl From<rusqlite::Error> for Error {
                 return Self::new(ErrorKind::Conflict, "记录重复或仍被其他业务引用。");
             }
         }
-        Self::unavailable(format!("SQLite 存储操作失败：{error}"))
+        let message = match &error {
+            rusqlite::Error::SqliteFailure(failure, _) => match failure.code {
+                rusqlite::ErrorCode::DiskFull => {
+                    "SQLite 所在卷空间已用尽，请扩容或清理无用临时文件。"
+                }
+                rusqlite::ErrorCode::ReadOnly => "SQLite 数据库或目录只读，请检查服务写入权限。",
+                rusqlite::ErrorCode::DatabaseCorrupt | rusqlite::ErrorCode::NotADatabase => {
+                    "SQLite 数据库损坏或格式无效，请保留现场并从已核验的恢复点恢复。"
+                }
+                rusqlite::ErrorCode::CannotOpen => {
+                    "SQLite 数据库无法打开，请核对目录、挂载状态和服务权限。"
+                }
+                _ => "SQLite 数据库操作未完成，请凭追踪编号联系管理员核验存储状态。",
+            },
+            _ => "SQLite 数据库记录不符合当前模型，请核验数据库版本和完整性。",
+        };
+        Self::unavailable(message)
     }
 }
 impl Sqlite {

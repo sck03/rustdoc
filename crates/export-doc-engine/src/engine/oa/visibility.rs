@@ -110,7 +110,7 @@ impl<'a, 'db> Visibility<'a, 'db> {
             return Ok(true);
         }
         Ok((resource == "office.general"
-            && !text(row, "handlingKey").is_empty()
+            && !text(row, "serviceId").is_empty()
             && handling::GENERAL_STATES.contains(&text(row, "status").as_str())
             || matches!(resource, "office.rooms" | "office.supplies")
                 && matches!(

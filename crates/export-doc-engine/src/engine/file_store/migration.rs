@@ -73,17 +73,25 @@ pub(super) fn run(store: &Store, administrator: &Actor, body: &Value) -> Result<
             } else {
                 return Err(invalid("请选择本地或 S3 存储。"));
             };
-            let config = Configuration {
-                version: 1,
+            let mut config = Configuration {
+                version: 2,
                 revision: source.revision + 1,
                 credential_revision: 1,
                 identity,
+                medium_identity: String::new(),
                 backend,
                 policy: source.policy.clone(),
+                archive_locations: source
+                    .archive_locations
+                    .keys()
+                    .map(|id| (id.clone(), None))
+                    .collect(),
             };
             match &config.backend {
                 Backend::Local { .. } => {
-                    store.files.local_root(&config)?;
+                    config.medium_identity =
+                        paths::volume_identity(&store.files.local_root(&config)?)
+                            .map_err(unavailable)?;
                 }
                 Backend::S3 { .. } => {
                     store.files.target(&config)?;
@@ -192,7 +200,7 @@ impl FileStore {
         }
         Ok(())
     }
-    fn copy_object(&self, target: &Configuration, object: &FileObject) -> Result<()> {
+    pub(super) fn copy_object(&self, target: &Configuration, object: &FileObject) -> Result<()> {
         match &target.backend {
             Backend::Local { .. } => {
                 self.local_identity(target)?;

@@ -16,16 +16,16 @@ import { attachmentUploadForm } from "../../ui/documentAttachments.ts";
 
 export function MeetingRoomEditor({ client, user, room, onClose, onSaved }: { client: ExportDocManagerApiClient; user: ApiUserDto; room?: MeetingRoomRecord; onClose: () => void; onSaved: (saved: MeetingRoomRecord) => void }) {
   const operation = useOfficeResourceOperation("rooms", client);
-  const [handlingKey, setHandlingKey] = useState(room?.handlingKey ?? "");
+  const [serviceId, setHandlingKey] = useState(room?.serviceId ?? "");
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const body = { ...readMeetingRoomForm(new FormData(event.currentTarget), room?.versionNumber ?? 0), handlingKey };
+    const body = { ...readMeetingRoomForm(new FormData(event.currentTarget), room?.versionNumber ?? 0), serviceId };
     void operation.run((signal) => room ? client.updateMeetingRoom({ id: room.id, body }, { signal }) : client.createMeetingRoom({ body }, { signal }), onSaved);
   }
   return <OfficeDialog title={room ? "编辑会议室" : "添加会议室"} onClose={onClose} {...operation} protectChanges>
     <form onSubmit={submit}><fieldset disabled={operation.busy} className="office-form-grid">
       <OfficeField label="会议室名称" wide><input name="name" required maxLength={120} defaultValue={room?.name} /></OfficeField>
-      <HandlingServicePicker client={client} user={user} category="Room" value={handlingKey} onChange={setHandlingKey} />
+      <HandlingServicePicker client={client} user={user} category="Room" value={serviceId} onChange={setHandlingKey} />
       <OfficeField label="位置" wide><input name="location" maxLength={200} defaultValue={room?.location} placeholder="例如：办公楼三层东侧" /></OfficeField>
       <OfficeField label="容纳人数"><input name="capacity" type="number" required min={1} max={10000} defaultValue={room?.capacity ?? 10} /></OfficeField>
       <OfficeField label="单次最长预约（小时）"><input name="maximumBookingHours" type="number" required min={1} max={24} defaultValue={room?.maximumBookingHours ?? 8} /></OfficeField>

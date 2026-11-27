@@ -13,7 +13,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub(super) const MAGIC: &[u8] = b"EDM-DISASTER-RECOVERY-2";
 fn root(paths: &RuntimePaths) -> Result<PathBuf> {
     super::disaster_root(paths)
 }
@@ -32,7 +31,7 @@ pub(super) fn status(service: &NativeService, actor: &Actor) -> Result<Value> {
     result["message"] = json!(if pending {
         "恢复已暂存，请退出并重新打开桌面程序。"
     } else if supported {
-        "加密恢复包包含数据库、凭据主密钥和用户模板；新包使用 ZIP64 和分块加密，不设固定总容量上限；请预留足够磁盘空间。"
+        "便携恢复点包含数据库、主密钥、模板和全部文件。恢复时按有界窗口读取；导出文件本身需要相应目标空间。"
     } else {
         "团队版请使用服务器迁移包。"
     });
@@ -74,22 +73,10 @@ pub(super) fn create_package(
             let result = (|| {
                 let snapshot = working.join("snapshot.sqlite3");
                 super::snapshot::backup_sqlite(&store, &paths, &snapshot)?;
-                let package = package::create(
-                    &store,
-                    &paths,
-                    &protector,
-                    &snapshot,
-                    package::SQLITE,
-                    &working,
-                    MAGIC,
-                    &password,
+                let target = super::portable::create(
+                    &store, &paths, &protector, &snapshot, "SQLite", &password,
                 )?;
-                let target = root(&paths)?.join(format!(
-                    "edm-recovery-{}.edmrecovery",
-                    crate::paths::nonce().map_err(unavailable)?
-                ));
                 crate::operation::check()?;
-                fs::rename(package, &target)?;
                 super::audit(
                     &store,
                     &actor,
@@ -124,11 +111,11 @@ pub(super) fn restore_package(
     let path = if Path::new(&name).is_absolute() {
         PathBuf::from(name)
     } else {
-        super::managed_file(&root(&service.paths)?, &name, "edmrecovery")?
+        super::managed_file(&root(&service.paths)?, &name, "edmpoint")?
     };
     crate::paths::ensure_safe_absolute(&path).map_err(invalid)?;
-    if path.extension().is_none_or(|e| e != "edmrecovery") {
-        return Err(invalid("请选择 .edmrecovery 恢复包。"));
+    if path.extension().is_none_or(|e| e != "edmpoint") {
+        return Err(invalid("请选择本版本 .edmpoint 恢复点文件。"));
     }
     let (store, paths, id) = (service.store.clone(), service.paths.clone(), actor.id);
     service.jobs.start_backup(
@@ -141,13 +128,12 @@ pub(super) fn restore_package(
             auth::authorize_operation(&actor, RESTORE_DISASTER_RECOVERY_PACKAGE, &[])?;
             let _gate = package::lock(&paths)?;
             crate::paths::ensure_safe_absolute(&path).map_err(invalid)?;
-            let prepared = package::prepare(
-                &paths.disk_space,
+            let prepared = super::portable::prepare(
+                &paths,
                 &marker(&paths)?,
-                MAGIC,
                 &password,
                 fs::File::open(path)?,
-                package::SQLITE,
+                "SQLite",
             )?;
             Ok(prepared.into_task(
                 _gate,
@@ -162,9 +148,10 @@ pub fn apply_pending(paths: &RuntimePaths) -> Result<()> {
     let _gate = package::lock(paths)?;
     if !package::confirm_task_marker(&paths.cache_root, &marker, |job| {
         let db = export_doc_storage::Connection::sqlite_read_only(&paths.sqlite_database_path())?;
-        let row = db
-            .find_identity("background-jobs", job)?
-            .ok_or_else(|| unavailable("恢复任务提交记录缺失，已停止恢复。"))?;
+        let row = db.find_identity("background-jobs", job)?.ok_or_else(|| {
+            unavailable("恢复任务提交记录缺失，已停止恢复。")
+                .coded(crate::api::ErrorCode::DependencyUnavailable)
+        })?;
         Ok(row["status"] == "Succeeded")
     })? {
         return Ok(());
@@ -173,10 +160,12 @@ pub fn apply_pending(paths: &RuntimePaths) -> Result<()> {
         Some(package::SnapshotRestore::Sqlite { sha256 }) => {
             return super::snapshot::apply_sqlite(paths, &marker, &sha256);
         }
+        Some(package::SnapshotRestore::Repository { ref provider, .. }) if provider == "SQLite" => {
+        }
         Some(_) => return Err(invalid("恢复数据库类型不匹配。")),
         None => {}
     }
-    let Some(staging) = package::staged(&marker, package::SQLITE, &paths.disk_space)? else {
+    let Some(staging) = package::staged(paths, &marker, package::SQLITE, &paths.disk_space)? else {
         return Ok(());
     };
     export_doc_storage::verify_sqlite_backup(&staging.join(package::SQLITE))?;

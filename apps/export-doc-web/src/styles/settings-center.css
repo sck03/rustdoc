@@ -1,4 +1,12 @@
 @layer route {
+.recovery-maintenance {
+  max-width: 1180px;
+  margin-inline: auto;
+  padding: var(--edm-space-4);
+}
+.recovery-maintenance .checkbox-field { white-space: normal; }
+.recovery-maintenance .settings-fieldset > [data-ui="button"] { justify-self: start; }
+
 .settings-section-nav {
   display: flex;
   flex-wrap: wrap;

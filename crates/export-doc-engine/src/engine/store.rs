@@ -203,6 +203,7 @@ impl Store {
         connection_string: &str,
         options: PoolOptions,
     ) -> Result<Self> {
+        export_doc_storage::maintenance::ensure_data_root_available(&paths.data_root)?;
         let connection = Pool::postgres(connection_string, options)?;
         let registered = !connection
             .acquire(|| false)?

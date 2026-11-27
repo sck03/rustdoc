@@ -2,11 +2,26 @@
 use crate::{Adapter, Error, Result, sql};
 use serde::{Deserialize, Serialize};
 
+pub(crate) fn export_database_snapshot(db: &(impl Adapter + ?Sized)) -> Result<String> {
+    if db.provider() != "PostgreSQL" {
+        return Err(Error::new(
+            crate::ErrorKind::Unsupported,
+            "SQLite 使用已完成的快照文件捕获对象清单。",
+        ));
+    }
+    db.query_json("SELECT to_json(pg_export_snapshot())::text", &[])?
+        .as_str()
+        .map(str::to_owned)
+        .ok_or_else(|| Error::unavailable("PostgreSQL 未返回可用快照标识。"))
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct FileObject {
     pub digest: String,
     pub size: u64,
+    #[serde(default)]
+    pub archive_identity: String,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -74,7 +89,7 @@ pub(crate) fn get(
         "json_object"
     };
     let projection = format!(
-        "{json}('fileName',v.file_name,'mediaType',v.media_type,'object',{json}('digest',o.digest,'size',o.size_bytes))"
+        "{json}('fileName',v.file_name,'mediaType',v.media_type,'object',{json}('digest',o.digest,'size',o.size_bytes,'archiveIdentity',COALESCE((SELECT storage_identity FROM file_locations l WHERE l.digest=o.digest AND l.archived=1),'')))"
     );
     let select = format!(
         "SELECT {projection} AS body FROM file_versions v JOIN file_objects o ON o.digest=v.digest WHERE v.record_id=CAST({record} AS BIGINT) AND v.kind={kind}"
@@ -126,7 +141,7 @@ pub(crate) fn page(
         "json_object"
     };
     let select = format!(
-        "SELECT {json}('fileName',v.file_name,'mediaType',v.media_type,'object',{json}('digest',o.digest,'size',o.size_bytes)) AS body FROM file_versions v JOIN file_objects o ON o.digest=v.digest WHERE {condition} AND v.kind>{after} ORDER BY v.kind LIMIT CAST({limit} AS BIGINT)"
+        "SELECT {json}('fileName',v.file_name,'mediaType',v.media_type,'object',{json}('digest',o.digest,'size',o.size_bytes,'archiveIdentity',COALESCE((SELECT storage_identity FROM file_locations l WHERE l.digest=o.digest AND l.archived=1),''))) AS body FROM file_versions v JOIN file_objects o ON o.digest=v.digest WHERE {condition} AND v.kind>{after} ORDER BY v.kind LIMIT CAST({limit} AS BIGINT)"
     );
     Ok((
         total,
@@ -152,12 +167,12 @@ pub(crate) fn objects(
         "json_object"
     };
     let unused = if unused {
-        " AND NOT EXISTS(SELECT 1 FROM file_versions v WHERE v.digest=o.digest)"
+        " AND o.reference_count=0"
     } else {
         ""
     };
     let query = format!(
-        "SELECT {json}('digest',o.digest,'size',o.size_bytes) AS body FROM file_objects o WHERE o.digest>{after}{unused} ORDER BY o.digest LIMIT CAST({limit} AS BIGINT)"
+        "SELECT {json}('digest',o.digest,'size',o.size_bytes,'archiveIdentity',COALESCE((SELECT storage_identity FROM file_locations l WHERE l.digest=o.digest AND l.archived=1),'')) AS body FROM file_objects o WHERE o.digest>{after}{unused} ORDER BY o.digest LIMIT CAST({limit} AS BIGINT)"
     );
     rows(db, &query, &values)?
         .into_iter()
@@ -177,7 +192,7 @@ pub(crate) fn pending_copies(
     } else {
         "json_object"
     };
-    rows(db, &format!("SELECT {constructor}('digest',o.digest,'size',o.size_bytes) AS body FROM file_migration_queue q JOIN file_objects o ON o.digest=q.digest WHERE q.storage_identity={identity} ORDER BY q.digest LIMIT 200"), &values)?
+    rows(db, &format!("SELECT {constructor}('digest',o.digest,'size',o.size_bytes,'archiveIdentity',COALESCE((SELECT storage_identity FROM file_locations l WHERE l.digest=o.digest AND l.archived=1),'')) AS body FROM file_migration_queue q JOIN file_objects o ON o.digest=q.digest WHERE q.storage_identity={identity} ORDER BY q.digest LIMIT 200"), &values)?
         .into_iter().map(|value| serde_json::from_value(value).map_err(Into::into)).collect()
 }
 pub(crate) fn locate(db: &(impl Adapter + ?Sized), identity: &str, digest: &str) -> Result<()> {
@@ -219,7 +234,7 @@ pub(crate) fn referenced(db: &(impl Adapter + ?Sized), digest: &str) -> Result<b
     let mut values = vec![];
     let digest = sql::bind(&mut values, digest, pg);
     let value = db.query_json(
-        &format!("SELECT CAST(COUNT(*) AS TEXT) FROM file_versions WHERE digest={digest}"),
+        &format!("SELECT CAST(COALESCE((SELECT reference_count FROM file_objects WHERE digest={digest}),0) AS TEXT)"),
         &values,
     )?;
     value
@@ -231,10 +246,13 @@ pub(crate) fn remove_unused(db: &(impl Adapter + ?Sized), digest: &str) -> Resul
     let pg = db.provider() == "PostgreSQL";
     let mut values = vec![];
     let digest = sql::bind(&mut values, digest, pg);
-    db.execute_statement(&format!("DELETE FROM file_objects WHERE digest={digest} AND NOT EXISTS(SELECT 1 FROM file_versions v WHERE v.digest=file_objects.digest)"), &values)?;
+    db.execute_statement(
+        &format!("DELETE FROM file_objects WHERE digest={digest} AND reference_count=0"),
+        &values,
+    )?;
     Ok(())
 }
-fn rows(
+pub(crate) fn rows(
     db: &(impl Adapter + ?Sized),
     select: &str,
     values: &[String],
@@ -253,7 +271,7 @@ pub(crate) fn statistics(db: &(impl Adapter + ?Sized)) -> Result<serde_json::Val
     } else {
         "json_object"
     };
-    db.query_json(&format!("SELECT CAST({constructor}('fileCount',file_count,'physicalBytes',physical_bytes,'unreferencedBytes',physical_bytes-referenced_bytes,'logicalBytes',logical_bytes) AS TEXT) FROM file_storage_totals WHERE id=1"), &[])
+    db.query_json(&format!("SELECT CAST({constructor}('fileCount',file_count,'physicalBytes',physical_bytes,'unreferencedBytes',physical_bytes-referenced_bytes,'logicalBytes',logical_bytes,'protectedBytes',(SELECT protected_bytes FROM file_retention_totals WHERE id=1)) AS TEXT) FROM file_storage_totals WHERE id=1"), &[])
 }
 
 pub(crate) fn owner_company(db: &(impl Adapter + ?Sized), record: i64) -> Result<String> {
@@ -284,11 +302,12 @@ pub(crate) fn usage(db: &(impl Adapter + ?Sized), company: &str) -> Result<u64> 
 pub(crate) fn verify_accounting(db: &(impl Adapter + ?Sized)) -> Result<()> {
     let scope = sql::field("companyScope", db.provider() == "PostgreSQL");
     let inconsistent = db.query_json(&format!("SELECT CAST(COUNT(*) AS TEXT) FROM (
-        SELECT 1 AS mismatch FROM file_objects o WHERE reference_count<>(SELECT COUNT(*) FROM file_versions v WHERE v.digest=o.digest)
+        SELECT 1 AS mismatch FROM file_objects o WHERE reference_count<>(SELECT COUNT(*) FROM file_versions v WHERE v.digest=o.digest)+(SELECT COUNT(*) FROM file_retention_refs f WHERE f.digest=o.digest)
         UNION ALL SELECT 1 FROM file_storage_totals WHERE id=1 AND (
             file_count<>(SELECT COUNT(*) FROM file_objects) OR physical_bytes<>(SELECT COALESCE(SUM(size_bytes),0) FROM file_objects) OR
-            referenced_bytes<>(SELECT COALESCE(SUM(size_bytes),0) FROM file_objects o WHERE EXISTS(SELECT 1 FROM file_versions v WHERE v.digest=o.digest)) OR
+            referenced_bytes<>(SELECT COALESCE(SUM(size_bytes),0) FROM file_objects o WHERE o.reference_count>0) OR
             logical_bytes<>(SELECT COALESCE(SUM(o.size_bytes),0) FROM file_versions v JOIN file_objects o ON o.digest=v.digest))
+        UNION ALL SELECT 1 FROM file_retention_totals WHERE id=1 AND protected_bytes<>(SELECT COALESCE(SUM(size_bytes),0) FROM file_objects o WHERE EXISTS(SELECT 1 FROM file_retention_refs f WHERE f.digest=o.digest))
         UNION ALL SELECT 1 FROM (SELECT company,SUM(amount) AS difference FROM (
             SELECT COALESCE({scope},'') AS company,o.size_bytes AS amount FROM file_versions v JOIN file_objects o ON o.digest=v.digest JOIN records r ON r.id=v.record_id
             UNION ALL SELECT company,-logical_bytes AS amount FROM file_usage_totals

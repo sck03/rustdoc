@@ -253,6 +253,7 @@ impl InputMapping {
             "durationDays" | "durationHours" => ContextField::Duration,
             "departmentId" => ContextField::Department,
             "category" => ContextField::Category,
+            "serviceId" => ContextField::ServiceId,
             "personnelChange.action" => ContextField::PersonnelAction,
             "isReturnable" => ContextField::Returnable,
             _ => return Err("子流程输入只能引用声明的冻结条件字段。".into()),
@@ -266,6 +267,7 @@ pub enum ContextField {
     Duration,
     Department,
     Category,
+    ServiceId,
     PersonnelAction,
     Returnable,
 }
@@ -277,6 +279,7 @@ impl ContextField {
             Self::Duration => "duration",
             Self::Department => "department",
             Self::Category => "category",
+            Self::ServiceId => "serviceId",
             Self::PersonnelAction => "personnelAction",
             Self::Returnable => "returnable",
         }

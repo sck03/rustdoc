@@ -1,6 +1,6 @@
 //! The served API and both generated clients share the native declarations.
 #[path = "native_contract/mod.rs"]
-mod native;
+pub mod native;
 pub use native::{DETAIL_FIELDS as OA_SHEET_DETAIL_FIELDS, SHEET_FIELDS as OA_SHEET_FIELDS};
 use serde_json::Value;
 #[cfg(test)]
@@ -315,6 +315,7 @@ mod tests {
         maintenance_cleanup::apply(&mut baseline);
         license_validity::apply(&mut baseline);
         oa_resource_cleanup::apply(&mut baseline);
+        file_storage::apply_oa_recovery(&mut baseline);
         if let Some(change) = difference("contract", &document(), &baseline) {
             panic!("undeclared contract change: {change}");
         }

@@ -127,13 +127,23 @@ pub(super) fn list_with(
         let keys = super::handling::keys(tx, actor, resource)?;
         let mut keyword_keys = vec![];
         if directory && !keyword.is_empty() {
-            for service in super::handling::directory(tx, actor, resource)?["items"]
-                .as_array()
-                .into_iter()
-                .flatten()
-            {
-                if store::normalize(&text(service, "handlerNames")).contains(&keyword) {
-                    keyword_keys.push(text(service, "key"));
+            let mut after = String::new();
+            loop {
+                crate::operation::check()?;
+                let page = super::handling::directory(
+                    tx,
+                    actor,
+                    resource,
+                    &[("after", after), ("pageSize", "100".into())],
+                )?;
+                for service in page["items"].as_array().into_iter().flatten() {
+                    if store::normalize(&text(service, "handlerNames")).contains(&keyword) {
+                        keyword_keys.push(text(service, "key"));
+                    }
+                }
+                after = text(&page, "nextCursor");
+                if after.is_empty() {
+                    break;
                 }
             }
         }

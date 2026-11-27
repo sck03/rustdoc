@@ -10,12 +10,14 @@ use export_doc_domain::backup_plan::{S3Addressing, S3Settings};
 use sha2::{Digest, Sha256};
 use std::{
     io::Read,
-    path::Path,
     time::{Duration, SystemTime},
 };
 use ureq::http::{Request, Response};
 mod journal;
 mod multipart;
+mod stream;
+pub(in crate::engine) use stream::StreamUpload;
+mod objects;
 #[cfg(test)]
 mod tests;
 
@@ -92,6 +94,7 @@ pub(in crate::engine) fn validate(settings: &S3Settings) -> Result<url::Url> {
     Ok(url)
 }
 
+#[derive(Clone)]
 pub(in crate::engine) struct Target {
     settings: S3Settings,
     endpoint: url::Url,
@@ -178,10 +181,24 @@ impl Target {
         size: Option<u64>,
         hash: &str,
     ) -> Result<Request<B>> {
+        self.request_headers(method, url, body, size, hash, &[])
+    }
+    fn request_headers<B>(
+        &self,
+        method: &str,
+        url: &url::Url,
+        body: B,
+        size: Option<u64>,
+        hash: &str,
+        extra: &[(&str, &str)],
+    ) -> Result<Request<B>> {
         crate::operation::check()?;
         let mut request = Request::builder().method(method).uri(url.as_str());
         if let Some(size) = size {
             request = request.header("content-length", size);
+        }
+        for (key, value) in extra {
+            request = request.header(*key, *value);
         }
         let mut request = request.body(body).map_err(|_| invalid("S3 请求无效。"))?;
         let mut settings = SigningSettings::default();
@@ -232,20 +249,6 @@ impl Target {
     pub(in crate::engine) fn delete(&self, name: &str) -> Result<()> {
         self.control(&self.agent, "DELETE", &self.url(name)?, &[])
             .map(|_| ())
-    }
-    pub(in crate::engine) fn upload(
-        &self,
-        path: &Path,
-        name: &str,
-        size: u64,
-        digest: &str,
-        verify: bool,
-    ) -> Result<()> {
-        self.put_file(&mut std::fs::File::open(path)?, name, size, digest)?;
-        if verify {
-            self.verify(name, size, digest)?;
-        }
-        Ok(())
     }
     pub(super) fn verify(&self, name: &str, size: u64, digest: &str) -> Result<()> {
         let request = self.request("GET", &self.url(name)?, (), None, EMPTY_HASH)?;

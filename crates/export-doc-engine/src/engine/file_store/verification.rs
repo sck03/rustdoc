@@ -6,7 +6,10 @@ use super::*;
 mod tests;
 
 pub(super) fn open(path: &Path, object: &FileObject) -> Result<fs::File> {
-    let mut file = fs::File::open(path).map_err(|_| unavailable("已登记文件对象缺失或不可读。"))?;
+    let mut file = fs::File::open(path).map_err(|_| {
+        unavailable("已登记文件对象缺失或不可读。")
+            .coded(crate::api::ErrorCode::DependencyUnavailable)
+    })?;
     check(&mut file, object)?;
     Ok(file)
 }

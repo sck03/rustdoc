@@ -167,7 +167,6 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("success",b()),("message",s()),("fromAddress",s()),
         ("smtpHost",s()),("storagePolicy",s())
     ]).required(vec!["success","message","fromAddress","smtpHost","storagePolicy"])),
-    ("ApiErrorResponse",o(vec![("message",s()),("code",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String]))),("correlationId",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])))]).required(vec!["message"])),
     ("ApiExcelConvertBookingSheetRequest",o(vec![("sourcePath",s()),("destinationPath",s())])),
     ("ApiExcelImportAnalysisIssueDto",o(vec![
         ("severity",s()),("code",s()),("message",s()),
@@ -409,7 +408,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("status",s()),("progressPercent",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("statusText",s()),
         ("detailText",s()),("requestedBy",s()),("requestedByUserId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("createdAt",s().format("date-time")),("startedAt",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).format("date-time")),("completedAt",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).format("date-time")),
-        ("updatedAt",s().format("date-time")),("outputPath",s()),("errorMessage",s()),
+        ("updatedAt",s().format("date-time")),("outputPath",s()),("errorMessage",s()),("failure",r("ApiErrorResponse")),
         ("canCancel",b()),("canRetry",b()),("retryOperation",s()),
         ("retryRequestJson",s())
     ]).required(vec!["jobId","kind","title","status","statusText","detailText","requestedBy","requestedByUserId","createdAt","updatedAt","outputPath","errorMessage","canCancel","canRetry","retryOperation","retryRequestJson"])),
@@ -511,7 +510,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("attendeeCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("startsAt",s().format("date-time")),("endsAt",s().format("date-time")),
         ("status",r("MeetingBookingStatus")),("issuedAt",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).format("date-time")),("returnedAt",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).format("date-time")),
         ("createdAt",s().format("date-time")),("versionNumber",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("approvalPlan",r("OaApprovalPlan")),
-        ("canReview",b()),("reviewTaskKeys",a(s())),("handlingKey",s()),
+        ("canReview",b()),("reviewTaskKeys",a(s())),("serviceId",s()),
         ("handlingName",s()),("handlerNames",s()),("canHandle",b()),
         ("attachments",a(r("OaAttachment")).read_only(true)),("submissionId",i().format("int64").read_only(true)),("submissionNumber",i().format("int64").read_only(true)),
         ("approvalDocument",r("ResourceSubmission")),("companyScope",s().read_only(true)),("applicantAppointmentId",s().read_only(true)),
@@ -528,14 +527,14 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ("MeetingBusySlot",o(vec![("startsAt",s().format("date-time")),("endsAt",s().format("date-time")),("status",r("MeetingBookingStatus"))]).required(vec!["startsAt","endsAt","status"])),
     ("MeetingRoomRecord",object_groups(vec![
         (&["id","capacity","maximumBookingHours","advanceBookingDays","versionNumber"], Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
-        (&["name","location","equipment","handlingKey","handlingName","handlerNames"], s()),
+        (&["name","location","equipment","serviceId","handlingName","handlerNames"], s()),
         (&["requiresKey","isActive","inUse","canHandle"], b()),
     ]).required(vec!["id","name","location","equipment","capacity","maximumBookingHours","advanceBookingDays","requiresKey","isActive","inUse","versionNumber"])),
     ("MeetingRoomSaveRequest",o(vec![
         ("name",s()),("location",s()),("equipment",s()),
         ("capacity",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("maximumBookingHours",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("advanceBookingDays",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("requiresKey",b()),("isActive",b()),("expectedVersion",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
-        ("handlingKey",s())
+        ("serviceId",s())
     ]).required(vec!["name","location","equipment","capacity","maximumBookingHours","advanceBookingDays","requiresKey","isActive","expectedVersion"])),
     ("NotifyPartyMode",Schema::default().enumeration(Enumeration::Values(vec![serde_json::json!("None"),serde_json::json!("SameAsConsignee"),serde_json::json!("Separate")]))),
     ("OfficeDecisionRequest",o(vec![
@@ -563,7 +562,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ]).required(vec!["operationId","quantity","expectedVersion","note"])),
     ("OfficeSupplyRecord",object_groups(vec![
         (&["id","stockQuantity","reservedQuantity","minimumStock","versionNumber","availableQuantity"], Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
-        (&["name","unit","location","description","handlingKey","handlingName","handlerNames"], s()),
+        (&["name","unit","location","description","serviceId","handlingName","handlerNames"], s()),
         (&["isReturnable","isActive","lowStock","canHandle"], b()),
     ]).required(vec!["id","name","unit","location","description","isReturnable","isActive","stockQuantity","reservedQuantity","minimumStock","versionNumber","availableQuantity","lowStock"])),
     ("OfficeSupplyRequestRecord",o(vec![
@@ -573,7 +572,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("quantity",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("returnedQuantity",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("returnDueDate",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).format("date")),
         ("status",r("SupplyRequestStatus")),("createdAt",s().format("date-time")),("versionNumber",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("approvalPlan",r("OaApprovalPlan")),("canReview",b()),("reviewTaskKeys",a(s())),
-        ("handlingKey",s()),("handlingName",s()),("handlerNames",s()),
+        ("serviceId",s()),("handlingName",s()),("handlerNames",s()),
         ("canHandle",b()),("attachments",a(r("OaAttachment")).read_only(true)),("submissionId",i().format("int64").read_only(true)),
         ("submissionNumber",i().format("int64").read_only(true)),("approvalDocument",r("ResourceSubmission")),("companyScope",s().read_only(true)),
         ("applicantAppointmentId",s().read_only(true)),("applicantJobTitle",s().read_only(true)),("reservationState",s().enumeration(Enumeration::Values(vec![serde_json::json!("Unreserved"),serde_json::json!("Reserved"),serde_json::json!("Insufficient"),serde_json::json!("Consumed")])).read_only(true)),
@@ -584,7 +583,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ("OfficeSupplySaveRequest",o(vec![
         ("name",s()),("unit",s()),("location",s()),
         ("description",s()),("isReturnable",b()),("isActive",b()),
-        ("minimumStock",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("expectedVersion",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("handlingKey",s())
+        ("minimumStock",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("expectedVersion",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("serviceId",s())
     ]).required(vec!["name","unit","location","description","isReturnable","isActive","minimumStock","expectedVersion"])),
     ("PagedResultOfBusinessAttachmentRecord",super::schema_shapes::paged_response("BusinessAttachmentRecord")),
     ("PagedResultOfMeetingBookingRecord",super::schema_shapes::paged_response("MeetingBookingRecord")),

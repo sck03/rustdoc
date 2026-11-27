@@ -157,6 +157,7 @@ pub fn check() -> Result<(), ApiError> {
                 message: "操作已取消或超过时限，未提交后续修改。".into(),
                 code: None,
                 diagnostic: Some("cancelled-or-timeout"),
+                ..Default::default()
             });
         }
         Ok(())

@@ -10,6 +10,7 @@ import type {
   OaRoutingUnit,
 } from "../../api/index.ts";
 import { ApprovalSimulationDialog } from "./ApprovalSimulationDialog.tsx";
+import { ApprovalDeploymentDialog } from "./ApprovalDeploymentDialog.tsx";
 import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 import { SegmentedNav } from "../../ui/primitives/Tabs.tsx";
 import { ApprovalDefinitionList } from "./ApprovalDefinitionList.tsx";
@@ -32,6 +33,7 @@ import { ApprovalDefinitionHistory } from "./ApprovalDefinitionHistory.tsx";
 import { WorkflowExceptionsPanel } from "./WorkflowExceptionsPanel.tsx";
 import { BusinessCalendarEditor } from "./BusinessCalendarEditor.tsx";
 import { OaFormDesigner } from "./OaFormDesigner.tsx";
+import { generalCategories } from "./oaCategories.ts";
 import "../../styles/routes/office.css";
 import "../../styles/routes/oa.css";
 
@@ -104,6 +106,8 @@ function ApprovalSettingsEditor({
     rule: OaApprovalRule;
     publish: boolean;
   } | null>(null);
+  const [deployment, setDeployment] = useState<"Publish" | "Disable" | null>(null);
+  const [setupOpen,setSetupOpen]=useState(initial.publications.length===0);
   const {
     draft,
     setDraft,
@@ -119,6 +123,8 @@ function ApprovalSettingsEditor({
     calendarInputs,
     changeCalendarInput,
     changedElsewhere,
+    hasUnsavedChanges,
+    acceptDeployment,
   } = useApprovalSettingsDraft(client, initial);
   const index = draft.rules.findIndex((rule) => rule.key === params.get("definition"));
   const rule = index >= 0 ? draft.rules[index] : null;
@@ -126,9 +132,7 @@ function ApprovalSettingsEditor({
   const section: ApprovalSettingsField =
     view === "calendar"
       ? "calendar"
-      : view === "handling"
-        ? "handlingServices"
-        : view === "delegations"
+      : view === "delegations"
           ? "delegations"
           : view === "templates"
             ? "sheetTemplates"
@@ -168,6 +172,14 @@ function ApprovalSettingsEditor({
       {changedElsewhere && (
         <InlineNotice tone="warning">设置已被其他管理员修改。当前草稿已保留，请核对后重新载入最新设置。</InlineNotice>
       )}
+      {view === "definitions" && !rule && <details className="oa-settings-section" open={setupOpen} onToggle={event=>setSetupOpen(event.currentTarget.open)}><summary>首次启用流程</summary>
+        <ol>
+          <li>{user.capabilities.canManageUsers ? <Link to="/system/organization">核对组织与职责</Link> : "请组织管理员核对负责人及职责"}，<Link to="/office/people">核对人员任职与账号</Link>。{accounts.length===0&&<strong> 当前没有可选审批人员。</strong>}</li>
+          <li><Button type="button" onClick={()=>update({view:"handling",definition:null,tab:null})}>配置办理事项与人员</Button>{handlers.length===0&&<strong> 当前没有具备办理权限的人员。</strong>}</li>
+          <li>在流程定义中设置审批节点并保存。{draft.rules.length} 个流程可按需启用。</li>
+          <li><Button type="button" disabled={hasUnsavedChanges} onClick={()=>setDeployment("Publish")}>选择流程并批量预检</Button>，按具体提示修正后确认发布。</li>
+        </ol>
+      </details>}
       {view !== "runtime" && (
         <form
           ref={formRef}
@@ -177,15 +189,16 @@ function ApprovalSettingsEditor({
           }}
           onSubmit={(event) => {
             event.preventDefault();
+            if (view === "handling") return;
             void save(section, rule?.key);
           }}
         >
           <fieldset disabled={operation.busy} className="office-form-grid">
             <legend>{views.find((item) => item.key === view)?.label}</legend>
             {view === "definitions" && !rule && (
-              <Button type="button" onClick={() => addApplication()}>
+              <div className="office-card-actions"><Button type="button" onClick={() => addApplication()}>
                 新建审批事项
-              </Button>
+              </Button><Button type="button" disabled={hasUnsavedChanges} onClick={() => setDeployment("Publish")}>批量发布</Button><Button type="button" disabled={hasUnsavedChanges} onClick={() => setDeployment("Disable")}>批量停用</Button>{hasUnsavedChanges && <span>请先保存当前修改</span>}</div>
             )}
             {view === "definitions" && !rule && (
               <ApprovalDefinitionList
@@ -226,6 +239,14 @@ function ApprovalSettingsEditor({
                         onChange={(event) => changeRule(index, { name: event.target.value })}
                       />
                     </OfficeField>
+                    {rule.kind === "general" && <OfficeField label="其他事项办理要求">
+                      <select value={rule.generalHandling?.Other ?? "Required"} onChange={event => changeRule(index, {generalHandling: {
+                        ...Object.fromEntries(Object.keys(generalCategories).map(key => [key,"Required"])),
+                        ...rule.generalHandling, Other: event.target.value,
+                      } as NonNullable<OaApprovalRule["generalHandling"]>})}>
+                        <option value="Required">审批后办理</option><option value="ApprovalOnly">仅审批</option>
+                      </select>
+                    </OfficeField>}
                     <p className="office-muted">
                       {publication
                         ? `当前发布版本 ${publication.version} · ${publication.enabled ? "已启用" : "已停用"}`
@@ -316,10 +337,9 @@ function ApprovalSettingsEditor({
             )}
             {view === "handling" && (
               <HandlingServicesEditor
-                services={draft.handlingServices ?? []}
+                client={client}
+                user={user}
                 accounts={handlers}
-                disabled={operation.busy}
-                onChange={(handlingServices) => setDraft((value) => ({ ...value, handlingServices }))}
               />
             )}
             {view === "templates" && (
@@ -340,7 +360,7 @@ function ApprovalSettingsEditor({
             )}
           </fieldset>
           {operation.error && <InlineNotice tone="error">{operation.error}</InlineNotice>}
-          <OfficeSubmit
+          {view !== "handling" && <OfficeSubmit
             busy={operation.busy}
             disabled={view === "definitions" && !rule}
             label={view === "definitions" ? "保存当前流程" : `保存${views.find((item) => item.key === view)?.label}`}
@@ -348,7 +368,7 @@ function ApprovalSettingsEditor({
             <Button type="button" disabled={operation.busy} onClick={() => void reload()}>
               重新载入审批设置
             </Button>
-          </OfficeSubmit>
+          </OfficeSubmit>}
         </form>
       )}
       {view === "runtime" && (
@@ -378,6 +398,7 @@ function ApprovalSettingsEditor({
           onClose={() => setSimulation(null)}
         />
       )}
+      {deployment && <ApprovalDeploymentDialog client={client} user={user} settings={draft} action={deployment} onClose={() => setDeployment(null)} onSaved={acceptDeployment}/>}
     </EditorWorkspace>
   );
 }

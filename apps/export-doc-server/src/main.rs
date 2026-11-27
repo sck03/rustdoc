@@ -29,6 +29,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         return result.map_err(Into::into);
     }
     let configuration = Configuration::load()?;
+    if configuration.maintenance_web {
+        return export_doc_server::maintenance::run(configuration);
+    }
     if let Some(package) = &configuration.migration_package {
         export_doc_engine::engine::stage_postgres_migration_file(
             &configuration.paths,
@@ -100,7 +103,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         });
         let server = export_doc_server::serve(listener, routes, control, async move {
             tokio::select! {
-                _ = shutdown_signal() => {},
+                _ = export_doc_server::shutdown_signal() => {},
                 _ = stopping.changed() => eprintln!("数据库实例锁或连接失效，Rust API 正在停止。"),
             }
             let _ = closing.request_shutdown();
@@ -123,23 +126,6 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn shutdown_signal() {
-    #[cfg(unix)]
-    {
-        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
-            Ok(mut terminate) => {
-                tokio::select! {_ = tokio::signal::ctrl_c()=>{},_ = terminate.recv()=>{}}
-            }
-            Err(_) => {
-                let _ = tokio::signal::ctrl_c().await;
-            }
-        }
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = tokio::signal::ctrl_c().await;
-    }
-}
 fn health_check(address: &str) -> Result<(), Box<dyn std::error::Error>> {
     use std::io::{Read, Write};
     let address = address.parse::<std::net::SocketAddr>()?;

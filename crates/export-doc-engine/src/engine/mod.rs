@@ -112,6 +112,7 @@ pub(crate) mod test_support;
 mod units;
 mod workflow_tasks;
 pub use team_backup::UploadAuthorization;
+pub use team_backup::maintenance::RecoveryMaintenance;
 #[cfg(feature = "postgres")]
 pub use team_backup::migration::stage_file as stage_postgres_migration_file;
 pub use team_backup::postgres::apply_pending as apply_pending_postgres_restore;

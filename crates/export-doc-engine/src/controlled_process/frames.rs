@@ -116,6 +116,7 @@ impl FramedProcess {
                     message: "OCR 超过运行时限。".into(),
                     code: None,
                     diagnostic: Some("controlled-process-timeout"),
+                    ..Default::default()
                 });
             }
             thread::sleep(Duration::from_millis(20));

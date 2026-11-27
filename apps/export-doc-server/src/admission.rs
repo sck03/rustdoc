@@ -37,6 +37,7 @@ impl Admission {
                 message: "请求队列繁忙，请稍后重试。".into(),
                 code: None,
                 diagnostic: None,
+                ..Default::default()
             }
         };
         let reservation = self

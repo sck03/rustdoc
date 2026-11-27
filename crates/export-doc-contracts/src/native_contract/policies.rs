@@ -25,6 +25,7 @@ pub(super) fn access(
 }
 pub(super) fn rule(flags: (bool, bool, bool), access: Access) -> Policy {
     Policy {
+        authentication_context: None,
         requires_authentication: flags.0,
         requires_desktop_access: flags.1,
         requires_license: flags.2,

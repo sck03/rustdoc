@@ -3,12 +3,26 @@
 use serde_json::Value;
 
 pub(super) fn apply(baseline: &mut Value) {
-    for line in include_str!("../tests/fixtures/file-storage-contract-changes.jsonl")
-        .lines()
-        .chain(
-            include_str!("../tests/fixtures/file-storage-stability-contract-changes.jsonl").lines(),
-        )
-    {
+    changes(
+        baseline,
+        include_str!("../tests/fixtures/file-storage-contract-changes.jsonl")
+            .lines()
+            .chain(
+                include_str!("../tests/fixtures/file-storage-stability-contract-changes.jsonl")
+                    .lines(),
+            ),
+    );
+}
+
+pub(super) fn apply_oa_recovery(baseline: &mut Value) {
+    changes(
+        baseline,
+        include_str!("../tests/fixtures/oa-recovery-refactor-changes.jsonl").lines(),
+    );
+}
+
+fn changes<'a>(baseline: &mut Value, lines: impl Iterator<Item = &'a str>) {
+    for line in lines {
         let change: Value = serde_json::from_str(line).unwrap();
         let path = change["path"].as_array().unwrap();
         let mut parent = &mut *baseline;

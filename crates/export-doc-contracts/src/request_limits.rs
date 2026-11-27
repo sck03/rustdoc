@@ -57,6 +57,8 @@ pub fn seconds(operation: &str) -> u64 {
         | "DownloadJobResult"
         | "DownloadJobResultWithTicket"
         | "DownloadBusinessAttachmentWithTicket"
+        | "DownloadRetainedFileWithTicket"
+        | "DownloadRetainedFile"
         | "DownloadPostgreSqlPhysicalBackupWithTicket"
         | "DownloadRecoveryArchiveWithTicket" => TRANSFER_SECONDS,
         "UploadLetterOfCreditDocument" | "ImportLetterOfCreditDocument" => 600,

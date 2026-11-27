@@ -1,7 +1,7 @@
 import { formatDecimal } from "./decimalSum.ts";
 import { ApiError, type ApiErrorResponse } from "../api/index.ts";
 
-function readErrorResponse(error: ApiError): (Partial<ApiErrorResponse> & { error?: string }) | null {
+export function readErrorResponse(error: ApiError): Partial<ApiErrorResponse> | null {
   try {
     const value: unknown = JSON.parse(error.responseText);
     return value !== null && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -13,13 +13,21 @@ function readErrorResponse(error: ApiError): (Partial<ApiErrorResponse> & { erro
 export function readApiError(error: unknown): string {
   if (error instanceof ApiError) {
     const parsed = readErrorResponse(error);
-    if (!parsed) return error.responseText || error.message;
-    return (typeof parsed.message === "string" && parsed.message)
-      || (typeof parsed.error === "string" && parsed.error)
-      || error.message;
+    if (!parsed || typeof parsed.message !== "string" || !parsed.message) {
+      return `服务器未返回可识别的错误说明（HTTP ${error.status}）。请检查服务或网关状态；写入结果不明时先查询处理结果。`;
+    }
+    return formatErrorResponse(parsed, error.status >= 500);
   }
 
-  return error instanceof Error ? error.message : "请求失败";
+  if (error instanceof TypeError) return "无法连接服务，请检查网络和服务状态；写入结果不明时先查询处理结果。";
+  return error instanceof Error ? error.message : "请求失败，未取得可识别的错误详情。";
+}
+export function formatErrorResponse(parsed: Partial<ApiErrorResponse>, includeTrace = true): string {
+  const suggestions = Array.isArray(parsed.issues)
+    ? [...new Set(parsed.issues.slice(0,32).map(issue=>issue?.suggestion).filter((value):value is string=>typeof value==="string"&&!!value))] : [];
+  const receipt = parsed.outcome === "Unknown" ? "结果尚未确认，请先查询处理回执，避免重复提交。" : "";
+  const trace = includeTrace && typeof parsed.requestId === "string" && parsed.requestId ? `追踪编号：${parsed.requestId}` : "";
+  return [parsed.message,...suggestions,receipt,trace].filter(Boolean).join(" ");
 }
 
 export function isConcurrencyConflict(error: unknown): boolean {

@@ -28,10 +28,7 @@ fn resolve(store: &Store, relative: &str) -> Result<PathBuf> {
     Ok(path)
 }
 fn permission(path: &Path) -> &'static str {
-    if path
-        .extension()
-        .is_some_and(|e| e == "edmrecovery" || e == "edmmigration")
-    {
+    if path.extension().is_some_and(|e| e == "edmpoint") {
         "system.disaster-recovery"
     } else {
         "system.backup"

@@ -1,5 +1,7 @@
 # 脚本使用说明
 
+2026-11-27：schema 19、OA 批量部署与独立灾备维护已实现。本批按用户要求仅做必要专项，不执行完整 workspace 测试；证据见[本批记录](../docs/archive/2026-11/2026-11-27通用申请与存储灾备重构.md)。
+
 2026-11-26 组织删除／账号单位菜单专项：`cargo test --locked -p export-doc-engine --test organization_deletion` 验证管理员迁出后默认组织可删除；`cargo test --locked -p export-doc-storage --test organization_references` 验证真实层级、人员历史、账号和业务引用保护。真实 PostgreSQL 使用 `test-native-postgres.ps1 -PostgresBin <PostgreSQL18的bin目录> -Scope Organization`，只执行同一引用契约。前端执行 `test_account_menu_ui.mjs`、`test_unit_identity_ui.mjs`，复用 `lib/unit-context-ui.mjs` 操作账号菜单中的单位单选项；中文草稿保护在账号菜单专项通过真实内联编辑器验证。真实 HTTP 夹具构建后复制到仓库 `.codex-runtime` 并通过 `EXPORTDOC_OFFICE_REVIEW_BINARY` 指定，避免与后续 Cargo 编译共用运行中的程序文件。验证边界见[本批记录](../docs/archive/2026-11/2026-11-26组织删除与账号单位菜单.md)。
 
 Excel 单位默认资料专项：`cargo test --locked -p export-doc-engine --features excel --test excel_company_defaults --test excel_workflow` 验证本地／上传预览保留表格名称、缺失时补当前公司、公司更名／未分配公司、真实空白模板／订舱输出和预览不写业务库。既有 Excel 工作流按现行任务契约等待备份、恢复暂存完成，并重开服务验证恢复。`node scripts/test_excel_exporter_ui.mjs` 验证设置字段移除、发票原有名称保留和重新选择出口商后保存回读；登记在 `test:identity-ui`，复用现有真实 HTTP 夹具。
@@ -190,7 +192,7 @@ pwsh -NoProfile -File scripts/package-native-web-server.ps1 -Version 1.2.3 -NoPa
 
 桌面业务库统一位于 `App_Data/Database/exportdoc-native.db`，实例锁位于 `App_Data/Locks`。旧位置出现数据库或伴随文件时拒绝启动，不自动搬迁或覆盖；Database 目录仅有 WAL/SHM 时也拒绝初始化。重建使用明确的新 DataRoot，不要手工只移动正在使用的主文件。WebView 内部数据库保留在 `WebView` profile 中。
 
-便携包重复构建保留已有 `App_Data`。当前只接受全新 schema 18，旧库和旧 schema 备份不兼容；只有数据库不存在才初始化，空文件或损坏库不覆盖。需要重建时退出旧程序，保留需要的原目录及备份，再显式使用新 DataRoot；不要修改版本标记。初始化错误及 panic 显示错误和日志位置，日志为 `App_Data/Logs/tauri-bootstrap-error.log` 或 `tauri-errors.log`；不可写时明确提示。
+便携包重复构建保留已有 `App_Data`。当前只接受全新 schema 19，旧库和旧 schema 备份不兼容；只有数据库不存在才初始化，空文件或损坏库不覆盖。需要重建时退出旧程序，保留需要的原目录及备份，再显式使用新 DataRoot；不要修改版本标记。初始化错误及 panic 显示错误和日志位置，日志为 `App_Data/Logs/tauri-bootstrap-error.log` 或 `tauri-errors.log`；不可写时明确提示。
 
 Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便携包携带原版固定清单验证的微软离线安装器；缺少 WebView2 时显示安装／退出选择，保留取消、繁忙、超时和需重启处理。构建时核对微软签名、版本、大小和 SHA-256。Windows GNU 构建同时携带 `WebView2Loader.dll`。
 
@@ -241,9 +243,9 @@ npm --prefix apps/export-doc-web run test:file-storage-ui
 
 源码脚本的启动／更新经过：准备镜像 → 停 API → 等数据库就绪 → 独立维护容器初始化或校验当前基线 → 启 API 并检查就绪。构建及缺失镜像取得在停 API 前完成，失败不打断原应用；已有/离线镜像按 missing 策略复用。原 `compose.yml` 的维护服务仍由脚本显式运行，`-SkipBuild` 复用已有镜像。新版 `compose.image.yml` 则声明初始化完成依赖，支持直接 Compose 启动；升级时先 pull，再 down（不删卷）及 up。两种入口的恢复失败均保留 API 停止状态。
 
-应用 schema 与 PostgreSQL 软件主版本是两件事：当前只支持全新 schema 18，不迁移旧试验库。PostgreSQL 18 的补丁镜像升级保留现有卷，但不能将镜像改成 19 后直接复用旧卷；主版本升级须另行安排 PostgreSQL 原生迁移、兼容验证与停机恢复演练。维护前保留需要的备份/完整迁移包。
+应用 schema 与 PostgreSQL 软件主版本是两件事：当前只支持全新 schema 19，不迁移旧试验库。PostgreSQL 18 的补丁镜像升级保留现有卷，但不能将镜像改成 19 后直接复用旧卷；主版本升级须另行安排 PostgreSQL 原生迁移、兼容验证与停机恢复演练。维护前保留需要的备份/完整迁移包。
 
-首次浏览器管理员用 `admin`、自定 8—128 字符密码及该目录的 `bootstrap-token.txt` 初始化。日常服务只持有 PostgreSQL 18 业务连接，维护连接供初始化/恢复使用。桌面 SQLite 新库仍为 admin 空密码；当前仅支持全新 schema 18，不兼容此前试验库。
+首次浏览器管理员用 `admin`、自定 8—128 字符密码及该目录的 `bootstrap-token.txt` 初始化。日常服务只持有 PostgreSQL 18 业务连接，维护连接供初始化/恢复使用。桌面 SQLite 新库仍为 admin 空密码；当前仅支持全新 schema 19，不兼容此前试验库。
 
 ## 远端入口
 
@@ -278,8 +280,8 @@ HTTP 保持 16 个执行名额，另有 16 个公平等待名额，最多等待 
 - “日常灾备”默认关闭，可手工执行或按业务时区每天／每周生成完整加密包。“异机副本”选择 WebDAV／S3 并测试写入、回读和删除。新包及副本成功后执行受管保留策略，副本失败保留本地包和旧备份。内建为完整快照，增量和 WAL/PITR 由数据库运维另行配置。
 - SQLite 普通备份和恢复返回后台任务；恢复校验及暂存成功后退出重开，启动前完成数据库替换。启动失败时可通过桌面程序 `--import-recovery` 或 `--restore-sqlite-pending` 离线恢复，参数与保密要求见[恢复指南](../docs/服务器备份迁移与恢复指南.md)。
 - 归档使用 `ListRecoveryArchives` 分页，计划状态不携带归档数组；归档异常逐份呈现，损坏归档拒绝下载与恢复。
-- 桌面 `.edmrecovery` 灾备包包含 SQLite 快照、Security 主密钥、DataRoot/Templates 和 `FileObjects.pack`；从本机明确选择的文件校验并暂存后，退出重开即可恢复。启动先取得实例锁，校验暂存内容，保存原文件并记录替换日志；失败停止启动，保留恢复目录。
-- PostgreSQL API 沿用“物理备份”名称，实际为 `pg_dump` custom-format `.dump`。完整包另含主密钥、用户模板及 `FileObjects.pack`。本地数据库快照配套 `.objects.jsonl` 清单与邻接 `Objects/` 仓库，不可只搬运 dump。完整包仅接受 ZIP64／v2 认证分块格式，上传下载及摘要使用固定缓冲和受管磁盘，不设置固定总容量额度；v1 包明确拒绝，不自动转换或覆盖。尚无完整包分卷，磁盘余量、存储协议及 24 小时任务时限仍适用。
+- 桌面完整灾备使用 `.edmpoint` 自包含便携恢复点，含 SQLite 快照、匹配主密钥、模板、配置及全部被引用文件；校验并暂存后按原有离线切换日志恢复。
+- PostgreSQL API 的“物理备份”实际为 pg_dump custom-format；普通快照必须连同 `.objects.jsonl` 与邻接 Objects 目录保存。完整灾备使用加密恢复点仓库和 `.edmpoint`，不再接受旧 ZIP64/v2 完整包。独立维护网页和恢复命令见[灾备指南](../docs/服务器备份迁移与恢复指南.md)。
 - 服务器在界面完成密码/确认及暂存后，停止正常 API，使用同一个 AppRoot/DataRoot 执行 `ExportDocManager.Server --app-root <AppRoot> --data-root <DataRoot> --restore-pending`。维护进程需提供 `EXPORTDOCMANAGER_POSTGRES_CONNECTION`、独立 `EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_CONNECTION` 和 NOLOGIN 所有者 `EXPORTDOCMANAGER_POSTGRES_OWNER`；两种连接须指向同一数据库，均可使用对应 `_FILE`。命令完成即退出，再以业务连接启动 API。
 - 新镜像部署依次执行 `docker compose stop application`、`docker compose run --rm --no-deps restore`、`docker compose up -d --no-deps --wait application`；每条成功后再执行下一条。旧源码入口继续使用 `scripts/run-native-docker.ps1 -RestorePending -NoPause` 及原 RuntimeRoot。普通 API 不持维护密钥，失败保留停止状态、待恢复标记及安全副本。
 - 服务端现有完整包可在网页按编号暂存恢复；外部大包可用 `--import-migration <绝对包路径> --package-password-file <私有密码文件>`，在 API 停止后通过独立维护锁导入并恢复。命令保持原 AppRoot／DataRoot 和维护连接。

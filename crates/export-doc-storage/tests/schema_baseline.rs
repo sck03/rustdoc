@@ -4,6 +4,41 @@ use export_doc_storage::{Connection, SCHEMA_VERSION};
 mod test_workspace;
 use std::{fs, path::PathBuf};
 struct Database(PathBuf);
+#[test]
+fn handling_directory_pages_beyond_one_hundred_and_preserves_scope() {
+    let database = Database::fresh();
+    let db = Connection::sqlite(&database.0).unwrap();
+    for i in 0..105 {
+        db.save_handling_service("test", &serde_json::json!({"key":format!("service-{i:03}"),"name":format!("办理事项{i}"),"category":"Seal","handlerUserIds":[],"isActive":true})).unwrap();
+    }
+    let page = db
+        .search_handling_services("test", "Seal", "office.general", "", "active", "", 100)
+        .unwrap();
+    assert_eq!(page.len(), 100);
+    let tail = db
+        .search_handling_services(
+            "test",
+            "Seal",
+            "office.general",
+            "",
+            "active",
+            page.last().unwrap()["key"].as_str().unwrap(),
+            100,
+        )
+        .unwrap();
+    assert_eq!(tail.len(), 5);
+    assert!(
+        db.get_handling_service("other", "service-000")
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(
+        db.get_handling_service("test", "service-104")
+            .unwrap()
+            .unwrap()["revision"],
+        1
+    );
+}
 impl Database {
     fn fresh() -> Self {
         let root = test_workspace::create("schema-baseline");

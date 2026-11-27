@@ -8,7 +8,7 @@ use super::{
 use crate::api::ApiError;
 use base64::{Engine, prelude::BASE64_STANDARD};
 use serde_json::Value;
-use std::{fs, io::Read, path::Path, time::Duration};
+use std::{io::Read, time::Duration};
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const TRANSFER_TIMEOUT: Duration = Duration::from_secs(super::super::backup_io::TIMEOUT_SECONDS);
@@ -191,7 +191,9 @@ fn request(
         );
     }
     let mut response = agent(timeout).run(request).map_err(|error| match error {
-        ureq::Error::Timeout(_) => unavailable("WebDAV 请求超时。"),
+        ureq::Error::Timeout(_) => {
+            unavailable("WebDAV 请求超时。").coded(crate::api::ErrorCode::DependencyUnavailable)
+        }
         _ => unavailable(format!("WebDAV 请求失败:{error}")),
     })?;
     let status = response.status().as_u16();
@@ -200,11 +202,19 @@ fn request(
     Ok(Response { status, body })
 }
 
-fn failure(status: u16, body: &[u8]) -> ApiError {
+fn failure(status: u16, _body: &[u8]) -> ApiError {
+    let reason = match status {
+        401 | 403 => "访问凭据无效或缺少目标目录权限",
+        404 => "目标目录或对象不存在",
+        409 => "父目录缺失或目标状态冲突",
+        412 => "目标已被另一操作修改",
+        507 => "目标存储空间不足",
+        _ => "存储服务返回异常状态",
+    };
     unavailable(format!(
-        "WebDAV 请求失败(HTTP {status}):{}",
-        String::from_utf8_lossy(&body[..body.len().min(ERROR_LIMIT)])
+        "WebDAV 操作失败（HTTP {status}）：{reason}。请核对连接、目录权限和剩余空间。"
     ))
+    .coded(crate::api::ErrorCode::DependencyUnavailable)
 }
 
 #[cfg(test)]

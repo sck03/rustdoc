@@ -59,6 +59,7 @@ impl Reviewer {
             message: e.message,
             code: None,
             diagnostic: Some("ai-transport"),
+            ..Default::default()
         })?;
         let mut command = Command::new(std::env::current_exe()?);
         command
@@ -82,6 +83,7 @@ impl Reviewer {
             message: e.message,
             code: None,
             diagnostic: Some("ai-transport"),
+            ..Default::default()
         })?;
         Ok(
             json!({"reportText":report,"contextSummary":review.summary,"letterOfCreditContentTruncated":review.truncated,"storagePolicy":"只向系统设置中的 AI 服务提交当前发票／信用证草稿，审查结果不自动写入发票。"}),

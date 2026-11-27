@@ -29,7 +29,7 @@ export function OfficeSuppliesPage({ client, user }: { client: ExportDocManagerA
 
 function OfficeSupplyDirectory({ client, user }: { client: ExportDocManagerApiClient; user: ApiUserDto }) {
   const access = officeAccess(user, "supplies");
-  const allowsSupply = (action: string, supply: OfficeSupplyRecord) => access.allows(action) && (!supply.handlingKey || supply.canHandle === true);
+  const allowsSupply = (action: string, supply: OfficeSupplyRecord) => access.allows(action) && (!supply.serviceId || supply.canHandle === true);
   const model = useOfficeDirectory<OfficeSupplyRecord>(user, "supplies", (input, signal) => client.listOfficeSupplies(input, { signal }));
   const { paging, query, keyword, search, lowStockOnly, includeInactive } = model;
   const [dialog, setDialog] = useState<SupplyDialog | null>(null);

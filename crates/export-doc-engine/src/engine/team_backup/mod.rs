@@ -33,10 +33,15 @@ pub mod disaster;
 pub mod migration;
 pub mod ownership;
 pub(in crate::engine) mod package;
+mod portable;
 pub mod postgres;
 mod restore_files;
 #[cfg(feature = "s3-backup")]
 use super::s3_transport as s3;
+mod capture;
+pub mod maintenance;
+mod maintenance_artifacts;
+pub(in crate::engine) mod repository;
 pub(in crate::engine) mod scheduled;
 mod scratch;
 mod sealed;
@@ -50,14 +55,14 @@ mod tests;
 
 pub const OPERATIONS: &[Operation] = &[
     GET_BACKUP_PLAN,
+    MAINTAIN_RECOVERY_REPOSITORY,
+    GET_RECOVERY_REPOSITORY_MAINTENANCE,
     LIST_RECOVERY_ARCHIVES,
     SAVE_BACKUP_PLAN,
     RUN_BACKUP_PLAN,
     TEST_BACKUP_REPLICA,
-    CREATE_RECOVERY_ARCHIVE_DOWNLOAD_TICKET,
     START_RECOVERY_ARCHIVE_SAVE_TO_PATH_JOB,
     STAGE_RECOVERY_ARCHIVE_RESTORE,
-    DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET,
     CREATE_POSTGRE_SQL_PHYSICAL_BACKUP,
     CREATE_POSTGRE_SQL_PHYSICAL_BACKUP_DOWNLOAD_TICKET,
     DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET,
@@ -77,7 +82,6 @@ pub const OPERATIONS: &[Operation] = &[
 ];
 /// 灾备包只能由受信任的桌面版创建和恢复；浏览器版请使用服务器迁移包。
 pub const LOCAL: &[Operation] = &[
-    START_RECOVERY_ARCHIVE_SAVE_TO_PATH_JOB,
     CREATE_DISASTER_RECOVERY_PACKAGE,
     RESTORE_DISASTER_RECOVERY_PACKAGE,
 ];
@@ -229,13 +233,12 @@ pub fn handle(
 ) -> Result<Value> {
     match operation {
         GET_BACKUP_PLAN => scheduled::status(service, actor),
+        MAINTAIN_RECOVERY_REPOSITORY => scheduled::maintain(service, actor, body),
+        GET_RECOVERY_REPOSITORY_MAINTENANCE => scheduled::maintenance_status(service, actor),
         LIST_RECOVERY_ARCHIVES => scheduled::archives(service, actor, query),
         SAVE_BACKUP_PLAN => scheduled::save(service, actor, body),
         RUN_BACKUP_PLAN => scheduled::run_now(service, actor),
         TEST_BACKUP_REPLICA => scheduled::test_replica(service, actor),
-        CREATE_RECOVERY_ARCHIVE_DOWNLOAD_TICKET => {
-            scheduled::ticket(service, actor, header(parameters, "id"))
-        }
         START_RECOVERY_ARCHIVE_SAVE_TO_PATH_JOB => {
             scheduled::save_to_path(service, actor, header(parameters, "id"), body)
         }

@@ -5,8 +5,9 @@ use export_doc_domain::backup_plan::BackupPlan;
 use serde::{Deserialize, Serialize};
 use std::fs;
 mod configuration;
-mod replica;
-mod repository;
+mod maintenance;
+pub(in crate::engine) use maintenance::{maintain, maintenance_status};
+mod points;
 mod restore;
 mod run;
 mod save_archive;
@@ -32,6 +33,10 @@ struct SavedPlan {
     s3_secret: String,
     s3_token: String,
     repository: String,
+    #[serde(default)]
+    writer_identity: String,
+    #[serde(default)]
+    medium_identity: String,
     plan: BackupPlan,
 }
 fn load(store: &Store) -> Result<SavedPlan> {
@@ -39,7 +44,9 @@ fn load(store: &Store) -> Result<SavedPlan> {
         .settings(PLAN)?
         .map(serde_json::from_value)
         .transpose()
-        .map_err(|_| unavailable("日常灾备配置损坏。"))?
+        .map_err(|_| {
+            unavailable("日常灾备配置损坏。").coded(crate::api::ErrorCode::DependencyUnavailable)
+        })?
         .unwrap_or_default();
     saved.plan.validate().map_err(invalid)?;
     Ok(saved)
@@ -54,7 +61,8 @@ fn administrator(actor: &Actor) -> Result<()> {
 fn state(store: &Store) -> Result<Value> {
     let value = store.settings(STATE)?.unwrap_or_else(|| json!({}));
     if !value.is_object() {
-        return Err(unavailable("日常灾备状态记录损坏。"));
+        return Err(unavailable("日常灾备状态记录损坏。")
+            .coded(crate::api::ErrorCode::DependencyUnavailable));
     }
     Ok(value)
 }
@@ -62,7 +70,8 @@ fn update_state(store: &Store, id: Option<&str>, patch: Value) -> Result<()> {
     store.transaction(|tx| {
         let mut current = tx.settings(STATE)?.unwrap_or_else(|| json!({}));
         if !current.is_object() {
-            return Err(unavailable("日常灾备状态记录损坏。"));
+            return Err(unavailable("日常灾备状态记录损坏。")
+                .coded(crate::api::ErrorCode::DependencyUnavailable));
         }
         if id.is_some_and(|id| current["archiveId"] != id) {
             return Ok(());
@@ -71,7 +80,10 @@ fn update_state(store: &Store, id: Option<&str>, patch: Value) -> Result<()> {
             .as_i64()
             .unwrap_or(0)
             .checked_add(1)
-            .ok_or_else(|| unavailable("灾备状态版本超出范围。"))?;
+            .ok_or_else(|| {
+                unavailable("灾备状态版本超出范围。")
+                    .coded(crate::api::ErrorCode::DependencyUnavailable)
+            })?;
         for (key, value) in patch.as_object().ok_or_else(|| invalid("备份状态无效。"))? {
             current[key] = value.clone();
         }
@@ -90,95 +102,51 @@ pub(in crate::engine) fn run_now(service: &NativeService, actor: &Actor) -> Resu
     service
         .backup_scheduler
         .run(service, Some(actor), Utc::now())?
-        .ok_or_else(|| unavailable("灾备任务未启动。"))
+        .ok_or_else(|| {
+            unavailable("灾备任务未启动。").coded(crate::api::ErrorCode::DependencyUnavailable)
+        })
 }
 pub(in crate::engine) fn test_replica(service: &NativeService, actor: &Actor) -> Result<Value> {
     administrator(actor)?;
     let saved = load(&service.store)?;
-    if saved.plan.replica_mode == "None" {
-        return Err(invalid("请先选择并保存异机副本存储。"));
+    if saved.password.is_empty() {
+        return Err(invalid("请先保存恢复凭证。"));
     }
-    let (store, protector, paths, owner) = (
+    let (store, paths, protector, owner) = (
         service.store.clone(),
-        service.protector.clone(),
         service.paths.clone(),
+        service.protector.clone(),
         actor.id,
     );
     service.jobs.start(
         actor,
         TEST_BACKUP_REPLICA,
-        "BackupReplicaTest",
-        "验证异机副本存储",
+        "RecoveryRepositoryTest",
+        "核验恢复仓库",
         move |_| {
             administrator(&auth::current_actor(&store, owner)?)?;
-            let target = replica::Target::read(&store, &protector, &saved)?;
-            let directory = paths.cache_root.join(format!(
-                "replica-test-{}",
-                crate::paths::nonce().map_err(unavailable)?
-            ));
-            package::private_directory(&directory)?;
-            let name = format!(
-                "connection-test-{}.bin",
-                crate::paths::nonce().map_err(unavailable)?
-            );
-            let path = directory.join(&name);
-            let result: Result<tasks::TaskOutput> = (|| {
-                let bytes = b"ExportDocManager backup storage write/read/delete verification\n";
-                sealed::atomic_write(&path, bytes)?;
-                let (size, digest) = super::super::backup_io::digest_file(&path)?;
-                let uploaded = target.upload(&path, &name, size, &digest, true);
-                let cleanup = crate::operation::OperationScope::detached(Duration::from_secs(30))
-                    .run(|| replica::Target::read(&store, &protector, &saved)?.delete(&name));
-                uploaded?;
-                cleanup?;
-                Ok(tasks::TaskOutput {
-                    managed_file: None,
-                    file: None,
-                    detail: "存储写入、回读校验和删除均成功。".into(),
-                    destination: None,
-                    directory: None,
-                    publication: None,
-                    archive: None,
-                })
-            })();
-            let cleanup = fs::remove_dir_all(&directory);
-            let output = result?;
-            cleanup?;
-            Ok(output)
+            let _gate = package::lock(&paths)?;
+            let password = protector
+                .unprotect(PASSWORD, &saved.password)
+                .map_err(unavailable)?;
+            let _repository = points::open(&store, &paths, &protector, &saved, &password, true)?;
+            Ok(tasks::TaskOutput {
+                file: None,
+                managed_file: None,
+                destination: None,
+                directory: None,
+                publication: None,
+                archive: None,
+                detail: "仓库身份、恢复凭证和所需存储能力已核验。此检查不替代恢复演练。".into(),
+            })
         },
     )
 }
-pub(in crate::engine) fn ticket(service: &NativeService, actor: &Actor, id: &str) -> Result<Value> {
-    administrator(actor)?;
-    let archive = repository::read(&service.paths, id)?;
-    if archive.deleting {
-        return Err(error(404, "此备份已清理。"));
-    }
-    let mut ticket = service.backup_tickets.issue_download(id.into())?;
-    ticket["downloadUrl"] = json!(
-        DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET
-            .path
-            .replace("{token}", ticket["token"].as_str().unwrap())
-    );
-    Ok(ticket)
-}
-pub(in crate::engine) fn download(
-    service: &NativeService,
-    actor: &Actor,
-    parameters: &[(&str, String)],
-) -> Result<crate::engine::backup_io::Download> {
-    administrator(actor)?;
-    let id = service
-        .backup_tickets
-        .consume_download(super::header(parameters, "token"))?;
-    repository::download(&service.paths, &id)
-}
-
 pub(in crate::engine) fn archives(
     service: &NativeService,
     actor: &Actor,
     query: &[(&str, String)],
 ) -> Result<Value> {
     administrator(actor)?;
-    repository::page(&service.paths, query)
+    points::page(service, query)
 }

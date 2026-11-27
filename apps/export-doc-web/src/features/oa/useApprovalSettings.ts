@@ -346,6 +346,8 @@ export function useApprovalSettingsDraft(client: ExportDocManagerApiClient, init
   };
   return {
     draft,
+    hasUnsavedChanges: editableFields.some(key => !sameDraftValue(draft[key], baseline[key])) || !sameDraftValue(calendarInputs, calendarDateInputs(baseline.calendar)),
+    acceptDeployment: (saved: OaApprovalSettings) => { setBaseline(saved); setDraft(saved); },
     setDraft,
     operation,
     formRef,

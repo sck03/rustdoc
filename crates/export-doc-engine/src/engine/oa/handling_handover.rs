@@ -1,33 +1,9 @@
 //! Reassignment creates ordinary business events; it never rewrites request content.
 use super::*;
 
-pub(super) fn notify(
-    tx: &Connection,
-    actor: &Actor,
-    previous: &Value,
-    saved: &Value,
-) -> Result<()> {
-    let changed: Vec<_> = saved["handlingServices"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter(|service| {
-            previous["handlingServices"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .any(|old| {
-                    old["key"] == service["key"]
-                        && old["handlerUserIds"] != service["handlerUserIds"]
-                })
-        })
-        .map(|s| text(s, "key"))
-        .collect();
-    if changed.is_empty() {
-        return Ok(());
-    }
+pub(super) fn notify(tx: &Connection, actor: &Actor, key: &str) -> Result<()> {
     for kind in ["oa-general", "supply-requests", "bookings"] {
-        for key in &changed {
+        {
             let mut offset = 0;
             loop {
                 crate::operation::check()?;
@@ -46,7 +22,7 @@ pub(super) fn notify(
                         ("id", "id"),
                         ("status", "status"),
                         ("isReturnable", "isReturnable"),
-                        ("handlingKey", "handlingKey"),
+                        ("serviceId", "serviceId"),
                     ],
                     offset,
                     limit: 100,

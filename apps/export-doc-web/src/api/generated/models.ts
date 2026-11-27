@@ -190,6 +190,13 @@ export interface ApiAgentConsignmentUnlockFieldsResponse {
   success: boolean;
 }
 
+export interface ApiArchiveFiles {
+  expectedVersion: number;
+  ids: string[];
+  location: string;
+  reason: string;
+}
+
 export interface ApiAttachmentSaveRequest {
   destinationPath: string;
 }
@@ -294,9 +301,10 @@ export interface ApiBackupListResponse {
 }
 
 export interface ApiBackupPlan {
+  backupLocation?: string;
   enabled: boolean;
   frequency: "Daily" | "Weekly";
-  replicaMode: "None" | "WebDav" | "S3";
+  replicaMode: "None" | "Directory" | "WebDav" | "S3";
   retentionCount: number;
   retentionDays: number;
   s3: ApiBackupS3Settings;
@@ -321,8 +329,10 @@ export interface ApiBackupPlanStatus {
   lastError: string;
   lastResult: string;
   lastRunAt: string | null;
+  locations?: { id: string; name: string }[];
   nextRunAt: string | null;
   plan: ApiBackupPlan;
+  repositoryId?: string;
   revision: number;
   runningJobId: string | null;
   s3Available: boolean;
@@ -352,6 +362,46 @@ export interface ApiBackupWebDavSettings {
   enabled: boolean;
   url: string;
   userName: string;
+}
+
+export interface ApiCapacityAlert {
+  area: string;
+  at: string;
+  message: string;
+  state: string;
+}
+
+export interface ApiCapacityArea {
+  availableBytes?: number;
+  id: string;
+  logicalBytes?: number;
+  message: string;
+  name: string;
+  physicalBytes?: number;
+  protectedBytes?: number;
+  reclaimableBytes?: number;
+  state: string;
+  totalBytes?: number;
+}
+
+export interface ApiCapacityPolicy {
+  criticalPercent: number;
+  growthDays: number;
+  minimumFreeBytes: number;
+  warningPercent: number;
+}
+
+export interface ApiCapacityPolicyRequest {
+  expectedVersion: number;
+  policy: ApiCapacityPolicy;
+}
+
+export interface ApiCapacitySample {
+  day: string;
+  location: string;
+  logicalBytes: number;
+  physicalBytes: number;
+  reclaimableBytes: number;
 }
 
 export interface ApiChangePasswordRequest {
@@ -1201,10 +1251,31 @@ export interface ApiEmailTestResponse {
   success: boolean;
 }
 
-export interface ApiErrorResponse {
-  code?: string | null;
-  correlationId?: string | null;
+export type ApiErrorCode = "VALIDATION_FAILED" | "AUTHENTICATION_REQUIRED" | "PERMISSION_DENIED" | "RESOURCE_NOT_FOUND" | "STATE_CONFLICT" | "ConcurrencyConflict" | "RESOURCE_BUSY" | "OPERATION_CANCELLED" | "CAPABILITY_UNAVAILABLE" | "DEPENDENCY_UNAVAILABLE" | "OPERATION_TIMEOUT" | "UNCLASSIFIED_FAILURE" | "DATABASE_UNAVAILABLE" | "DATABASE_AUTHENTICATION_FAILED" | "DATABASE_CONNECTION_FAILED" | "DATABASE_MODEL_MISMATCH" | "DATABASE_OUTCOME_UNKNOWN" | "FILE_MISSING" | "FILE_PERMISSION_DENIED" | "FILE_SPACE_EXHAUSTED" | "FILE_UNAVAILABLE" | "STORED_DATA_INVALID" | "OA_HANDLING_SERVICE_REQUIRED" | "OA_HANDLING_SERVICE_UNCONFIGURED" | "OA_HANDLING_SERVICE_UNAVAILABLE" | "OA_HANDLER_UNAVAILABLE" | "OA_HANDLER_PERMISSION_MISSING" | "OA_PUBLICATION_STALE" | "STORAGE_IDENTITY_MISMATCH" | "OBJECT_INTEGRITY_FAILED" | "BACKUP_INCOMPLETE" | "RECOVERY_BLOCKED";
+
+export interface ApiErrorContext {
+  node?: string;
+  object?: string;
+  stage?: string;
+}
+
+export interface ApiErrorIssue {
+  code: ApiErrorCode;
+  field: string;
   message: string;
+  suggestion: string;
+}
+
+export interface ApiErrorResponse {
+  actions: ("Edit" | "SignIn" | "Refresh" | "QueryReceipt" | "RetryRead" | "ContactAdministrator")[];
+  code: ApiErrorCode;
+  context?: ApiErrorContext;
+  issues: ApiErrorIssue[];
+  jobId?: string;
+  message: string;
+  outcome: "NotCommitted" | "Committed" | "Unknown";
+  requestId: string;
+  retryability: "Never" | "AfterCorrection" | "ReadOnly" | "CheckReceipt";
 }
 
 export interface ApiExcelConvertBookingSheetRequest {
@@ -1394,6 +1465,7 @@ export interface ApiFileStorageStatus {
   migrationPending?: boolean;
   physicalBytes?: number;
   policy?: ApiFileStoragePolicy;
+  protectedBytes?: number;
   registeredRoots?: string[];
   s3?: ApiBackupS3Settings;
   unreferencedBytes?: number;
@@ -2847,11 +2919,13 @@ export interface ApiRecoveryArchiveList {
 export interface ApiRecoveryArchiveRestoreRequest {
   adminPassword: string;
   confirmationText: "MIGRATE" | "RECOVER";
+  fileMode?: "Local" | "Directory" | "Reconnect";
   password: string;
+  targetLocation?: string;
 }
 
 export interface ApiRecoveryArchiveSaveRequest {
-  destinationPath: string;
+  destinationPath?: string;
 }
 
 export interface ApiReportHtmlPreviewRequest {
@@ -3041,6 +3115,93 @@ export interface ApiReportTemplateV3PageContract {
   pageAndLayerRoles: string[];
   presets?: { heightHundredthMm: number; size: string; widthHundredthMm: number }[];
   size: string;
+}
+
+export interface ApiRepositoryMaintenanceRequest {
+  action: "Preview" | "Collect" | "Hold" | "Release" | "Verify" | "RecoverLock" | "RotatePassword";
+  newPassword?: string;
+  oldInstanceIsolated?: boolean;
+  pointId?: string;
+  reason?: string;
+  token?: string;
+}
+
+export interface ApiRepositoryMaintenanceStatus {
+  bytes?: number;
+  count?: number;
+  expiresAt?: string;
+  message?: string;
+  protectedObjects?: number;
+  token?: string;
+  verifiedAt?: string;
+  waitingObjects?: number;
+}
+
+export interface ApiRetentionClassification {
+  archiveClass: string;
+  basisDate: string;
+  expectedVersion: number;
+  id: string;
+  reason: string;
+}
+
+export interface ApiRetentionHold {
+  active: boolean;
+  digest: string;
+  expectedVersion: number;
+  reason: string;
+}
+
+export interface ApiRetentionPage {
+  items: ApiRetentionRow[];
+  nextCursor: string;
+  plan?: ApiRetentionPlan;
+}
+
+export interface ApiRetentionPlan {
+  bytes: number;
+  count: number;
+  expiresAt: string;
+  requestedBy: number;
+  token: string;
+}
+
+export interface ApiRetentionPolicyRequest {
+  archiveClass: string;
+  days: number;
+  expectedVersion: number;
+  reason: string;
+}
+
+export interface ApiRetentionPreviewRequest {
+  ids: string[];
+  reason: string;
+}
+
+export interface ApiRetentionQuery {
+  after?: string;
+}
+
+export interface ApiRetentionRow {
+  activeReferences: number;
+  archiveClass: string;
+  archiveIdentity: string;
+  basisDate: string;
+  company: string;
+  days: number;
+  digest: string;
+  eligible: boolean;
+  expiresOn: string;
+  fileKind: string;
+  fileName: string;
+  held: boolean;
+  holdReason: string;
+  holdRevision: number;
+  id: string;
+  policyRevision: number;
+  recordId: number;
+  revision: number;
+  size: number;
 }
 
 export interface ApiRuntimeDatabaseMetrics {
@@ -3581,6 +3742,25 @@ export interface ApiSingleWindowUnlockFieldsRequest {
   fieldKeys?: string[];
 }
 
+export interface ApiStorageActionResult {
+  bytes: number;
+  count: number;
+  message: string;
+}
+
+export interface ApiStorageApproval {
+  token: string;
+}
+
+export interface ApiStorageCapacityStatus {
+  alerts: ApiCapacityAlert[];
+  areas: ApiCapacityArea[];
+  policy: ApiCapacityPolicy;
+  revision: number;
+  samples: ApiCapacitySample[];
+  updatedAt: string;
+}
+
 export interface ApiSupplierAssessmentAnalyticsDto {
   deliveryTotal: number;
   pausedCount: number;
@@ -4014,6 +4194,7 @@ export interface BackgroundJobSnapshot {
   createdAt: string;
   detailText: string;
   errorMessage: string;
+  failure?: ApiErrorResponse;
   jobId: string;
   kind: string;
   outputPath: string;
@@ -4246,6 +4427,12 @@ export interface ExchangeRateSettings {
   selectedCurrencies: string[];
   sourceFormat?: "BankOfChinaHtml" | "Icbc" | "Cmb" | "Json" | "Auto";
   url: string;
+}
+
+export interface GeneralHandlingPolicy {
+  catalogRevision: number;
+  definitionVersion: number;
+  requirements: { Certificate: "Required" | "ApprovalOnly"; IT: "Required" | "ApprovalOnly"; Other: "Required" | "ApprovalOnly"; Repair: "Required" | "ApprovalOnly"; Seal: "Required" | "ApprovalOnly" };
 }
 
 export interface HsCodeDeclarationExample {
@@ -4574,6 +4761,63 @@ export interface InvoiceReviewResult {
   ready: boolean;
 }
 
+export interface MaintenanceApply {
+  planId: string;
+}
+
+export interface MaintenanceDiscard {
+  id: string;
+  secretAccessKey?: string;
+  sessionToken?: string;
+}
+
+export interface MaintenanceLogin {
+  token: string;
+}
+
+export interface MaintenancePointQuery {
+  after?: string;
+}
+
+export interface MaintenanceRestore {
+  fileMode: "Local" | "Directory" | "Reconnect" | "S3";
+  pointId: string;
+  s3?: ApiBackupS3Settings;
+  secretAccessKey?: string;
+  sessionToken?: string;
+  targetLocation: string;
+}
+
+export interface MaintenanceSession {
+  csrfToken: string;
+  expiresInSeconds: number;
+}
+
+export interface MaintenanceStatus {
+  artifacts?: { id: string; location: string; state: string }[];
+  failure?: ApiErrorResponse;
+  locations: { id: string; name: string }[];
+  message: string;
+  nextCursor?: string;
+  planId: string;
+  points: { createdAt: string; id: string; provider: string; sizeBytes: number }[];
+  state: string;
+}
+
+export interface MaintenanceUnlock {
+  locationId: string;
+  oldInstanceIsolated: boolean;
+  password: string;
+  portableFile?: string;
+  repositoryId: string;
+  s3?: ApiBackupS3Settings;
+  secretAccessKey?: string;
+  sessionToken?: string;
+  sourceKind?: "Directory" | "S3" | "WebDav";
+  webDav?: ApiBackupWebDavSettings;
+  webDavPassword?: string;
+}
+
 export interface MeetingBookingCreateRequest {
   appointmentId?: string;
   attendeeCount: number;
@@ -4606,7 +4850,6 @@ export interface MeetingBookingRecord {
   endsAt?: string;
   fulfillmentState?: "Pending" | "Active" | "Completed" | "Blocked" | "Suspended" | "Cancelled";
   handlerNames?: string;
-  handlingKey?: string;
   handlingName?: string;
   id: number;
   issuedAt?: string | null;
@@ -4621,6 +4864,7 @@ export interface MeetingBookingRecord {
   returnedAt?: string | null;
   reviewTaskKeys?: string[];
   roomName?: string;
+  serviceId?: string;
   startsAt?: string;
   status: MeetingBookingStatus;
   submissionId?: number;
@@ -4654,7 +4898,6 @@ export interface MeetingRoomRecord {
   capacity: number;
   equipment: string;
   handlerNames?: string;
-  handlingKey?: string;
   handlingName?: string;
   id: number;
   inUse: boolean;
@@ -4663,6 +4906,7 @@ export interface MeetingRoomRecord {
   maximumBookingHours: number;
   name: string;
   requiresKey: boolean;
+  serviceId?: string;
   versionNumber: number;
 }
 
@@ -4671,12 +4915,12 @@ export interface MeetingRoomSaveRequest {
   capacity: number;
   equipment: string;
   expectedVersion: number;
-  handlingKey?: string;
   isActive: boolean;
   location: string;
   maximumBookingHours: number;
   name: string;
   requiresKey: boolean;
+  serviceId?: string;
 }
 
 export interface NotificationCount {
@@ -4752,7 +4996,7 @@ export interface OaApplicationCatalog {
 }
 
 export interface OaApprovalCondition {
-  field: "Amount" | "Currency" | "Duration" | "Department" | "Category" | "PersonnelAction" | "Returnable" | "FormText" | "FormNumber";
+  field: "Amount" | "Currency" | "Duration" | "Department" | "Category" | "ServiceId" | "PersonnelAction" | "Returnable" | "FormText" | "FormNumber";
   fieldKey?: string;
   operator: "Equal" | "NotEqual" | "Greater" | "GreaterOrEqual" | "Less" | "LessOrEqual";
   value: string;
@@ -4849,6 +5093,7 @@ export interface OaApprovalPreview {
 export interface OaApprovalRule {
   calendar?: OaBusinessCalendar | null;
   form?: OaFormDefinition | null;
+  generalHandling?: { Certificate: "Required" | "ApprovalOnly"; IT: "Required" | "ApprovalOnly"; Other: "Required" | "ApprovalOnly"; Repair: "Required" | "ApprovalOnly"; Seal: "Required" | "ApprovalOnly" };
   key: string;
   kind: "leave" | "overtime" | "expense" | "travel" | "purchase" | "general" | "personnel" | "room" | "supply";
   name: string;
@@ -4862,7 +5107,6 @@ export interface OaApprovalSettings {
   calendar?: OaBusinessCalendar;
   delegations: OaApprovalDelegation[];
   expectedVersion?: number;
-  handlingServices?: OfficeHandlingService[];
   publications: OaPublication[];
   revisions?: Record<string, number>;
   rules: OaApprovalRule[];
@@ -5047,6 +5291,42 @@ export interface OaDefinitionVersion {
 export interface OaDefinitionVersions {
   items: OaDefinitionVersion[];
   totalCount: number;
+}
+
+export interface OaDeploymentApply {
+  action: "Publish" | "Disable";
+  catalogRevision: number;
+  commandKey: string;
+  expectedVersion: number;
+  items: OaDeploymentItem[];
+}
+
+export interface OaDeploymentCheck {
+  definitionKey: string;
+  expectedRevision: number;
+  failure?: ApiErrorResponse;
+  name: string;
+  ready: boolean;
+  samples: OaSimulationSample[];
+}
+
+export interface OaDeploymentItem {
+  definitionKey: string;
+  expectedRevision?: number;
+  samples?: OaSimulationSample[];
+}
+
+export interface OaDeploymentPreview {
+  action: "Publish" | "Disable";
+  items: OaDeploymentItem[];
+  sample?: OaSimulationSample;
+}
+
+export interface OaDeploymentResult {
+  action: "Publish" | "Disable";
+  catalogRevision: number;
+  expectedVersion: number;
+  items: OaDeploymentCheck[];
 }
 
 export interface OaEscalation {
@@ -5468,7 +5748,6 @@ export interface OaRequest {
   formValues?: OaFormValues;
   fulfillmentState?: "Pending" | "Active" | "Completed" | "Blocked" | "Suspended" | "Cancelled";
   handlerNames?: string;
-  handlingKey?: string;
   handlingName?: string;
   id: number;
   kind: "leave" | "expense" | "travel" | "overtime" | "purchase" | "general" | "personnel";
@@ -5487,6 +5766,8 @@ export interface OaRequest {
   reason?: string;
   requestKey: string;
   reviewTaskKeys?: string[];
+  serviceId?: string;
+  serviceRevision?: number;
   status: "Draft" | "Pending" | "Approved" | "Rejected" | "Cancelled" | "Completed" | "HandedOff" | "Returned" | "Suspended" | "Terminated";
   submissionId?: number;
   submissionNumber?: number;
@@ -5519,7 +5800,6 @@ export interface OaRequestSave {
   formDefinition?: OaFormDefinition;
   formDisplayValues?: OaFormValues;
   formValues?: OaFormValues;
-  handlingKey?: string;
   leave?: OaLeave;
   lines?: OaExpenseLine[];
   overtime?: OaOvertime;
@@ -5528,6 +5808,8 @@ export interface OaRequestSave {
   purchaseLines?: OaPurchaseLine[];
   reason: string;
   requestKey: string;
+  serviceId?: string;
+  serviceRevision?: number;
   title: string;
   travel?: OaTravel;
 }
@@ -5578,10 +5860,9 @@ export interface OaSettingsPatch {
   definitionKey?: string;
   delegations?: OaApprovalDelegation[];
   expectedRevision: number;
-  handlingServices?: OfficeHandlingService[];
   remove?: boolean;
   rule?: OaApprovalRule;
-  section: "rules" | "calendar" | "delegations" | "handlingServices" | "sheetTemplates";
+  section: "rules" | "calendar" | "delegations" | "sheetTemplates";
   sheetTemplates?: OaSheetTemplate[];
 }
 
@@ -5624,6 +5905,7 @@ export interface OaSimulationReporting {
 export interface OaSimulationRequest {
   amount: string;
   appointmentId: string;
+  catalogRevision?: number;
   category: string;
   currency: string;
   definition: OaApprovalRule;
@@ -5633,16 +5915,20 @@ export interface OaSimulationRequest {
   isReturnable?: boolean;
   projectId?: string | null;
   reporting?: OaSimulationReporting;
+  serviceId?: string;
+  serviceRevision?: number;
 }
 
 export interface OaSimulationResult {
   approvalPlan: OaApprovalPlan;
+  catalogRevision: number;
   notes: string[];
 }
 
 export interface OaSimulationSample {
   amount?: string;
   appointmentId: string;
+  catalogRevision?: number;
   category?: string;
   currency?: string;
   duration?: string;
@@ -5651,11 +5937,13 @@ export interface OaSimulationSample {
   isReturnable?: boolean;
   projectId?: string | null;
   reporting?: OaSimulationReporting;
+  serviceId?: string;
+  serviceRevision?: number;
 }
 
 export interface OaSubflowInput {
-  sourcePath: "totalAmount" | "currency" | "durationDays" | "durationHours" | "departmentId" | "category" | "personnelChange.action" | "isReturnable";
-  target: "Amount" | "Currency" | "Duration" | "Department" | "Category" | "PersonnelAction" | "Returnable";
+  sourcePath: "totalAmount" | "currency" | "durationDays" | "durationHours" | "departmentId" | "category" | "serviceId" | "personnelChange.action" | "isReturnable";
+  target: "Amount" | "Currency" | "Duration" | "Department" | "Category" | "ServiceId" | "PersonnelAction" | "Returnable";
 }
 
 export interface OaSubflowInstance {
@@ -5758,7 +6046,6 @@ export interface OaSubmittedRequest {
   formDisplayValues?: OaFormValues;
   formValues?: OaFormValues;
   handlerNames?: string;
-  handlingKey?: string;
   handlingName?: string;
   id: number;
   kind: "leave" | "expense" | "travel" | "overtime" | "purchase" | "general" | "personnel";
@@ -5775,6 +6062,8 @@ export interface OaSubmittedRequest {
   reason?: string;
   requestKey: string;
   reviewTaskKeys?: string[];
+  serviceId?: string;
+  serviceRevision?: number;
   status: "Draft" | "Pending" | "Approved" | "Rejected" | "Cancelled" | "Completed" | "HandedOff" | "Returned";
   title?: string;
   totalAmount?: string;
@@ -5867,8 +6156,19 @@ export interface OfficeDecisionRequest {
   verificationValues?: Record<string, string | boolean>;
 }
 
+export interface OfficeHandlingCommand {
+  commandKey: string;
+  service: OfficeHandlingService;
+}
+
 export interface OfficeHandlingDirectory {
   items: OfficeHandlingService[];
+  nextCursor: string;
+  selected: OfficeHandlingService | null;
+}
+
+export interface OfficeHandlingResult {
+  success: boolean;
 }
 
 export interface OfficeHandlingService {
@@ -5878,6 +6178,7 @@ export interface OfficeHandlingService {
   isActive: boolean;
   key: string;
   name: string;
+  revision?: number;
 }
 
 export interface OfficeRequestEventRecord {
@@ -5923,7 +6224,6 @@ export interface OfficeSupplyRecord {
   canHandle?: boolean;
   description: string;
   handlerNames?: string;
-  handlingKey?: string;
   handlingName?: string;
   id: number;
   isActive: boolean;
@@ -5933,6 +6233,7 @@ export interface OfficeSupplyRecord {
   minimumStock: number;
   name: string;
   reservedQuantity: number;
+  serviceId?: string;
   stockQuantity: number;
   unit: string;
   versionNumber: number;
@@ -5954,7 +6255,6 @@ export interface OfficeSupplyRequestRecord {
   employeeNumber?: string;
   fulfillmentState?: "Pending" | "Active" | "Completed" | "Blocked" | "Suspended" | "Cancelled";
   handlerNames?: string;
-  handlingKey?: string;
   handlingName?: string;
   id: number;
   isReturnable?: boolean;
@@ -5970,6 +6270,7 @@ export interface OfficeSupplyRequestRecord {
   returnDueDate?: string | null;
   returnedQuantity?: number;
   reviewTaskKeys?: string[];
+  serviceId?: string;
   status: SupplyRequestStatus;
   submissionId?: number;
   submissionNumber?: number;
@@ -5983,12 +6284,12 @@ export interface OfficeSupplyRequestRecord {
 export interface OfficeSupplySaveRequest {
   description: string;
   expectedVersion: number;
-  handlingKey?: string;
   isActive: boolean;
   isReturnable: boolean;
   location: string;
   minimumStock: number;
   name: string;
+  serviceId?: string;
   unit: string;
 }
 
@@ -6538,7 +6839,6 @@ export interface ResourceSubmittedRequest {
   employeeNumber: unknown;
   endsAt?: string;
   handlerNames?: string;
-  handlingKey?: string;
   handlingName?: string;
   id: number;
   isReturnable?: boolean;
@@ -6560,6 +6860,7 @@ export interface ResourceSubmittedRequest {
   returnedQuantity?: number;
   reviewTaskKeys?: string[];
   roomName?: string;
+  serviceId?: string;
   startsAt?: string;
   status?: SupplyRequestStatus;
   supplyName?: string;
@@ -7137,6 +7438,7 @@ export interface WorklistSourceCount {
 }
 
 export const ApiBackupPlanDefaults = {
+  backupLocation: "",
   enabled: false,
   frequency: "Daily",
   replicaMode: "None",
@@ -7385,6 +7687,10 @@ export const ApiQueryInvoiceRowDtoDefaults = {
   totalQuantity: "0",
 } as const satisfies Partial<ApiQueryInvoiceRowDto>;
 
+export const ApiRecoveryArchiveRestoreRequestDefaults = {
+  fileMode: "Local",
+} as const satisfies Partial<ApiRecoveryArchiveRestoreRequest>;
+
 export const ApiReportHtmlPreviewRequestDefaults = {
   pageIndex: 0,
   previewFormat: "Svg",
@@ -7559,6 +7865,10 @@ export const IdentityResponsibilitySaveDefaults = {
   departmentId: null,
   id: null,
 } as const satisfies Partial<IdentityResponsibilitySave>;
+
+export const MaintenanceUnlockDefaults = {
+  sourceKind: "Directory",
+} as const satisfies Partial<MaintenanceUnlock>;
 
 export const MeetingBookingCreateRequestDefaults = {
   submitImmediately: true,
@@ -7788,8 +8098,16 @@ export interface AnalyzeInvoiceProfitRequest {
   body: ApiInvoiceProfitAnalysisRequest;
 }
 
+export interface ApplyOaDeploymentRequest {
+  body: OaDeploymentApply;
+}
+
 export interface ApplyPermissionSchemeVersionRequest {
   body: PermissionSchemeApply;
+}
+
+export interface ApplyRecoveryPointRequest {
+  body: MaintenanceApply;
 }
 
 export interface ApproveExpenseRequestRequest {
@@ -7832,6 +8150,10 @@ export interface ApprovePurchaseRequestRequest {
   body: OaCommandAction;
 }
 
+export interface ApproveRetentionDeletionRequest {
+  body: ApiStorageApproval;
+}
+
 export interface ApproveTravelRequestRequest {
   id: number;
   body: OaCommandAction;
@@ -7845,6 +8167,10 @@ export interface ArchiveAnnouncementRequest {
 export interface ArchiveEmailTemplateRequest {
   id: number;
   expectedVersion: number;
+}
+
+export interface ArchiveRetainedFilesRequest {
+  body: ApiArchiveFiles;
 }
 
 export interface ArchiveSalesOpportunityRequest {
@@ -7934,6 +8260,10 @@ export interface CaptureRemoteHsCodesRequest {
 
 export interface ChangeOwnPasswordRequest {
   body: ApiChangePasswordRequest;
+}
+
+export interface ClassifyRetainedFileRequest {
+  body: ApiRetentionClassification;
 }
 
 export interface CleanupAuditLogsRequest {
@@ -8137,12 +8467,12 @@ export interface CreatePurchaseRequestRequest {
   body: OaRequestSave;
 }
 
-export interface CreateRecoveryArchiveDownloadTicketRequest {
-  id: string;
-}
-
 export interface CreateReportTemplateRequest {
   body: ApiReportTemplateCreateRequest;
+}
+
+export interface CreateRetainedFileDownloadTicketRequest {
+  id: string;
 }
 
 export interface CreateSalesOpportunityRequest {
@@ -8502,6 +8832,10 @@ export interface DisableUserReportTemplateRequest {
   body: ApiUserReportTemplateLifecycleRequest;
 }
 
+export interface DiscardRecoveryArtifactsRequest {
+  body: MaintenanceDiscard;
+}
+
 export interface DiscoverHsCodeHistoryCandidatesRequest {
   keyword?: string;
   pageNumber?: number;
@@ -8738,17 +9072,22 @@ export interface DownloadQueriedInvoicesRequest {
   body: ApiQueryInvoiceFilterRequest;
 }
 
-export interface DownloadRecoveryArchiveWithTicketRequest {
-  token: string;
-  Range?: string;
-}
-
 export interface DownloadReportTemplateFileRequest {
   body: ApiReportTemplateFileDownloadRequest;
 }
 
 export interface DownloadReportTemplateV3ImageResourceRequest {
   resourceId: string;
+  Range?: string;
+}
+
+export interface DownloadRetainedFileRequest {
+  id: string;
+  Range?: string;
+}
+
+export interface DownloadRetainedFileWithTicketRequest {
+  token: string;
   Range?: string;
 }
 
@@ -8981,6 +9320,10 @@ export interface GetExpenseRequestCommandResultRequest {
 
 export interface GetExporterRequest {
   id: number;
+}
+
+export interface GetGeneralHandlingPolicyRequest {
+  definitionKey?: string;
 }
 
 export interface GetGeneralRequestRequest {
@@ -9333,6 +9676,10 @@ export interface GetWorklistRequest {
   pageSize?: number;
 }
 
+export interface HoldRetainedFileRequest {
+  body: ApiRetentionHold;
+}
+
 export interface ImportCrmCustomersRequest {
   body: ApiCrmCustomerImportRequest;
 }
@@ -9579,6 +9926,15 @@ export interface ListExportersPageRequest {
   keyword?: string;
 }
 
+export interface ListGeneralHandlingServicesRequest {
+  category?: string;
+  keyword?: string;
+  state?: "active" | "inactive" | "";
+  after?: string;
+  selected?: string;
+  pageSize?: number;
+}
+
 export interface ListGeneralRequestRequest {
   pageNumber?: number;
   pageSize?: number;
@@ -9695,6 +10051,19 @@ export interface ListLeaveRequestRequest {
 export interface ListLeaveRequestWorkflowCandidatesRequest {
   id: number;
   beforeId?: number;
+}
+
+export interface ListMaintenancePointsRequest {
+  body: MaintenancePointQuery;
+}
+
+export interface ListManagedHandlingServicesRequest {
+  category?: string;
+  keyword?: string;
+  state?: "active" | "inactive" | "";
+  after?: string;
+  selected?: string;
+  pageSize?: number;
 }
 
 export interface ListMeetingBookingWorkflowCandidatesRequest {
@@ -9919,6 +10288,15 @@ export interface ListResponsibilitiesRequest {
   pageSize?: number;
 }
 
+export interface ListRoomHandlingServicesRequest {
+  category?: string;
+  keyword?: string;
+  state?: "active" | "inactive" | "";
+  after?: string;
+  selected?: string;
+  pageSize?: number;
+}
+
 export interface ListSalesOpportunityHistoryRequest {
   id: number;
   beforeId?: number;
@@ -9999,6 +10377,15 @@ export interface ListSupplierAssessmentsRequest {
   pageSize?: number;
 }
 
+export interface ListSupplyHandlingServicesRequest {
+  category?: string;
+  keyword?: string;
+  state?: "active" | "inactive" | "";
+  after?: string;
+  selected?: string;
+  pageSize?: number;
+}
+
 export interface ListTravelRequestRequest {
   pageNumber?: number;
   pageSize?: number;
@@ -10042,9 +10429,21 @@ export interface LoginRequest {
   body: ApiLoginRequest;
 }
 
+export interface MaintainRecoveryRepositoryRequest {
+  body: ApiRepositoryMaintenanceRequest;
+}
+
 export interface ManageAnnouncementsRequest {
   pageNumber?: number;
   pageSize?: number;
+}
+
+export interface OpenMaintenanceSessionRequest {
+  body: MaintenanceLogin;
+}
+
+export interface PreflightRecoveryPointRequest {
+  body: MaintenanceRestore;
 }
 
 export interface PreviewApprovalOfExpenseRequestRequest {
@@ -10122,6 +10521,10 @@ export interface PreviewOaApprovalSheetRequest {
   body: OaSheetTemplate;
 }
 
+export interface PreviewOaDeploymentRequest {
+  body: OaDeploymentPreview;
+}
+
 export interface PreviewOcrImageRequest {
   filePath?: string;
   Range?: string;
@@ -10147,6 +10550,10 @@ export interface PreviewPermissionSchemeApplicationRequest {
 
 export interface PreviewReportTemplateContentRequest {
   body: ApiReportTemplatePreviewRequest;
+}
+
+export interface PreviewRetentionDeletionRequest {
+  body: ApiRetentionPreviewRequest;
 }
 
 export interface PreviewShippingMarkImageRequest {
@@ -10251,6 +10658,10 @@ export interface QueryCrmFollowUpsRequest {
   followUpId?: number;
 }
 
+export interface QueryFileRetentionRequest {
+  body: ApiRetentionQuery;
+}
+
 export interface QueryReportTemplateV3ImageResourcesRequest {
   pageNumber?: number;
   pageSize?: number;
@@ -10294,6 +10705,10 @@ export interface ReassignUnitWorkflowTaskRequest {
 
 export interface RecognizeOcrImageRequest {
   body: ApiOcrRecognizeImageRequest;
+}
+
+export interface ReconcileFileStorageRequest {
+  body: ApiStorageApproval;
 }
 
 export interface RecordHsCodeKnowledgeFeedbackRequest {
@@ -10386,6 +10801,10 @@ export interface RemindPurchaseRequestRequest {
 export interface RemindTravelRequestRequest {
   id: number;
   body: OaAction;
+}
+
+export interface RemoveHandlingServiceRequest {
+  body: OfficeHandlingCommand;
 }
 
 export interface RenameReportTemplateRequest {
@@ -10599,6 +11018,10 @@ export interface SaveEmailTemplateDraftRequest {
   body: ApiEmailTemplateDraftRequest;
 }
 
+export interface SaveHandlingServiceRequest {
+  body: OfficeHandlingCommand;
+}
+
 export interface SaveHsCodeKnowledgeExampleRequest {
   body: HsCodeExampleInput;
 }
@@ -10644,6 +11067,10 @@ export interface SaveResponsibilityRequest {
   body: IdentityResponsibilitySave;
 }
 
+export interface SaveRetentionPolicyRequest {
+  body: ApiRetentionPolicyRequest;
+}
+
 export interface SaveShippingMarkImageRequest {
   body: ApiShippingMarkImageSaveRequest;
 }
@@ -10654,6 +11081,10 @@ export interface SaveSingleWindowClientProfileRequest {
 
 export interface SaveSingleWindowReceiptPackageToPathRequest {
   body: ApiSingleWindowReceiptPackageExportRequest;
+}
+
+export interface SaveStorageCapacityPolicyRequest {
+  body: ApiCapacityPolicyRequest;
 }
 
 export interface SaveUnitAccessRequest {
@@ -10918,6 +11349,10 @@ export interface UnlockAgentConsignmentFieldsRequest {
 export interface UnlockCustomsCooFieldsRequest {
   sourceId: number;
   body: ApiSingleWindowUnlockFieldsRequest;
+}
+
+export interface UnlockRecoveryRepositoryRequest {
+  body: MaintenanceUnlock;
 }
 
 export interface UnverifyInvoiceRequest {

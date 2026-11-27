@@ -93,61 +93,12 @@ impl Target {
                 let mut url = session.clone();
                 url.query_pairs_mut()
                     .append_pair("partNumber", &(parts.len() + 1).to_string());
-                let mut etag = None;
-                for attempt in 0..3 {
-                    crate::operation::check()?;
-                    file.seek(SeekFrom::Start(offset))?;
-                    let mut part = Read::by_ref(file).take(length);
-                    let request = self.request(
-                        "PUT",
-                        &url,
-                        ureq::SendBody::from_reader(&mut part),
-                        Some(length),
-                        &hash,
-                    )?;
-                    match self.agent.run(request) {
-                        Ok(response) if response.status().is_success() => {
-                            let value = response
-                                .headers()
-                                .get("etag")
-                                .and_then(|value| value.to_str().ok())
-                                .map(str::to_owned);
-                            response_text(response)?;
-                            etag = value;
-                            break;
-                        }
-                        Ok(response)
-                            if attempt < 2
-                                && (response.status().is_server_error()
-                                    || response.status().as_u16() == 429) => {}
-                        Ok(response) => {
-                            response_text(response)?;
-                        }
-                        Err(_) if attempt < 2 => {}
-                        Err(_) => return Err(unavailable("S3 分段上传失败或超时。")),
-                    }
-                    std::thread::sleep(Duration::from_millis(250 * (attempt + 1)));
-                }
-                let etag = etag
-                    .filter(|value| !value.is_empty() && value.len() <= 1024)
-                    .ok_or_else(|| unavailable("S3 上传未返回有效 ETag，不能完成备份。"))?;
+                file.seek(SeekFrom::Start(offset))?;
+                let etag = self.upload_part(&url, &hash, length, file)?;
                 parts.push(etag);
                 offset += length;
             }
-            let mut xml = String::from("<CompleteMultipartUpload>");
-            for (index, etag) in parts.iter().enumerate() {
-                xml.push_str(&format!(
-                    "<Part><PartNumber>{}</PartNumber><ETag>{}</ETag></Part>",
-                    index + 1,
-                    quick_xml::escape::escape(etag)
-                ));
-            }
-            xml.push_str("</CompleteMultipartUpload>");
-            let response = self.control(&self.agent, "POST", &session, xml.as_bytes())?;
-            if xml_root(&response)? != "CompleteMultipartUploadResult" {
-                return Err(unavailable("S3 未确认分段上传完成。"));
-            }
-            Ok(())
+            self.complete_upload(&session, &parts)
         })();
         if result.is_err() {
             let cleanup = self.abort_upload(&session);
@@ -161,6 +112,67 @@ impl Target {
             std::fs::remove_file(path)?;
         }
         result
+    }
+    pub(super) fn upload_part(
+        &self,
+        url: &url::Url,
+        hash: &str,
+        length: u64,
+        file: &mut (impl Read + Seek),
+    ) -> Result<String> {
+        let offset = file.stream_position()?;
+        for attempt in 0..3 {
+            crate::operation::check()?;
+            file.seek(SeekFrom::Start(offset))?;
+            let mut body = Read::by_ref(file).take(length);
+            let request = self.request(
+                "PUT",
+                url,
+                ureq::SendBody::from_reader(&mut body),
+                Some(length),
+                hash,
+            )?;
+            match self.agent.run(request) {
+                Ok(response) if response.status().is_success() => {
+                    let etag = response
+                        .headers()
+                        .get("etag")
+                        .and_then(|v| v.to_str().ok())
+                        .map(str::to_owned);
+                    response_text(response)?;
+                    return etag
+                        .filter(|v| !v.is_empty() && v.len() <= 1024)
+                        .ok_or_else(|| unavailable("S3 上传未返回有效 ETag，不能完成上传。"));
+                }
+                Ok(response)
+                    if attempt < 2
+                        && (response.status().is_server_error()
+                            || response.status().as_u16() == 429) => {}
+                Ok(response) => {
+                    response_text(response)?;
+                }
+                Err(_) if attempt < 2 => {}
+                Err(_) => return Err(unavailable("S3 分段上传失败或超时。")),
+            }
+            std::thread::sleep(Duration::from_millis(250 * (attempt + 1)));
+        }
+        Err(unavailable("S3 分段上传超过重试预算。"))
+    }
+    pub(super) fn complete_upload(&self, session: &url::Url, parts: &[String]) -> Result<()> {
+        let mut xml = String::from("<CompleteMultipartUpload>");
+        for (index, etag) in parts.iter().enumerate() {
+            xml.push_str(&format!(
+                "<Part><PartNumber>{}</PartNumber><ETag>{}</ETag></Part>",
+                index + 1,
+                quick_xml::escape::escape(etag)
+            ));
+        }
+        xml.push_str("</CompleteMultipartUpload>");
+        let response = self.control(&self.agent, "POST", session, xml.as_bytes())?;
+        if xml_root(&response)? != "CompleteMultipartUploadResult" {
+            return Err(unavailable("S3 未确认分段上传完成。"));
+        }
+        Ok(())
     }
 }
 

@@ -13,6 +13,7 @@ import { applyInterfaceDensity, readInterfaceDensity } from "./app/interfaceDens
 import { installPortableFonts } from "./app/typographyPolicy.ts";
 import { isTauri } from "@tauri-apps/api/core";
 import { MigrationStartupScreen } from "./desktop/MigrationStartupScreen.tsx";
+const RecoveryMaintenancePage = React.lazy(() => import("./features/settings/RecoveryMaintenancePage.tsx").then(module => ({ default: module.RecoveryMaintenancePage })));
 
 installPortableFonts();
 const migrationStartup = isTauri() && window.location.hash === "#/startup-migration";
@@ -26,7 +27,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         <ConfirmationProvider>
           <UnsavedChangesProvider>
             <FrontendErrorBoundary>
-              <App />
+              {window.location.hash === "#/maintenance" ? <React.Suspense fallback={<p role="status">正在加载灾备维护…</p>}><RecoveryMaintenancePage /></React.Suspense> : <App />}
             </FrontendErrorBoundary>
           </UnsavedChangesProvider>
         </ConfirmationProvider>

@@ -10,7 +10,7 @@ pub fn exercise(c: &Connection) {
         (72, "OFFICE-Q", "B", "Pending", "handler"),
         (72, "OTHER-Q", "B", "Approved", "handler"),
     ] {
-        let mut body = json!({"versionNumber":1,"ownerUserId":owner,"companyScope":company,"departmentId":department,"status":status,"handlingKey":key,"createdAt":"2026-10-24T08:00:00+08:00","quantity":1,"isReturnable":true});
+        let mut body = json!({"versionNumber":1,"ownerUserId":owner,"companyScope":company,"departmentId":department,"status":status,"serviceId":key,"createdAt":"2026-10-24T08:00:00+08:00","quantity":1,"isReturnable":true});
         let id = c
             .insert(&RecordWrite::unkeyed("supply-requests", &body))
             .unwrap();

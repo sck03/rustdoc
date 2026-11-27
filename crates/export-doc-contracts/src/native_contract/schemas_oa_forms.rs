@@ -112,16 +112,10 @@ pub(super) fn entries() -> Vec<(&'static str, Schema)> {
                 (
                     "section",
                     s().enumeration(Enumeration::Values(
-                        [
-                            "rules",
-                            "calendar",
-                            "delegations",
-                            "handlingServices",
-                            "sheetTemplates",
-                        ]
-                        .into_iter()
-                        .map(serde_json::Value::from)
-                        .collect(),
+                        ["rules", "calendar", "delegations", "sheetTemplates"]
+                            .into_iter()
+                            .map(serde_json::Value::from)
+                            .collect(),
                     )),
                 ),
                 ("expectedRevision", i().minimum(num("0"))),
@@ -130,10 +124,6 @@ pub(super) fn entries() -> Vec<(&'static str, Schema)> {
                 ("rule", r("OaApprovalRule")),
                 ("calendar", r("OaBusinessCalendar")),
                 ("delegations", a(r("OaApprovalDelegation"))),
-                (
-                    "handlingServices",
-                    a(r("OfficeHandlingService")).max_items(100),
-                ),
                 ("sheetTemplates", a(r("OaSheetTemplate")).max_items(18)),
             ])
             .required(vec!["section", "expectedRevision"]),

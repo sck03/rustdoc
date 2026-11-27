@@ -21,169 +21,28 @@ pub(super) fn start(
         actor.id,
         saved.clone(),
     );
-    service.jobs.start_backup(
-        actor,
-        RUN_BACKUP_PLAN,
-        "ScheduledRecoveryBackup",
-        "日常完整灾备",
-        move |_| {
-            let target = repository::root(&paths).join(format!(
-                "{id}.{}",
-                if pg { "edmmigration" } else { "edmrecovery" }
-            ));
-            let mut registered = false;
-            let result: Result<tasks::TaskOutput> = (|| {
-                let actor = auth::current_actor(&store, owner)?;
-                administrator(&actor)?;
-                {
-                    let _package = package_lock;
-                    let _templates = crate::engine::report_template_files::storage_lock(&paths)?;
-                    if pg {
-                        postgres::ensure_no_pending(&paths)?;
-                    } else if super::super::disaster_root(&paths)?
-                        .join(".pending-restore.json")
-                        .try_exists()?
-                    {
-                        return Err(error(409, "已有灾备恢复等待处理。"));
-                    }
-                    let working = sealed::working_directory(&repository::root(&paths))?;
-                    package::private_directory(&working)?;
-                    let created: Result<()> = (|| {
-                        let snapshot = working.join(if pg {
-                            "database.dump"
-                        } else {
-                            "snapshot.sqlite3"
-                        });
-                        if let Some(tool) = &tool {
-                            postgres::dump_to(
-                                &store,
-                                &protector,
-                                tool,
-                                &snapshot,
-                                &paths.disk_space,
-                            )?;
-                        } else {
-                            super::super::snapshot::backup_sqlite(&store, &paths, &snapshot)?;
-                        }
-                        let package = package::create(
-                            &store,
-                            &paths,
-                            &protector,
-                            &snapshot,
-                            if pg {
-                                package::POSTGRES
-                            } else {
-                                package::SQLITE
-                            },
-                            &working,
-                            if pg {
-                                migration::MAGIC
-                            } else {
-                                disaster::MAGIC
-                            },
-                            &password,
-                        )?;
-                        crate::operation::check()?;
-                        fs::rename(package, &target)?;
-                        Ok(())
-                    })();
-                    let cleanup = fs::remove_dir_all(&working);
-                    created?;
-                    cleanup?;
-                }
-                let mut output =
-                    tasks::TaskOutput::managed_file(target.clone(), "日常完整灾备已保存。".into())?;
-                let file = output.managed_file.as_ref().unwrap();
-                let mut archive = repository::Archive {
-                    id: id.clone(),
-                    repository: saved.repository.clone(),
-                    file_name: target.file_name().unwrap().to_string_lossy().into_owned(),
-                    created_at: Utc::now(),
-                    size_bytes: file.size,
-                    sha256: file.digest.clone(),
-                    replica_status: if saved.plan.replica_mode == "None" {
-                        "NotRequested"
-                    } else {
-                        "Pending"
-                    }
-                    .into(),
-                    replica_target: String::new(),
-                    message: String::new(),
-                    deleting: false,
-                };
-                repository::write(&paths, &archive)?;
-                registered = true;
-                let replica: Result<replica::Target> = (|| {
-                    let replica = replica::Target::read(&store, &protector, &saved)?;
-                    archive.replica_target = replica.identity();
-                    // Register ownership before remote I/O, including failures and cancellation.
-                    repository::write(&paths, &archive)?;
-                    replica.upload(
-                        &target,
-                        &archive.file_name,
-                        archive.size_bytes,
-                        &archive.sha256,
-                        saved.plan.verify_replica,
-                    )?;
-                    Ok(replica)
-                })();
-                let replica = match replica {
-                    Ok(replica) => {
-                        if saved.plan.replica_mode != "None" {
-                            archive.replica_status = if saved.plan.verify_replica {
-                                "Verified"
-                            } else {
-                                "Uploaded"
-                            }
-                            .into();
-                        }
-                        replica
-                    }
-                    Err(cause) => {
-                        archive.replica_status = "Failed".into();
-                        archive.message =
-                            "本地备份已保存，异机副本未完成；本次未清理旧备份。".into();
-                        output.detail = archive.message.clone();
-                        crate::operation::OperationScope::detached(Duration::from_secs(30))
-                            .run(|| repository::write(&paths, &archive))?;
-                        finish_state(
-                            &store,
-                            &id,
-                            json!({"lastResult":"Partial", "lastError":cause.message}),
-                        )?;
-                        return Ok(output);
-                    }
-                };
-                crate::operation::OperationScope::detached(Duration::from_secs(30))
-                    .run(|| repository::write(&paths, &archive))?;
-                match repository::prune(&paths, &saved.plan, &replica) {
-                    Ok(()) => finish_state(
-                        &store,
-                        &id,
-                        json!({"lastResult":"Succeeded", "lastError":""}),
-                    )?,
-                    Err(cause) => {
-                        output.detail = "备份已完成，保留策略清理未完成；请检查灾备状态。".into();
-                        finish_state(
-                            &store,
-                            &id,
-                            json!({"lastResult":"Partial", "lastError":cause.message}),
-                        )?;
-                    }
-                }
-                Ok(output)
+    service.jobs.start_backup(actor,RUN_BACKUP_PLAN,"ScheduledRecoveryBackup","创建恢复点",move |_|{
+        let _package=package_lock;
+        let result:Result<tasks::TaskOutput>=(||{
+            administrator(&auth::current_actor(&store,owner)?)?;
+            let _templates=crate::engine::report_template_files::storage_lock(&paths)?;
+            if pg{postgres::ensure_no_pending(&paths)?;}else if super::super::disaster_root(&paths)?.join(".pending-restore.json").try_exists()?{return Err(error(409,"已有恢复等待维护处理。"));}
+            let repository=points::open(&store,&paths,&protector,&saved,&password,true)?;
+            let working=sealed::working_directory(&paths.cache_root)?;package::private_directory(&working)?;
+            let capture:Result<_>=(||{
+                let snapshot=working.join(if pg{"database.dump"}else{"snapshot.sqlite3"});
+                if let Some(tool)=&tool{postgres::dump_to(&store,&protector,tool,&snapshot,&paths.disk_space)?;}else{super::super::snapshot::backup_sqlite(&store,&paths,&snapshot)?;}
+                super::super::repository::capture::create(&repository,&store,&paths,&protector,&snapshot,if pg{"PostgreSQL"}else{"SQLite"},&id)
             })();
-            if let Err(cause) = &result {
-                if !registered && target.try_exists().unwrap_or(false) {
-                    let _ = fs::remove_file(&target);
-                }
-                let _ = finish_state(
-                    &store,
-                    &id,
-                    json!({"lastResult":"Failed", "lastError":cause.message}),
-                );
+            let cleanup=fs::remove_dir_all(&working);let commit=capture?;cleanup?;
+            if let Err(cause)=repository.retain(saved.plan.retention_count,saved.plan.retention_days) {
+                finish_state(&store,&id,json!({"lastResult":"Partial","lastError":cause.message,"lastPointId":commit.id}))?;
+                return Ok(tasks::TaskOutput{file:None,managed_file:None,destination:None,directory:None,publication:None,archive:None,detail:"恢复点已提交；保留策略未完成，请检查灾备状态。".into()});
             }
-            result
-        },
-    )
+            finish_state(&store,&id,json!({"lastResult":"Succeeded","lastError":"","lastPointId":commit.id,"repositoryId":commit.repository,"logicalBytes":commit.size_bytes,"newBytes":commit.new_bytes}))?;
+            Ok(tasks::TaskOutput{file:None,managed_file:None,destination:None,directory:None,publication:None,archive:None,detail:format!("恢复点已提交并核验：{} 个文件，新增 {} 字节。",commit.files,commit.new_bytes)})
+        })();
+        if let Err(cause)=&result {let _=finish_state(&store,&id,json!({"lastResult":"Failed","lastError":cause.message}));}
+        result
+    })
 }

@@ -33,6 +33,7 @@ pub(super) fn schemas() -> Vec<(&'static str, Schema)> {
                 ("physicalBytes", bytes()),
                 ("logicalBytes", bytes()),
                 ("unreferencedBytes", bytes()),
+                ("protectedBytes", bytes()),
                 ("migrationPending", b()),
                 ("healthy", b()),
                 ("healthMessage", s()),
@@ -109,7 +110,7 @@ pub(super) fn endpoints() -> Vec<Endpoint> {
             "/api/file-storage/reconcile",
             "ReconcileFileStorage",
             "BackgroundJobSnapshot",
-            None,
+            Some("ApiStorageApproval"),
         ),
         (
             "post",

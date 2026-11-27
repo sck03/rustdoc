@@ -82,6 +82,7 @@ pub(super) fn submit(tx: &Connection, actor: &Actor, row: &mut Value) -> Result<
             text(row, "category")
         },
         personnel_action: variant,
+        service_id: text(row, "serviceId"),
         returnable: row["isReturnable"]
             .as_bool()
             .map(|value| value.to_string())
@@ -99,6 +100,23 @@ pub(super) fn build_plan(
     version: i64,
     context: &ConditionContext,
 ) -> Result<()> {
+    let handling_required = if rule.kind == "general" {
+        let category = text(row, "category");
+        let requirement = rule
+            .general_handling
+            .get(&category)
+            .ok_or_else(|| invalid("申请类别没有对应的办理政策，请管理员检查发布流程。"))?;
+        let required =
+            *requirement == export_doc_domain::general_request::HandlingRequirement::Required;
+        handling::select(tx, actor, row, &category, required, true)?;
+        row["handlingRequirement"] = serde_json::to_value(requirement)?;
+        Some(required)
+    } else {
+        None
+    };
+    let mut resolved_context = context.clone();
+    resolved_context.service_id = text(row, "serviceId");
+    let context = &resolved_context;
     let mut compiled = super::subflows::compile(tx, &actor.company, rule)?;
     super::request_projects::bind(tx, actor, row, employee)?;
     super::subflows::map_contexts(&mut compiled, row, context)?;
@@ -125,11 +143,22 @@ pub(super) fn build_plan(
         .map_err(invalid)?;
     let mut notes = vec![];
     let mut self_skipped = vec![];
+    let mut has_handling = false;
     for (index, node) in rule.stages.iter().enumerate() {
         let context = compiled.contexts.get(&node.key).unwrap_or(context);
         super::materials::validate_policy(&node.material_policy)?;
         let mut included =
             !excluded.contains(&node.key) && rule.includes(index, &context).map_err(invalid)?;
+        if handling_required == Some(false) && node.kind == NodeKind::Handling {
+            included = false;
+            notes.push(format!(
+                "{}：已发布类别政策为仅审批，不创建办理任务。",
+                node.name
+            ));
+        }
+        if included && node.kind == NodeKind::Handling {
+            has_handling = true;
+        }
         let mut routing_row = row.clone();
         routing_row["routingDepartment"] = json!(context.department);
         let mut bindings = if included
@@ -260,6 +289,11 @@ pub(super) fn build_plan(
                 source_generation: None,
             });
         }
+    }
+    if handling_required == Some(true) && !has_handling {
+        return Err(invalid(
+            "该类别要求办理，但本次路线没有可达的办理节点，请管理员修正流程条件。",
+        ));
     }
     for skipped in self_skipped {
         let mut descendants = HashSet::from([skipped]);

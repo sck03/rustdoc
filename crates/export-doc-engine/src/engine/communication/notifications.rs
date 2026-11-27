@@ -1,14 +1,65 @@
 use super::super::{handling, oa::approval::authority};
 use super::*;
 use export_doc_storage::NotificationScope;
+pub(in crate::engine) fn capacity_alert(
+    tx: &Connection,
+    edition: export_doc_domain::permissions::ProductEdition,
+    alert: &Value,
+) -> Result<()> {
+    let recipients = tx.capacity_administrators()?;
+    for row in recipients.as_array().into_iter().flatten() {
+        let actor = match auth::current_actor_in(tx, row["id"].as_i64().unwrap_or(0), edition) {
+            Ok(actor) => actor,
+            Err(cause) if cause.status == Some(403) => continue,
+            Err(cause) => return Err(cause),
+        };
+        if !actor.admin || auth::authorize(&actor, "office.notifications", "view").is_err() {
+            continue;
+        }
+        let identity = format!(
+            "capacity:{}:{}:{}:{}",
+            text(alert, "area"),
+            text(alert, "at"),
+            text(alert, "state"),
+            actor.id
+        );
+        if tx.find_identity("site-notification", &identity)?.is_some() {
+            continue;
+        }
+        let title = format!("存储容量：{}", text(alert, "message"));
+        let parent = store::save(
+            tx,
+            "storage-capacity",
+            0,
+            json!({"identity":identity,"title":title,"status":alert["state"],"area":alert["area"]}),
+            Some(identity.clone()),
+            &actor,
+            "capacity-alert",
+        )?;
+        store::save(
+            tx,
+            "site-notification",
+            0,
+            json!({"identity":identity,"eventId":parent["id"],"requestId":parent["id"],"requestKind":"storage-capacity","title":title,"action":"capacity","status":"Unread","readAt":""}),
+            Some(identity),
+            &actor,
+            "notify",
+        )?;
+    }
+    Ok(())
+}
 fn resource(kind: &str) -> Option<&'static str> {
     match kind {
+        "storage-capacity" => Some("system.settings"),
         "supply-requests" => Some("office.supplies"),
         "bookings" => Some("office.rooms"),
         _ => super::super::oa::approval::resource(kind),
     }
 }
 fn viewable(tx: &Connection, actor: &Actor, resource: &str, row: &Value) -> Result<bool> {
+    if resource == "system.settings" {
+        return Ok(actor.admin);
+    }
     if matches!(resource, "office.supplies" | "office.rooms") {
         handling::resource_access(tx, actor, resource, "view", row, false)
     } else {
@@ -92,6 +143,18 @@ fn scopes(tx: &Connection, actor: &Actor) -> Result<Vec<NotificationScope>> {
             }
         }
     }
+    if actor.admin {
+        result.push(NotificationScope {
+            restrictions: vec![],
+            kind: "storage-capacity".into(),
+            rank: 3,
+            statuses: vec![],
+            handling_keys: None,
+            approval_principals: vec![],
+            node_access: vec![],
+            workflow_date: Some(workflow_date),
+        });
+    }
     Ok(result)
 }
 fn accessible(tx: &Connection, actor: &Actor, row: &Value) -> Result<()> {
@@ -109,6 +172,21 @@ fn accessible(tx: &Connection, actor: &Actor, row: &Value) -> Result<()> {
 }
 fn project(tx: &Connection, actor: &Actor, mut notification: Value) -> Result<Value> {
     let kind = text(&notification, "requestKind");
+    if kind == "storage-capacity" {
+        accessible(tx, actor, &notification)?;
+        let parent = store::get(
+            tx,
+            &kind,
+            records::positive(&notification, "requestId", "容量通知")?,
+        )?;
+        notification["title"] = parent["title"].clone();
+        notification["requestStatus"] = parent["status"].clone();
+        notification["actionRequired"] = json!(false);
+        return Ok(contracts::dto(
+            contracts::schema("SiteNotification"),
+            notification,
+        ));
+    }
     let parent = store::get(
         tx,
         &kind,

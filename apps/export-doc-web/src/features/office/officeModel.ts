@@ -41,7 +41,7 @@ export function officeAccess(user: ApiUserDto, kind: OfficeKind) {
       return grants.some(grant => {
         if (grant.action !== action || !["own", "department", "company", "all"].includes(grant.dataScope)) return false;
         if (!row) return true;
-        if (row.handlingKey && ["issue", "return"].includes(action)) return row.canHandle === true;
+        if (row.serviceId && ["issue", "return"].includes(action)) return row.canHandle === true;
         if (grant.dataScope === "own") return row.ownerUserId === user.id;
         if (grant.dataScope === "department") return hasDepartment(user, row.departmentId);
         return true;
@@ -120,11 +120,11 @@ export function readMeetingRoomForm(form: FormData, version: number): MeetingRoo
   return { name: String(form.get("name") ?? ""), location: String(form.get("location") ?? ""), equipment: String(form.get("equipment") ?? ""),
     capacity: Number(form.get("capacity")), maximumBookingHours: Number(form.get("maximumBookingHours")),
     advanceBookingDays: Number(form.get("advanceBookingDays")), requiresKey: form.has("requiresKey"), isActive: form.has("isActive"), expectedVersion: version,
-    handlingKey: String(form.get("handlingKey") ?? "") };
+    serviceId: String(form.get("serviceId") ?? "") };
 }
 
 export function readOfficeSupplyForm(form: FormData, version: number): OfficeSupplySaveRequest {
   return { name: String(form.get("name") ?? ""), unit: String(form.get("unit") ?? ""), location: String(form.get("location") ?? ""),
     description: String(form.get("description") ?? ""), isReturnable: form.has("isReturnable"), isActive: form.has("isActive"),
-    minimumStock: Number(form.get("minimumStock")), expectedVersion: version, handlingKey: String(form.get("handlingKey") ?? "") };
+    minimumStock: Number(form.get("minimumStock")), expectedVersion: version, serviceId: String(form.get("serviceId") ?? "") };
 }

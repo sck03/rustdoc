@@ -171,7 +171,7 @@ export function usePostgreSqlMaintenance(
       return downloadJobResultWhenReady(
         client,
         job,
-        `export-doc-manager-server-migration-${currentLocalDateInputValue()}.edmmigration`,
+        `export-doc-manager-server-migration-${currentLocalDateInputValue()}.edmpoint`,
         { timeoutMs: 60 * 60 * 1000, pollIntervalMs: 2_000, signal },
       );
     },
@@ -210,7 +210,7 @@ export function usePostgreSqlMaintenance(
           "X-ExportDocManager-Sensitive-Operation-Ticket": authorization.ticket,
           "X-ExportDocManager-Migration-Password": encodeHeaderText(migrationRestorePassword),
           "X-ExportDocManager-Migration-File-Name": encodeHeaderText(
-            migrationRestoreFile?.name ?? "migration.edmmigration",
+            migrationRestoreFile?.name ?? "migration.edmpoint",
           ),
           "X-ExportDocManager-Restore-Confirmation": migrationRestoreConfirmation.trim(),
         },

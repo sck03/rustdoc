@@ -79,14 +79,8 @@ pub fn import_sqlite(paths: &RuntimePaths, source: &Path, password: &str) -> Res
     let _instance = super::super::store::sqlite_layout::prepare(paths)?;
     let lock = package::lock(paths)?;
     let marker = disaster::marker(paths)?;
-    let prepared = package::prepare(
-        &paths.disk_space,
-        &marker,
-        disaster::MAGIC,
-        password,
-        fs::File::open(source)?,
-        package::SQLITE,
-    )?;
+    let prepared =
+        super::portable::prepare(paths, &marker, password, fs::File::open(source)?, "SQLite")?;
     super::sealed::atomic_write(&marker, &prepared.marker_content(None)?)?;
     drop(prepared);
     drop(lock);

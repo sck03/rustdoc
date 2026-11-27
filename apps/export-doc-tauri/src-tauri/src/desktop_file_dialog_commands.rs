@@ -39,8 +39,8 @@ pub(crate) async fn select_disaster_recovery_package_file(
 ) -> Result<Option<String>, String> {
     Ok(pick_file(
         &window,
-        "选择持卡机灾难恢复包",
-        &[("持卡机灾难恢复包", &["edmrecovery"]), ("全部文件", &["*"])],
+        "选择桌面灾备恢复点",
+        &[("桌面灾备恢复点", &["edmpoint"]), ("全部文件", &["*"])],
     )
     .await)
 }

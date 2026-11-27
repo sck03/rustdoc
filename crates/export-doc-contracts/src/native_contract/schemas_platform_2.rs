@@ -46,10 +46,14 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ]).required(vec!["nextCursor","page","sources","businessDate","asOf"])),
     ("WorklistSourceCount",o(vec![("key",s()),("name",s()),("count",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))]).required(vec!["key","name"])),
     ("OfficeHandlingService",o(vec![
+        ("revision",i().format("int64")),
         ("key",s()),("name",s()),("category",s().enumeration(Enumeration::Values(vec![serde_json::json!("Seal"),serde_json::json!("Certificate"),serde_json::json!("IT"),serde_json::json!("Repair"),serde_json::json!("Other"),serde_json::json!("Supply"),serde_json::json!("Room")]))),
         ("handlerUserIds",a(i().format("int64")).min_items(1).max_items(10)),("handlerNames",s()),("isActive",b())
     ]).required(vec!["key","name","category","handlerUserIds","isActive"])),
-    ("OfficeHandlingDirectory",o(vec![("items",a(r("OfficeHandlingService")).max_items(100))]).required(vec!["items"])),
+    ("OfficeHandlingDirectory",o(vec![("items",a(r("OfficeHandlingService")).max_items(100)),("nextCursor",s()),("selected",Schema::default().any_of(vec![r("OfficeHandlingService"),ty(Primitive::Null)]))]).required(vec!["items","nextCursor","selected"])),
+    ("OfficeHandlingResult",o(vec![("success",b())]).required(vec!["success"])),
+    ("GeneralHandlingPolicy",o(vec![("definitionVersion",i().format("int64")),("catalogRevision",i().format("int64")),("requirements",super::general_categories::requirements())]).required(vec!["definitionVersion","catalogRevision","requirements"])),
+    ("OfficeHandlingCommand",o(vec![("service",r("OfficeHandlingService")),("commandKey",s().min_length(8).max_length(128))]).required(vec!["service","commandKey"])),
     ("ResourceSubmittedRequest",o(vec![
         ("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("kind",s().enumeration(Enumeration::Values(vec![serde_json::json!("room"),serde_json::json!("supply")]))),("companyScope",Schema::Unspecified),
         ("ownerUserId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("departmentId",s()),("employeeId",i().format("int64")),
@@ -60,7 +64,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("requiresKey",b()),("applicantName",s()),("attendeeCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("startsAt",s().format("date-time")),("endsAt",s().format("date-time")),("status",r("SupplyRequestStatus")),
         ("issuedAt",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).format("date-time")),("returnedAt",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).format("date-time")),("createdAt",s().format("date-time")),
-        ("canReview",b()),("reviewTaskKeys",a(s())),("handlingKey",s()),
+        ("canReview",b()),("reviewTaskKeys",a(s())),("serviceId",s()),
         ("handlingName",s()),("handlerNames",s()),("canHandle",b()),
         ("officeSupplyId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("supplyName",s()),("unit",s()),
         ("isReturnable",b()),("purpose",s()),("quantity",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),

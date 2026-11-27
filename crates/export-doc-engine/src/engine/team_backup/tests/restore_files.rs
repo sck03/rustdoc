@@ -9,6 +9,7 @@ fn install_uses_snapshot_inventory_and_rolls_back_canceled_or_out_of_space_copy(
         let mut paths = root.paths();
         let staging = paths.data_root.join("restore-stage");
         let object = export_doc_storage::FileObject {
+            archive_identity: String::new(),
             digest: "a".repeat(64),
             size: 3,
         };
@@ -21,6 +22,15 @@ fn install_uses_snapshot_inventory_and_rolls_back_canceled_or_out_of_space_copy(
         )
         .unwrap();
         fs::write(staging.join("Files/.store-id"), b"staged identity").unwrap();
+        let store = crate::engine::store::Store::open(&paths).unwrap();
+        let config = store.files.configuration().unwrap();
+        fs::create_dir_all(staging.join("Configuration")).unwrap();
+        fs::write(
+            staging.join("Configuration/file-storage.json"),
+            serde_json::to_vec(&config).unwrap(),
+        )
+        .unwrap();
+        drop(store);
         fs::create_dir_all(paths.data_root.join("Files")).unwrap();
         fs::write(paths.data_root.join("Files/original"), b"original data").unwrap();
         let scope = OperationScope::new(Duration::from_secs(5));

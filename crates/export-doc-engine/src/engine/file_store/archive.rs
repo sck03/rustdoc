@@ -1,221 +1,220 @@
-//! Streamed object inventory inside the authenticated recovery package. Object
-//! count does not consume ZIP entries or require a whole-library JSON manifest.
+//! Archive transfers reuse immutable objects, the location catalog and the migration lock.
 use super::*;
-const MAGIC: &[u8] = b"EDM-FILE-OBJECTS-1\n";
-pub(in crate::engine) fn verify_local_inventory(
-    root: &Path,
-    mut page: impl FnMut(&str) -> Result<Vec<FileObject>>,
-) -> Result<()> {
-    let mut cursor = String::new();
-    loop {
-        let objects = page(&cursor)?;
-        if objects.is_empty() {
-            return Ok(());
-        }
-        for object in objects {
-            crate::operation::check()?;
-            validate(&object)?;
-            let path = root
-                .join("Files")
-                .join("objects")
-                .join(&object.digest[..2])
-                .join(&object.digest);
-            paths::ensure_safe_absolute(&path).map_err(invalid)?;
-            verify(
-                &mut fs::File::open(&path)
-                    .map_err(|_| unavailable("恢复包缺少数据库引用的文件。"))?,
-                &object,
-            )?;
-            cursor = object.digest;
-        }
-    }
-}
-
-pub(in crate::engine) fn export(store: &super::super::store::Store, path: &Path) -> Result<()> {
-    export_with(store, path, |cursor| {
-        Ok(store.connection()?.file_objects(cursor, 200, false)?)
-    })
-}
-pub(in crate::engine) fn export_snapshot(
-    store: &super::super::store::Store,
-    path: &Path,
-    db: &export_doc_storage::Connection,
-) -> Result<()> {
-    export_with(store, path, |cursor| {
-        Ok(db.file_objects(cursor, 200, false)?)
-    })
-}
-fn export_with(
-    store: &super::super::store::Store,
-    path: &Path,
-    mut page: impl FnMut(&str) -> Result<Vec<FileObject>>,
-) -> Result<()> {
-    let mut output_file = fs::OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .open(path)?;
-    let output = store
-        .files
-        .space
-        .at(path.parent().unwrap().to_path_buf())
-        .writer(&mut output_file)?;
-    let mut output = std::io::BufWriter::with_capacity(64 * 1024, output);
-    output.write_all(MAGIC)?;
-    let policy = serde_json::to_vec(&store.files.configuration()?.policy)?;
-    output.write_all(&(policy.len() as u32).to_le_bytes())?;
-    output.write_all(&policy)?;
-    let mut cursor = String::new();
-    loop {
-        let objects = page(&cursor)?;
-        if objects.is_empty() {
-            break;
-        }
-        for object in objects {
-            crate::operation::check()?;
-            let mut file = store.files.open_object(&object)?;
-            output.write_all(object.digest.as_bytes())?;
-            output.write_all(&object.size.to_le_bytes())?;
-            if super::super::backup_io::copy_and_hash(&mut file, &mut output, object.size)?
-                != (object.size, object.digest.clone())
-            {
-                return Err(unavailable("文件对象在备份时发生变化。"));
+use crate::engine::{
+    auth,
+    store::{Actor, Store},
+};
+use serde_json::{Value, json};
+impl FileStore {
+    pub(super) fn restore_archived(
+        &self,
+        object: &FileObject,
+        source: &mut fs::File,
+    ) -> Result<()> {
+        let config = self.object_configuration(object)?;
+        self.check_identity(&config)?;
+        match config.backend {
+            Backend::Local { .. } => {
+                let path = self.object_path(&config, object)?;
+                crate::secrets::private_directory(path.parent().unwrap()).map_err(unavailable)?;
+                paths::atomic_write_with(&path, |output| {
+                    let result: Result<()> = (|| {
+                        let actual = crate::engine::backup_io::copy_and_hash(
+                            source,
+                            &mut self
+                                .space
+                                .at(path.parent().unwrap().into())
+                                .writer(output)?,
+                            object.size,
+                        )?;
+                        if actual != (object.size, object.digest.clone()) {
+                            return Err(unavailable("归档文件恢复摘要不符。"));
+                        }
+                        Ok(())
+                    })();
+                    result.map_err(|e| e.to_string())
+                })
+                .map_err(unavailable)
             }
-            cursor = object.digest;
-        }
-    }
-    output.write_all(&[0; 64])?;
-    output.flush()?;
-    drop(output);
-    output_file.sync_all()?;
-    Ok(())
-}
-pub(in crate::engine) fn restore_archive(
-    archive: &Path,
-    staging: &Path,
-    space: &std::sync::Arc<crate::temporary_space::Budget>,
-) -> Result<()> {
-    read_archive(archive, staging, space, true)
-}
-pub(in crate::engine) fn verify_archive(
-    archive: &Path,
-    staging: &Path,
-    space: &std::sync::Arc<crate::temporary_space::Budget>,
-) -> Result<()> {
-    read_archive(archive, staging, space, false)
-}
-fn read_archive(
-    archive: &Path,
-    staging: &Path,
-    space: &std::sync::Arc<crate::temporary_space::Budget>,
-    extract: bool,
-) -> Result<()> {
-    let mut input = fs::File::open(archive)?;
-    let mut magic = vec![0; MAGIC.len()];
-    input.read_exact(&mut magic)?;
-    if magic != MAGIC {
-        return Err(invalid("文件对象归档格式无效。"));
-    }
-    let mut length = [0; 4];
-    input.read_exact(&mut length)?;
-    let length = u32::from_le_bytes(length) as usize;
-    if length > 16 * 1024 {
-        return Err(invalid("文件策略清单过大。"));
-    }
-    let mut bytes = vec![0; length];
-    input.read_exact(&mut bytes)?;
-    let policy: Policy =
-        serde_json::from_slice(&bytes).map_err(|_| invalid("文件策略清单无效。"))?;
-    policy.validate()?;
-    let root = staging.join("Files");
-    crate::secrets::private_directory(&root).map_err(unavailable)?;
-    let mut previous = String::new();
-    loop {
-        crate::operation::check()?;
-        let mut digest = [0; 64];
-        input.read_exact(&mut digest)?;
-        if digest == [0; 64] {
-            break;
-        }
-        let digest =
-            String::from_utf8(digest.to_vec()).map_err(|_| invalid("文件归档摘要无效。"))?;
-        let mut size = [0; 8];
-        input.read_exact(&mut size)?;
-        let object = FileObject {
-            digest,
-            size: u64::from_le_bytes(size),
-        };
-        validate(&object)?;
-        if object.digest <= previous {
-            return Err(invalid("文件对象清单重复或排序无效。"));
-        }
-        let path = root
-            .join("objects")
-            .join(&object.digest[..2])
-            .join(&object.digest);
-        paths::ensure_safe_absolute(&path).map_err(invalid)?;
-        crate::secrets::private_directory(path.parent().unwrap()).map_err(unavailable)?;
-        if extract {
-            paths::atomic_write_with(&path, |output| {
-                let mut output = space
-                    .at(path.parent().unwrap().to_path_buf())
-                    .writer(output)
-                    .map_err(|e| e.to_string())?;
-                let actual = super::super::backup_io::copy_and_hash(
-                    &mut Read::by_ref(&mut input).take(object.size),
-                    &mut output,
-                    object.size,
-                )
-                .map_err(|e| e.to_string())?;
-                if actual != (object.size, object.digest.clone()) {
-                    return Err("文件对象归档不完整或摘要不符。".into());
-                }
-                Ok(())
-            })
-            .map_err(unavailable)?;
-        } else {
-            verify(&mut fs::File::open(&path)?, &object)?;
-            if super::super::backup_io::copy_and_hash(
-                &mut Read::by_ref(&mut input).take(object.size),
-                &mut std::io::sink(),
+            Backend::S3 { .. } => self.target(&config)?.upload_file(
+                source,
+                &object.digest,
                 object.size,
-            )? != (object.size, object.digest.clone())
-            {
-                return Err(invalid("文件对象归档不完整或摘要不符。"));
+                &object.digest,
+            ),
+        }
+    }
+
+    pub(in crate::engine) fn reject_repository_overlap(&self, target: &Path) -> Result<()> {
+        let config = self.configuration()?;
+        if matches!(config.backend, Backend::Local { .. })
+            && paths::overlaps(&self.local_root(&config)?, target).map_err(invalid)?
+        {
+            return Err(invalid(
+                "恢复仓库不能与生产文件库重叠，请选择独立的登记位置。",
+            ));
+        }
+        for (id, location) in &config.archive_locations {
+            if location.is_none() {
+                continue;
+            }
+            let location = self.object_configuration(&FileObject {
+                digest: "0".repeat(64),
+                size: 1,
+                archive_identity: id.clone(),
+            })?;
+            if paths::overlaps(&self.local_root(&location)?, target).map_err(invalid)? {
+                return Err(invalid("恢复仓库不能与归档文件库重叠。"));
             }
         }
-        previous = object.digest;
+        Ok(())
     }
-    let mut extra = [0];
-    if input.read(&mut extra)? != 0 {
-        return Err(invalid("文件对象归档存在额外数据。"));
-    }
-    if !extract {
-        let config_path = staging.join("Configuration/file-storage.json");
-        paths::ensure_safe_absolute(&config_path).map_err(invalid)?;
-        paths::ensure_safe_absolute(&root.join(".store-id")).map_err(invalid)?;
-        let config: Configuration = serde_json::from_slice(&fs::read(config_path)?)?;
-        if serde_json::to_value(&config.policy)? != serde_json::to_value(&policy)?
-            || fs::read_to_string(root.join(".store-id"))? != config.identity
-            || !matches!(config.backend, Backend::Local { ref directory } if directory == "Files")
-        {
-            return Err(invalid("恢复文件存储配置或身份不匹配。"));
+
+    pub(super) fn object_configuration(&self, object: &FileObject) -> Result<Configuration> {
+        let mut config = self.configuration()?;
+        if object.archive_identity.is_empty() {
+            return Ok(config);
         }
-        return Ok(());
+        let location = config
+            .archive_locations
+            .get(&object.archive_identity)
+            .ok_or_else(|| {
+                unavailable("档案位置未登记，请恢复匹配的文件库配置；未回退到其它目录。")
+            })?
+            .clone();
+        if let Some(location) = location {
+            config.identity = object.archive_identity.clone();
+            config.medium_identity = location.medium_identity;
+            config.backend = Backend::Local {
+                directory: location.directory,
+            };
+        }
+        Ok(config)
     }
-    let identity = paths::nonce().map_err(unavailable)?;
-    paths::atomic_write(&root.join(".store-id"), identity.as_bytes()).map_err(unavailable)?;
-    let config = Configuration {
-        version: 1,
-        revision: 1,
-        credential_revision: 1,
-        identity,
-        backend: Backend::Local {
-            directory: "Files".into(),
-        },
-        policy,
+}
+pub(super) fn run(store: &Store, actor: &Actor, body: &Value) -> Result<(u64, u64)> {
+    let location = body["location"].as_str().unwrap_or("");
+    let base = store
+        .files
+        .roots
+        .get(location)
+        .ok_or_else(|| invalid("请先在部署配置登记归档位置，再选择该位置编号。"))?;
+    paths::ensure_safe_absolute(base).map_err(invalid)?;
+    if !base.is_dir() {
+        return Err(unavailable("归档位置未挂载。请连接原设备后再执行。"));
+    }
+    let mut config = store.files.configuration()?;
+    if body["expectedVersion"] != config.revision {
+        return Err(conflict("文件库配置已变化，请刷新后重新归档。"));
+    }
+    let directory = format!("@{location}/archive-{}", config.identity);
+    let existing = config
+        .archive_locations
+        .iter()
+        .find(|(_, v)| v.as_ref().is_some_and(|v| v.directory == directory))
+        .map(|(k, _)| k.clone());
+    let identity = existing.unwrap_or(paths::nonce().map_err(unavailable)?);
+    if !config.archive_locations.contains_key(&identity) {
+        if config.archive_locations.len() >= 32 {
+            return Err(invalid("归档位置数量已达 32 个，请使用已登记的位置。"));
+        }
+        config.archive_locations.insert(
+            identity.clone(),
+            Some(ArchiveLocation {
+                directory: directory.clone(),
+                medium_identity: paths::volume_identity(base).map_err(unavailable)?,
+            }),
+        );
+    }
+    let archive = config.archive_locations[&identity].as_ref().unwrap();
+    let mut target = config.clone();
+    target.identity = identity.clone();
+    target.backend = Backend::Local {
+        directory: directory.clone(),
     };
-    let config_path = staging.join("Configuration").join("file-storage.json");
-    crate::secrets::private_directory(config_path.parent().unwrap()).map_err(unavailable)?;
-    paths::atomic_write(&config_path, &serde_json::to_vec(&config)?).map_err(unavailable)?;
-    Ok(())
+    target.medium_identity = archive.medium_identity.clone();
+    if let Backend::Local { .. } = config.backend {
+        let source = store.files.local_root(&config)?;
+        if crate::paths::overlaps(&source, base).map_err(invalid)? {
+            return Err(invalid("归档位置不能与生产文件库重叠。"));
+        }
+    }
+    store.files.initialize_target(&target)?;
+    // Persist the registered destination before publishing any database route. Unused registrations are harmless.
+    store.with_writes_paused(|| {
+        let current = store.read(|tx| auth::refresh_actor_in(tx, actor))?;
+        if !current.admin {
+            return Err(crate::engine::error::error(403, "管理员权限已撤销。"));
+        }
+        config.revision += 1;
+        store.files.activate(config.clone())
+    })?;
+    let ids = body["ids"]
+        .as_array()
+        .ok_or_else(|| invalid("请选择需要归档的资料。"))?;
+    if ids.is_empty() || ids.len() > 100 {
+        return Err(invalid("一次选择 1–100 条归档资料。"));
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    let mut count = 0;
+    let mut bytes = 0;
+    for id in ids {
+        crate::operation::check()?;
+        let id = id.as_str().ok_or_else(|| invalid("归档编号无效。"))?;
+        let row = store
+            .read(|tx| tx.retained_file(id).map_err(Into::into))?
+            .ok_or_else(|| conflict("档案引用已变化，请刷新。"))?;
+        if row["activeReferences"].as_u64().unwrap_or(0) != 0 {
+            return Err(invalid(
+                "该文件仍被业务记录使用，请保留在线位置；结束业务引用后再迁移档案。",
+            ));
+        }
+        if row["basisDate"].as_str().unwrap_or("").is_empty() {
+            return Err(invalid("请先确认所选资料的档案类别和归档日期。"));
+        }
+        let object = FileObject {
+            digest: row["digest"].as_str().unwrap_or("").into(),
+            size: row["size"].as_u64().unwrap_or(0),
+            archive_identity: row["archiveIdentity"].as_str().unwrap_or("").into(),
+        };
+        if !seen.insert(object.digest.clone()) {
+            continue;
+        }
+        let source = store.files.object_configuration(&object)?;
+        store.files.copy_object(&target, &object)?;
+        store.files.check_identity(&target)?;
+        let _archive_write = store
+            .files
+            .archive_access
+            .write(std::time::Duration::from_secs(30))?;
+        store.transaction_as(actor, |tx, actor| {
+            if !actor.admin {
+                return Err(crate::engine::error::error(403, "管理员权限已撤销。"));
+            }
+            if tx.retained_file(id)?.as_ref() != Some(&row) {
+                return Err(conflict("复制期间档案记录已变化，源文件保留，请重新归档。"));
+            }
+            tx.archive_file(&identity, &object.digest)?;
+            tx.append_audit_details(
+                &export_doc_storage::AuditWrite {
+                    kind: "file-archive",
+                    record_id: row["recordId"].as_i64().unwrap_or(0),
+                    version: config.revision as i64,
+                    action: "archive",
+                    actor_id: actor.id,
+                    occurred_at: &crate::engine::store::timestamp(),
+                    note: "",
+                },
+                &json!({"digest":object.digest,"location":location,"reason":body["reason"]}),
+            )?;
+            Ok(())
+        })?;
+        // The verified target is authoritative before releasing source space. On interruption both copies remain valid.
+        if source.identity != target.identity {
+            store.files.remove_object(&source, &object)?;
+        }
+        count += 1;
+        bytes += object.size;
+    }
+    Ok((count, bytes))
 }

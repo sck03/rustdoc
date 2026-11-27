@@ -195,11 +195,11 @@ assert(!isRouteAccessAllowed({pathname:"/system/organization",user:personnelUser
 assert(navigation.searchWorkspaceNavGroups("部门",navigation.filterWorkspaceNavGroups(fullDesktopUser.capabilities)).some(group=>group.items.some(item=>item.to==="/system/organization")));
 assert(!isRouteAccessAllowed({pathname:"/invoices",user:fullDesktopUser,canManageSystem:true,isDesktopRuntime:true}));
 assert.equal(office.officeRequestActions({...row,status:"Approved"},fullDesktopUser,"rooms").find(item=>item.action==='cancel').label,"取消申请");
-const supplyRow = {companyScope:"C1",id:8,officeSupplyId:2,ownerUserId:2,status:"Approved",handlingKey:"daily",canHandle:false,isReturnable:false};
+const supplyRow = {companyScope:"C1",id:8,officeSupplyId:2,ownerUserId:2,status:"Approved",serviceId:"daily",canHandle:false,isReturnable:false};
 assert(!office.officeRequestActions(supplyRow,manager,"supplies").some(entry=>entry.action==="issue"),"company permission cannot bypass an explicit custodian");
 assert(office.officeRequestActions({...supplyRow,canHandle:true},user,"supplies").some(entry=>entry.action==="issue"),"a designated custodian can issue outside ordinary own scope");
 assert(!office.officeRequestActions({...supplyRow,status:"Issued",canHandle:true},manager,"supplies").some(entry=>entry.action==="return"),"consumable issue is terminal and offers no return action");
-const assignedRoom = { ...row, status: "Approved", handlingKey: "meeting", canHandle: true };
+const assignedRoom = { ...row, status: "Approved", serviceId: "meeting", canHandle: true };
 assert.equal(communication.notificationLink({ requestKind: "bookings", requestId: 7 }), "/office/meeting-rooms?view=requests&requestId=7");
 assert(office.officeRequestActions(assignedRoom, user, "rooms").some(entry => entry.action === "issue"));
 assert(!office.officeRequestActions({ ...assignedRoom, canHandle: false }, manager, "rooms").some(entry => entry.action === "issue"));

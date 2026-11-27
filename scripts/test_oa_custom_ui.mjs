@@ -76,12 +76,13 @@ await withOfficeUi('oa-custom-ui', async ({ output, url, operations, invoke, ope
     await scope.getByLabel('品名', { exact: true }).fill('展会样品 A');
     await scope.getByLabel('数量', { exact: true }).fill('2.5');
   }
-  await publishDefinitionInUi(admin, definition, '样品申请人', operations, async dialog => {
+  const publication = await publishDefinitionInUi(admin, definition, '样品申请人', operations, async dialog => {
     await dialog.getByLabel('客户名称', { exact: true }).fill('仿真客户');
     await dialog.getByLabel('运费（CNY）', { exact: true }).fill('25.50');
-    await dialog.getByLabel('类别代码', { exact: true }).fill('Other');
+    assert.equal(await dialog.getByLabel(/^(类别代码|申请类别)$/u).count(), 0);
     await sampleLine(dialog);
   });
+  assert.equal(publication.request().postDataJSON().samples[0].category, 'Other');
   const staff = await openPage(applicant.user.username, password);
   await staff.goto(`${url}/#/office/approvals?view=start`);
   const card = staff.locator('article').filter({ has: staff.getByRole('heading', { name: '样品寄送', exact: true }) });
@@ -100,6 +101,7 @@ await withOfficeUi('oa-custom-ui', async ({ output, url, operations, invoke, ope
   const response = await created; assert.equal(response.status(), 200, await response.text());
   const row = await response.json();
   assert.equal(row.definitionKey, key);
+  assert.equal(row.category, 'Other');
   await dialog.waitFor({ state: 'hidden' });
   await staff.getByRole('button', { name: '编辑草稿', exact: true }).click();
   const edited = staff.getByRole('dialog');

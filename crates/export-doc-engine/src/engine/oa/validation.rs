@@ -108,11 +108,13 @@ pub(super) fn fields(meta: &Value, body: &Value, today: chrono::NaiveDate) -> Re
                 }
             }
             let category = text(body, "category");
-            if !["Seal", "Certificate", "IT", "Repair", "Other"].contains(&category.as_str()) {
+            if export_doc_contracts::native_contract::general_categories::label(&category).is_none()
+            {
                 return Err(invalid("请选择通用申请类别。"));
             }
             row["category"] = json!(category);
-            row["handlingKey"] = json!(text(body, "handlingKey"));
+            row["serviceId"] = json!(text(body, "serviceId"));
+            row["serviceRevision"] = json!(body["serviceRevision"].as_i64().unwrap_or(0));
         }
         _ => return Err(invalid("未知申请类型。")),
     }

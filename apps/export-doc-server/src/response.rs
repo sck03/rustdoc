@@ -7,7 +7,6 @@ use axum::{
 use export_doc_contracts::{contracts, generated_api::Operation};
 use export_doc_engine::api::ApiError;
 use export_doc_engine::engine::tasks::FileOutput;
-use serde_json::json;
 mod range;
 #[cfg(test)]
 mod resource_tests;
@@ -69,21 +68,20 @@ impl Reply {
 }
 
 pub fn error(error: ApiError) -> Response<Body> {
+    error_with_id(
+        error,
+        &export_doc_engine::paths::nonce().unwrap_or_else(|_| "unavailable".into()),
+    )
+}
+
+pub fn error_with_id(error: ApiError, request_id: &str) -> Response<Body> {
     let status = StatusCode::from_u16(error.status.unwrap_or(503))
         .unwrap_or(StatusCode::SERVICE_UNAVAILABLE);
-    let message = if status.is_server_error()
-        && status != StatusCode::NOT_IMPLEMENTED
-        && status != StatusCode::GATEWAY_TIMEOUT
-    {
-        "服务依赖暂不可用，请稍后重试或联系管理员。".to_owned()
-    } else {
-        error.message
-    };
-    let mut body = json!({"message":message});
-    if let Some(code) = error.code {
-        body["code"] = json!(code.as_str());
-    }
+    let body = error.public_body(request_id);
     let mut response = (status, Json(body)).into_response();
+    if let Ok(value) = request_id.parse() {
+        response.headers_mut().insert("x-request-id", value);
+    }
     response
         .headers_mut()
         .insert(header::CACHE_CONTROL, "no-store".parse().unwrap());
@@ -105,6 +103,7 @@ mod error_tests {
             message: "记录版本已变化。".into(),
             code: Some(ErrorCode::ConcurrencyConflict),
             diagnostic: Some("private-test-category"),
+            ..Default::default()
         });
         assert_eq!(response.status().as_u16(), 409);
         let bytes = axum::body::to_bytes(response.into_body(), 4096)

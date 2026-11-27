@@ -341,6 +341,7 @@ pub(super) fn map_contexts(
                 }
                 "departmentId" => base.department.clone(),
                 "category" => base.category.clone(),
+                "serviceId" => base.service_id.clone(),
                 "personnelChange.action" => base.personnel_action.clone(),
                 "isReturnable" => base.returnable.clone(),
                 _ => {
@@ -366,6 +367,7 @@ pub(super) fn map_contexts(
                 ContextField::Currency => context.currency = value,
                 ContextField::Department => context.department = value,
                 ContextField::Category => context.category = value,
+                ContextField::ServiceId => context.service_id = value,
                 ContextField::PersonnelAction => context.personnel_action = value,
                 ContextField::Returnable => {
                     if !["true", "false"].contains(&value.as_str()) {

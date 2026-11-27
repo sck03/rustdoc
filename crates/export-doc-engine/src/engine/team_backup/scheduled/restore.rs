@@ -1,4 +1,3 @@
-//! Select an owned archive by ID; no browser round trip and no arbitrary server path.
 use super::*;
 pub(in crate::engine) fn stage_restore(
     service: &NativeService,
@@ -12,6 +11,7 @@ pub(in crate::engine) fn stage_restore(
         body,
     )
     .map_err(invalid)?;
+    super::super::repository::valid_id(id)?;
     let pg = service.provider()? == "PostgreSQL";
     if body["confirmationText"] != if pg { "MIGRATE" } else { "RECOVER" } {
         return Err(invalid("恢复确认文本不匹配。"));
@@ -26,59 +26,48 @@ pub(in crate::engine) fn stage_restore(
     }
     let password = zeroize::Zeroizing::new(body["password"].as_str().unwrap_or("").to_owned());
     validate_package_password(&password)?;
-    let archive = repository::read(&service.paths, id)?;
-    if archive.deleting {
-        return Err(error(404, "此备份已清理。"));
-    }
-    let (store, paths, owner) = (service.store.clone(), service.paths.clone(), actor.id);
+    let options = body.clone();
+    let (store, paths, protector, owner, id, saved) = (
+        service.store.clone(),
+        service.paths.clone(),
+        service.protector.clone(),
+        actor.id,
+        id.to_owned(),
+        load(&service.store)?,
+    );
     service.jobs.start_backup(
         actor,
         STAGE_RECOVERY_ARCHIVE_RESTORE,
         "RecoveryArchiveRestore",
-        "验证并暂存完整恢复",
+        "核验恢复点与目标文件库",
         move |_| {
-            let actor = auth::current_actor(&store, owner)?;
-            administrator(&actor)?;
-            let _gate = package::lock(&paths)?;
+            administrator(&auth::current_actor(&store, owner)?)?;
+            let gate = package::lock(&paths)?;
             if pg {
                 postgres::ensure_no_pending(&paths)?;
             }
-            let source = repository::root(&paths).join(&archive.file_name);
-            if crate::engine::backup_io::digest_file(&source)?
-                != (archive.size_bytes, archive.sha256)
-            {
-                return Err(unavailable("备份文件已变化，已拒绝恢复。"));
+            let repo = points::open(&store, &paths, &protector, &saved, &password, false)?;
+            let point = repo.commit(&id)?;
+            if (point.provider == "PostgreSQL") != pg {
+                return Err(invalid("恢复点与当前数据库类型不匹配。"));
             }
-            let prepared = package::prepare(
-                &paths.disk_space,
-                &if pg {
-                    migration::marker_path(&paths)?
-                } else {
-                    disaster::marker(&paths)?
-                },
-                if pg {
-                    migration::MAGIC
-                } else {
-                    disaster::MAGIC
-                },
-                &password,
-                fs::File::open(&source)?,
-                if pg {
-                    package::POSTGRES
-                } else {
-                    package::SQLITE
-                },
-            )?;
+            let marker = if pg {
+                migration::marker_path(&paths)?
+            } else {
+                disaster::marker(&paths)?
+            };
+            let prepared =
+                super::super::repository::restore::prepare(&paths, &repo, &id, &marker, &options)?;
             if pg {
                 prepared.verify_postgres(&paths)?;
             }
             Ok(prepared.into_task(
-                _gate,
-                "stage-recovery-archive",
+                gate,
+                "stage-recovery-point",
                 if pg {
-                    "完整恢复已暂存。请停止应用，执行 --restore-pending 维护命令后启动。"
+                    "恢复点与目标文件库已核验。请停止业务服务，在维护模式完成数据库与配置切换。"
                 } else {
-                    "完整恢复已暂存。请退出并重新打开桌面程序。"
+                    "恢复点已核验并暂存，请退出并重新打开桌面程序完成恢复。"
                 },
             ))
         },

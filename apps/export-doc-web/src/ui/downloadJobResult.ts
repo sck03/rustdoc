@@ -1,4 +1,5 @@
 import { ApiDownloadTicket, BackgroundJobSnapshot, ExportDocManagerApiClient } from "../api/index.ts";
+import { formatErrorResponse } from "./formUtils.ts";
 import { startBrowserDownload } from "./downloadBlob.ts";
 import { queryRetryDelay, shouldRetryQueryFailure } from "../api/queryRetryPolicy.ts";
 
@@ -85,7 +86,7 @@ export async function waitForJobCompletion(
 
   throwIfAborted(signal);
   if (job.status.toLowerCase() !== "succeeded") {
-    throw new Error(job.errorMessage || job.detailText || "后台任务执行失败。");
+    throw new Error(job.failure ? formatErrorResponse(job.failure) : job.errorMessage || job.detailText || "后台任务执行失败。");
   }
 
   return job;

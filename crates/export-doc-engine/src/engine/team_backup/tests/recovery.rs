@@ -47,7 +47,7 @@ fn disaster_package_download_restore_and_restart_preserve_data_keys_and_template
         .download(&admin(), created["jobId"].as_str().unwrap())
         .unwrap();
     assert!(!output.content.is_empty());
-    assert!(output.content.starts_with(b"EDM-DISASTER-RECOVERY-2"));
+    assert!(output.content.starts_with(b"EDM-RECOVERY-POINT-1\n"));
     let path = paths
         .data_root
         .join("DisasterRecovery")
@@ -131,6 +131,7 @@ fn staged_package_rejects_path_traversal_before_reading_external_files() {
     fs::write(&marker, br#"{"stagingDirectoryName":"../../escape"}"#).unwrap();
     assert!(
         package::staged(
+            &RuntimePaths::server(&workspace.0, &workspace.0.join("Data")).unwrap(),
             &marker,
             package::SQLITE,
             &std::sync::Arc::new(crate::temporary_space::Budget::new(workspace.0.clone()))

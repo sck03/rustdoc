@@ -1,4 +1,5 @@
 import type { BackgroundJobSnapshot } from "../../api/index.ts";
+import { formatErrorResponse } from "../../ui/formUtils.ts";
 import { formatPlainNumber } from "../../ui/formUtils.ts";
 
 export const jobStatusOptions = [
@@ -77,6 +78,7 @@ export function formatProgress(value?: number | null) {
 }
 
 export function readJobMessage(job: BackgroundJobSnapshot) {
+  if(job.failure) return formatErrorResponse(job.failure);
   return job.errorMessage || job.detailText || job.statusText || "-";
 }
 
