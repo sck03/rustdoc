@@ -93,6 +93,12 @@ impl FileStore {
     }
 }
 pub(super) fn run(store: &Store, actor: &Actor, body: &Value) -> Result<(u64, u64)> {
+    let ids = body["ids"]
+        .as_array()
+        .ok_or_else(|| invalid("请选择需要归档的资料。"))?;
+    if ids.is_empty() || ids.len() > 100 {
+        return Err(invalid("一次选择 1–100 条归档资料。"));
+    }
     let location = body["location"].as_str().unwrap_or("");
     let base = store
         .files
@@ -149,72 +155,85 @@ pub(super) fn run(store: &Store, actor: &Actor, body: &Value) -> Result<(u64, u6
         config.revision += 1;
         store.files.activate(config.clone())
     })?;
-    let ids = body["ids"]
-        .as_array()
-        .ok_or_else(|| invalid("请选择需要归档的资料。"))?;
-    if ids.is_empty() || ids.len() > 100 {
-        return Err(invalid("一次选择 1–100 条归档资料。"));
-    }
     let mut seen = std::collections::BTreeSet::new();
     let mut count = 0;
     let mut bytes = 0;
-    for id in ids {
-        crate::operation::check()?;
-        let id = id.as_str().ok_or_else(|| invalid("归档编号无效。"))?;
-        let row = store
-            .read(|tx| tx.retained_file(id).map_err(Into::into))?
-            .ok_or_else(|| conflict("档案引用已变化，请刷新。"))?;
-        if row["activeReferences"].as_u64().unwrap_or(0) != 0 {
-            return Err(invalid(
-                "该文件仍被业务记录使用，请保留在线位置；结束业务引用后再迁移档案。",
-            ));
-        }
-        if row["basisDate"].as_str().unwrap_or("").is_empty() {
-            return Err(invalid("请先确认所选资料的档案类别和归档日期。"));
-        }
-        let object = FileObject {
-            digest: row["digest"].as_str().unwrap_or("").into(),
-            size: row["size"].as_u64().unwrap_or(0),
-            archive_identity: row["archiveIdentity"].as_str().unwrap_or("").into(),
-        };
-        if !seen.insert(object.digest.clone()) {
-            continue;
-        }
-        let source = store.files.object_configuration(&object)?;
-        store.files.copy_object(&target, &object)?;
-        store.files.check_identity(&target)?;
-        let _archive_write = store
-            .files
-            .archive_access
-            .write(std::time::Duration::from_secs(30))?;
-        store.transaction_as(actor, |tx, actor| {
-            if !actor.admin {
-                return Err(crate::engine::error::error(403, "管理员权限已撤销。"));
+    let result: Result<()> = (|| {
+        for id in ids {
+            crate::operation::check()?;
+            let id = id.as_str().ok_or_else(|| invalid("归档编号无效。"))?;
+            let row = store
+                .read(|tx| tx.retained_file(id).map_err(Into::into))?
+                .ok_or_else(|| conflict("档案引用已变化，请刷新。"))?;
+            if row["activeReferences"].as_u64().unwrap_or(0) != 0 {
+                return Err(invalid(
+                    "该文件仍被业务记录使用，请保留在线位置；结束业务引用后再迁移档案。",
+                ));
             }
-            if tx.retained_file(id)?.as_ref() != Some(&row) {
-                return Err(conflict("复制期间档案记录已变化，源文件保留，请重新归档。"));
+            if row["basisDate"].as_str().unwrap_or("").is_empty() {
+                return Err(invalid("请先确认所选资料的档案类别和归档日期。"));
             }
-            tx.archive_file(&identity, &object.digest)?;
-            tx.append_audit_details(
-                &export_doc_storage::AuditWrite {
-                    kind: "file-archive",
-                    record_id: row["recordId"].as_i64().unwrap_or(0),
-                    version: config.revision as i64,
-                    action: "archive",
-                    actor_id: actor.id,
-                    occurred_at: &crate::engine::store::timestamp(),
-                    note: "",
-                },
-                &json!({"digest":object.digest,"location":location,"reason":body["reason"]}),
-            )?;
-            Ok(())
-        })?;
-        // The verified target is authoritative before releasing source space. On interruption both copies remain valid.
-        if source.identity != target.identity {
-            store.files.remove_object(&source, &object)?;
+            let object = FileObject {
+                digest: row["digest"].as_str().unwrap_or("").into(),
+                size: row["size"].as_u64().unwrap_or(0),
+                archive_identity: row["archiveIdentity"].as_str().unwrap_or("").into(),
+            };
+            if !seen.insert(object.digest.clone()) {
+                continue;
+            }
+            let source = store.files.object_configuration(&object)?;
+            store.files.copy_object(&target, &object)?;
+            store.files.check_identity(&target)?;
+            let _archive_write = store
+                .files
+                .archive_access
+                .write(std::time::Duration::from_secs(30))?;
+            let cleanup = if source.identity != target.identity {
+                Some(store.files.begin_archive_cleanup(&source, &object)?)
+            } else {
+                None
+            };
+            store.transaction_as(actor, |tx, actor| {
+                if !actor.admin {
+                    return Err(crate::engine::error::error(403, "管理员权限已撤销。"));
+                }
+                if tx.retained_file(id)?.as_ref() != Some(&row) {
+                    return Err(conflict("复制期间档案记录已变化，源文件保留，请重新归档。"));
+                }
+                tx.archive_file(&identity, &object.digest)?;
+                tx.append_audit_details(
+                    &export_doc_storage::AuditWrite {
+                        kind: "file-archive",
+                        record_id: row["recordId"].as_i64().unwrap_or(0),
+                        version: config.revision as i64,
+                        action: "archive",
+                        actor_id: actor.id,
+                        occurred_at: &crate::engine::store::timestamp(),
+                        note: "",
+                    },
+                    &json!({"digest":object.digest,"location":location,"reason":body["reason"]}),
+                )?;
+                Ok(())
+            })?;
+            count += 1;
+            bytes += object.size;
+            // The journal predates the SQL switch and survives failed/unknown commits.
+            if let Some(cleanup) = cleanup {
+                store.files.finish_archive_cleanup(store, &cleanup.path)?;
+            }
         }
-        count += 1;
-        bytes += object.size;
+        Ok(())
+    })();
+    if let Err(mut cause) = result {
+        // Registration also persists a configuration revision even if no file moved.
+        cause.partially_committed = true;
+        let public = cause.public_body("");
+        cause.message = format!(
+            "归档已切换 {count} 个对象、{bytes} 字节；文件库配置已登记。后续阶段失败：{} 请刷新档案和文件库配置核对结果；待清理旧副本已保留记录，可在文件存储中执行回收完成清理。",
+            public["message"].as_str().unwrap_or("请查询任务回执。")
+        );
+        cause.code = Some(crate::api::ErrorCode::PartialCommit);
+        return Err(cause);
     }
     Ok((count, bytes))
 }

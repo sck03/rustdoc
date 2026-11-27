@@ -12,6 +12,7 @@ import { WorkflowProjectPicker } from "./WorkflowProjectPicker.tsx";
 import { OaFormFields } from "./OaFormFields.tsx";
 import { defaultGeneralCategory, workflowCategoryField } from "./oaCategories.ts";
 import { HandlingServicePicker } from "./HandlingServicePicker.tsx";
+import { addPublicationSample } from "./simulationSamples.ts";
 
 export function ApprovalSimulationDialog({client,user,rule,onClose,onPublish,busy=false,error=""}:{client:ExportDocManagerApiClient;user:ApiUserDto;rule:OaApprovalRule;onClose:()=>void;onPublish?:(samples:OaSimulationSample[],activateAt?:string)=>Promise<void>;busy?:boolean;error?:string}) {
   const operation=useOfficeOperation([],false);
@@ -53,7 +54,7 @@ export function ApprovalSimulationDialog({client,user,rule,onClose,onPublish,bus
         {rule.kind==="supply"&&<label className="checkbox-field"><input type="checkbox" checked={isReturnable} onChange={e=>{setReturnable(e.target.checked);setResult(null);}}/>模拟借用并归还</label>}
       </fieldset><OfficeSubmit busy={busy||operation.busy||!applicant} label="解析模拟路线"/>
     </form>
-    {result&&<><OaApprovalSteps plan={result.approvalPlan} notes={result.notes} user={user}/>{onPublish&&<Button type="button" variant="primary" disabled={busy||operation.busy||samples.length>=20} onClick={()=>{if(submitted&&!samples.some(s=>JSON.stringify(s.sample)===JSON.stringify(submitted)))setSamples(current=>[...current,{sample:{...submitted,catalogRevision:result.catalogRevision},name:applicant!.name}]);}}>保留此发布样例</Button>}</>}
+    {result&&<><OaApprovalSteps plan={result.approvalPlan} notes={result.notes} user={user}/>{onPublish&&<Button type="button" variant="primary" disabled={busy||operation.busy||samples.length>=20} onClick={()=>{if(submitted)setSamples(current=>addPublicationSample(current,submitted,applicant!.name,result.catalogRevision));}}>保留此发布样例</Button>}</>}
     {onPublish&&<form onSubmit={e=>{e.preventDefault();if(!samples.length)return;try{const at=timed?businessDateTimeLocalInputToIso(activateAt,user.businessTimeZone):undefined;if(timed&&!at)return;void onPublish(samples.map(s=>s.sample),at??undefined);}catch(cause){const input=e.currentTarget.querySelector<HTMLInputElement>('input[type="datetime-local"]');input?.setCustomValidity(readApiError(cause));input?.reportValidity();}}}>
       <fieldset disabled={busy||operation.busy}><legend>发布样例（{samples.length}／20）</legend><p>至少保留一个已通过的样例；建议覆盖默认分支、金额边界与不同申请任职。</p><ul>{samples.map((entry, i) => <li key={i}>
         {entry.name}

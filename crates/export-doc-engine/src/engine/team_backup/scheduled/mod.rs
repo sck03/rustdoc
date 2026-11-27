@@ -131,6 +131,7 @@ pub(in crate::engine) fn test_replica(service: &NativeService, actor: &Actor) ->
                 .map_err(unavailable)?;
             let _repository = points::open(&store, &paths, &protector, &saved, &password, true)?;
             Ok(tasks::TaskOutput {
+                committed: true,
                 file: None,
                 managed_file: None,
                 destination: None,

@@ -21,6 +21,12 @@ struct Selection {
     repository: Repository,
     plan: Option<Plan>,
 }
+struct BusyReset<'a>(&'a AtomicBool);
+impl Drop for BusyReset<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Release);
+    }
+}
 pub struct RecoveryMaintenance {
     paths: RuntimePaths,
     #[cfg(feature = "postgres")]
@@ -69,17 +75,13 @@ impl RecoveryMaintenance {
             let lease =
                 export_doc_storage::PostgresMaintenanceLease::acquire(&maintenance, &owner)?;
             let state_path = directory.join("maintenance-state.json");
-            let state = if state_path.try_exists()? {
-                let mut state = super::scratch::read_json(&state_path)?;
-                if state["state"] != "Completed" {
-                    state["state"] = json!("Interrupted");
-                    state["message"] =
-                        json!("存在上次维护记录，请重新解锁仓库并核验；已暂存的恢复可继续完成。");
-                }
-                state
-            } else {
-                json!({"state":"Locked","message":"请先停止并隔离旧业务实例，再解锁恢复仓库。","planId":"","points":[]})
-            };
+            let previous = state_path
+                .try_exists()?
+                .then(|| super::scratch::read_json(&state_path))
+                .transpose()?;
+            let pending =
+                migration::marker_path(&paths)?.try_exists()? || postgres::has_pending(&paths)?;
+            let state = super::maintenance_state::reopen(previous.as_ref(), pending);
             paths::atomic_write(
                 &paths
                     .data_root
@@ -87,6 +89,7 @@ impl RecoveryMaintenance {
                 b"{\"state\":\"Maintenance\"}",
             )
             .map_err(unavailable)?;
+            paths::atomic_write(&state_path, &serde_json::to_vec(&state)?).map_err(unavailable)?;
             Ok(Arc::new(Self {
                 paths,
                 maintenance: zeroize::Zeroizing::new(maintenance),
@@ -109,6 +112,7 @@ impl RecoveryMaintenance {
             .lock()
             .map_err(|_| unavailable("维护状态锁不可用。"))?
             .clone();
+        state["busy"] = json!(self.busy.load(Ordering::Acquire));
         state["locations"] = json!(
             self.paths
                 .file_storage_roots
@@ -148,11 +152,26 @@ impl RecoveryMaintenance {
         if self.busy.swap(true, Ordering::AcqRel) {
             return Err(error(429, "已有维护任务正在运行，请等待或取消。"));
         }
-        let previous = self
+        let reset = BusyReset(&self.busy);
+        let terminal = {
+            let state = self
+                .state
+                .lock()
+                .map_err(|_| unavailable("维护状态锁不可用。"))?;
+            super::maintenance_state::finished(&state)
+                .then(|| state["state"].as_str().unwrap().to_owned())
+        };
+        if operation != "DiscardRecoveryArtifacts" && terminal.is_some() {
+            return Err(error(
+                409,
+                "本次维护已结束。如需再次恢复，请重新启动维护服务。",
+            ));
+        }
+        let mut worker_slot = self
             .worker
             .lock()
-            .map_err(|_| unavailable("维护线程状态不可用。"))?
-            .take();
+            .map_err(|_| unavailable("维护线程状态不可用。"))?;
+        let previous = worker_slot.take();
         if let Some(previous) = previous {
             let _ = previous.join();
         }
@@ -161,8 +180,9 @@ impl RecoveryMaintenance {
             .scope
             .lock()
             .map_err(|_| unavailable("维护取消状态不可用。"))? = Some(scope.clone());
-        if let Err(cause) = self.state("Preparing", "正在核验维护请求。", "") {
-            self.busy.store(false, Ordering::Release);
+        if operation != "DiscardRecoveryArtifacts"
+            && let Err(cause) = self.state("Preparing", "正在核验维护请求。", "")
+        {
             return Err(cause);
         }
         let service = self.clone();
@@ -188,18 +208,14 @@ impl RecoveryMaintenance {
                     let public =
                         cause.public_body(&paths::nonce().unwrap_or_else(|_| "maintenance".into()));
                     let _ = service.state(
-                        "Failed",
+                        terminal.as_deref().unwrap_or("Failed"),
                         public["message"]
                             .as_str()
                             .unwrap_or("维护失败，请查询追踪编号。"),
                         "",
                     );
                     if let Ok(mut state) = service.state.lock() {
-                        state["failure"] =
-                            serde_json::to_value(cause.public_body(
-                                &paths::nonce().unwrap_or_else(|_| "maintenance".into()),
-                            ))
-                            .unwrap_or_default();
+                        state["failure"] = public;
                         let _ = paths::atomic_write(
                             &service
                                 .paths
@@ -216,13 +232,11 @@ impl RecoveryMaintenance {
             });
         match spawned {
             Ok(worker) => {
-                *self
-                    .worker
-                    .lock()
-                    .map_err(|_| unavailable("维护线程状态不可用。"))? = Some(worker)
+                *worker_slot = Some(worker);
+                // The worker now owns the busy lifecycle.
+                std::mem::forget(reset);
             }
             Err(_) => {
-                self.busy.store(false, Ordering::Release);
                 return Err(unavailable("无法启动维护任务线程。"));
             }
         }
@@ -526,12 +540,20 @@ impl RecoveryMaintenance {
             ));
         }
         super::maintenance_artifacts::discard(&self.paths, &body)?;
-        self.state("Idle", "未发布的恢复工件已清理，可以重新预检恢复点。", "")
+        let state = self.status()?;
+        let name = if super::maintenance_state::finished(&state) {
+            state["state"].as_str().unwrap()
+        } else {
+            "Idle"
+        };
+        self.state(name, "未发布的恢复工件已清理。", "")
     }
     pub fn abandon(&self) -> Result<Value> {
-        if self.busy.load(Ordering::Acquire)
-            || migration::marker_path(&self.paths)?.try_exists()?
-            || postgres::has_pending(&self.paths)?
+        if self.busy.swap(true, Ordering::AcqRel) {
+            return Err(error(409, "已有维护任务正在运行，请等待结束后再放弃维护。"));
+        }
+        let _reset = BusyReset(&self.busy);
+        if migration::marker_path(&self.paths)?.try_exists()? || postgres::has_pending(&self.paths)?
         {
             return Err(error(
                 409,

@@ -45,6 +45,7 @@ export const queryKeys = {
   jobs: (pageNumber: number, pageSize: number, keyword: string, status: string) =>
     ["jobs", { pageNumber, pageSize, keyword, status }] as const,
   jobsRoot: () => ["jobs"] as const,
+  job: (id: string) => ["jobs", "detail", id] as const,
   containerPackingProjects: () => ["tools", "container-packing", "projects"] as const,
   containerPackingContainerTypes: () => ["tools", "container-packing", "container-types"] as const,
   customOptions: (optionType: string) => ["custom-options", optionType] as const,

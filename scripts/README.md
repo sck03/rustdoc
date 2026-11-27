@@ -1,5 +1,7 @@
 # 脚本使用说明
 
+2026-11-28 存储恢复专项：`npm --prefix apps/export-doc-web run test:storage-governance-lifecycle` 检查任务查询恢复、跨面板刷新、取消作用域、档案复核明细、样例去重和结构化错误。`test-native-postgres.ps1 -PostgresBin <PostgreSQL18的bin目录> -Scope StorageRecovery` 仅运行档案存储实库合同及独立维护网页的真实 Cookie/CSRF、刷新恢复和终态重开验证；需要已构建 Web。完整 workspace 与全灾难恢复验收不在该专项范围，详见[实施记录](../docs/archive/2026-11/2026-11-28存储恢复稳定性与清理.md)。
+
 2026-11-27：schema 19、OA 批量部署与独立灾备维护已实现。本批按用户要求仅做必要专项，不执行完整 workspace 测试；证据见[本批记录](../docs/archive/2026-11/2026-11-27通用申请与存储灾备重构.md)。
 
 2026-11-26 组织删除／账号单位菜单专项：`cargo test --locked -p export-doc-engine --test organization_deletion` 验证管理员迁出后默认组织可删除；`cargo test --locked -p export-doc-storage --test organization_references` 验证真实层级、人员历史、账号和业务引用保护。真实 PostgreSQL 使用 `test-native-postgres.ps1 -PostgresBin <PostgreSQL18的bin目录> -Scope Organization`，只执行同一引用契约。前端执行 `test_account_menu_ui.mjs`、`test_unit_identity_ui.mjs`，复用 `lib/unit-context-ui.mjs` 操作账号菜单中的单位单选项；中文草稿保护在账号菜单专项通过真实内联编辑器验证。真实 HTTP 夹具构建后复制到仓库 `.codex-runtime` 并通过 `EXPORTDOC_OFFICE_REVIEW_BINARY` 指定，避免与后续 Cargo 编译共用运行中的程序文件。验证边界见[本批记录](../docs/archive/2026-11/2026-11-26组织删除与账号单位菜单.md)。

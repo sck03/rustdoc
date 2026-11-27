@@ -1,30 +1,29 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import type { ApiRepositoryMaintenanceRequest, ExportDocManagerApiClient } from "../../api/index.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { CollapsibleSection } from "../../ui/primitives/Card.tsx";
 import { TextField } from "../../ui/FormFields.tsx";
 import { Button } from "../../ui/Button.tsx";
-import { readApiError } from "../../ui/formUtils.ts";
-import { isTerminalJob, readJobMessage } from "../jobs/jobPresentation.ts";
+import { readJobMessage } from "../jobs/jobPresentation.ts";
+import { JobTrackingRecovery } from "../jobs/JobTrackingRecovery.tsx";
+import { useRecoveryRepository } from "./useRecoveryRepository.ts";
 import { ViewJobButton } from "../jobs/ViewJobButton.tsx";
 import { formatBytes, formatRuntimeDate } from "./settingsFormatters.ts";
 export function RecoveryRepositoryPanel({ client, disabled }: { client: ExportDocManagerApiClient; disabled: boolean }) {
-  const [jobId, setJobId] = useState("");
-  const [error, setError] = useState("");
-  const [pending, setPending] = useState(false);
+  const c = useRecoveryRepository(client);
+  const { tracking, error } = c;
+  const { jobId, job } = tracking;
   const [pointId, setPointId] = useState("");
   const [reason, setReason] = useState("");
   const [password, setPassword] = useState("");
   const [isolated, setIsolated] = useState(false);
-  const status = useQuery({ queryKey: ["recovery-repository-maintenance"], queryFn: ({ signal }) => client.getRecoveryRepositoryMaintenance({ signal }) });
-  const job = useQuery({ queryKey: ["recovery-repository-job", jobId], enabled: Boolean(jobId), queryFn: ({ signal }) => client.getJob({ jobId }, { signal }), refetchInterval: q => isTerminalJob(q.state.data?.status) ? false : 2000 });
-  useEffect(() => { if (isTerminalJob(job.data?.status)) void status.refetch(); }, [job.data?.status]);
-  const busy = disabled || pending || Boolean(jobId && !isTerminalJob(job.data?.status));
-  const start = async (body: ApiRepositoryMaintenanceRequest) => { setPending(true); setError(""); try { const result = await client.maintainRecoveryRepository({ body }); setJobId(result.jobId); setPassword(""); } catch (cause) { setError(readApiError(cause)); } finally { setPending(false); } };
-  const data = status.data;
+  useEffect(() => { setPassword(""); setPointId(""); setReason(""); setIsolated(false); }, [client]);
+  const busy = disabled || c.busy;
+  const start = async (body: ApiRepositoryMaintenanceRequest) => { if (await c.start(body)) setPassword(""); };
+  const data = c.status.data;
   return <CollapsibleSection title="仓库核验与保留" error={Boolean(error)}>
-    {error && <InlineNotice tone="error">{error}</InlineNotice>}{status.isError && <InlineNotice tone="error">{readApiError(status.error)}</InlineNotice>}
+    {error && <InlineNotice tone="error">{error}</InlineNotice>}
+    {tracking.uncertain && <JobTrackingRecovery jobId={jobId} pending={job.isFetching} retry={tracking.retry} dismiss={tracking.dismiss} />}
     {data?.message && <InlineNotice tone="info">{data.message}</InlineNotice>}
     <p className="settings-helper-text">最近全库核验：{data?.verifiedAt ? formatRuntimeDate(data.verifiedAt) : "尚未记录"}</p>
     <div className="form-actions"><Button variant="secondary" disabled={busy} onClick={() => void start({ action: "Verify" })}>完整核验有效恢复点</Button><Button variant="secondary" disabled={busy} onClick={() => void start({ action: "Preview" })}>预览仓库回收</Button></div>

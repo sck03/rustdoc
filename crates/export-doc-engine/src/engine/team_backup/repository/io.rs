@@ -3,6 +3,7 @@
 use super::*;
 use fs2::FileExt;
 use std::fs;
+use std::{collections::BTreeSet, sync::Mutex};
 
 pub(in crate::engine::team_backup) trait ObjectStore:
     Send + Sync
@@ -17,6 +18,10 @@ pub(in crate::engine::team_backup) struct Directory {
     root: PathBuf,
     medium: String,
     _lock: fs::File,
+    // Valid only while this handle owns the exclusive OS repository lock.
+    names: Mutex<Option<BTreeSet<String>>>,
+    #[cfg(test)]
+    scans: std::sync::atomic::AtomicUsize,
 }
 impl Directory {
     pub fn open(root: PathBuf, expected_medium: Option<&str>) -> Result<Self> {
@@ -47,6 +52,9 @@ impl Directory {
             root,
             medium,
             _lock: lock,
+            names: Mutex::new(None),
+            #[cfg(test)]
+            scans: std::sync::atomic::AtomicUsize::new(0),
         })
     }
     fn path(&self, name: &str) -> Result<PathBuf> {
@@ -106,6 +114,14 @@ impl ObjectStore for Directory {
                 return Ok(false);
             }
             fs::rename(&pending, &path)?;
+            if let Some(names) = self
+                .names
+                .lock()
+                .map_err(|_| unavailable("仓库目录索引不可用。"))?
+                .as_mut()
+            {
+                names.insert(name.to_owned());
+            }
             Ok(true)
         })();
         if pending.try_exists()? {
@@ -124,35 +140,72 @@ impl ObjectStore for Directory {
             Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => {}
             Err(cause) => return Err(cause.into()),
         }
+        if let Some(names) = self
+            .names
+            .lock()
+            .map_err(|_| unavailable("仓库目录索引不可用。"))?
+            .as_mut()
+        {
+            names.remove(name);
+        }
         #[cfg(unix)]
         fs::File::open(&self.root)?.sync_all()?;
         self.check()
     }
     fn list(&self, prefix: &str, after: &str, limit: usize) -> Result<Vec<String>> {
         self.check()?;
-        let mut names = std::collections::BTreeSet::new();
-        for entry in fs::read_dir(&self.root)? {
-            crate::operation::check()?;
-            let entry = entry?;
-            let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
-                return Err(invalid("仓库含无效文件名。"));
-            };
-            if name.starts_with(prefix) && name.as_str() > after {
+        let mut index = self
+            .names
+            .lock()
+            .map_err(|_| unavailable("仓库目录索引不可用。"))?;
+        if index.is_none() {
+            let mut names = BTreeSet::new();
+            #[cfg(test)]
+            self.scans
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            for entry in fs::read_dir(&self.root)? {
+                crate::operation::check()?;
+                let entry = entry?;
+                let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
+                    return Err(invalid("仓库含无效文件名。"));
+                };
                 valid_name(&name)?;
                 paths::ensure_safe_absolute(&entry.path()).map_err(invalid)?;
                 if !entry.file_type()?.is_file() {
                     return Err(invalid("仓库对象不是普通文件。"));
                 }
                 names.insert(name);
-                if names.len() > limit {
-                    names.pop_last();
+                if names.len() > 2_000_000 {
+                    return Err(invalid("仓库目录索引超过两百万对象预算，请分库管理。"));
                 }
+            }
+            *index = Some(names);
+        }
+        let names: Vec<_> = index
+            .as_ref()
+            .unwrap()
+            .range(prefix.max(after).to_owned()..)
+            .take_while(|name| name.starts_with(prefix))
+            .filter(|name| name.as_str() > after)
+            .take(limit)
+            .cloned()
+            .collect();
+        drop(index);
+        for name in &names {
+            let path = self.path(name)?;
+            if !fs::metadata(path)?.is_file() {
+                return Err(invalid("仓库对象不是普通文件。"));
             }
         }
         self.check()?;
-        Ok(names.into_iter().collect())
+        Ok(names)
     }
 }
+
+#[cfg(test)]
+#[path = "tests/io.rs"]
+mod tests;
+
 pub(super) fn valid_name(name: &str) -> Result<()> {
     if name.is_empty()
         || name.len() > 128

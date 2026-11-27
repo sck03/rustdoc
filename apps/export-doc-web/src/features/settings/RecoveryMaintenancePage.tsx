@@ -28,7 +28,7 @@ export function RecoveryMaintenancePage() {
     {c.status.isError && <InlineNotice tone="error">{readApiError(c.status.error)}</InlineNotice>}
     {!c.csrf ? <form className="dashboard-section-stack" onSubmit={event => { event.preventDefault(); void c.login(token).then(ok => { if (ok) setToken(""); }); }}>
       <label><span>部署端一次性凭证</span><input type="password" autoComplete="off" value={token} onChange={event => setToken(event.target.value)} /></label>
-      <Button type="submit" disabled={c.pending || token.length < 32}>进入维护</Button>
+      <Button type="submit" disabled={c.pending || c.resuming || token.length < 32}>{c.resuming ? "正在恢复会话…" : "进入维护"}</Button>
     </form> : <>
       {data && <InlineNotice tone={data.state === "Failed" ? "error" : data.state === "Completed" ? "success" : "info"}>{data.failure ? formatErrorResponse(data.failure) : data.message}</InlineNotice>}
       <fieldset className="settings-fieldset dashboard-section-stack" disabled={c.active || finished}>

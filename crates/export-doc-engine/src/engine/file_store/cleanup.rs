@@ -73,10 +73,19 @@ pub(in crate::engine) fn preview(service: &NativeService, actor: &Actor) -> Resu
         objects.push(object);
     }
     let token = paths::nonce().map_err(unavailable)?;
+    let archive_cleanup = service
+        .store
+        .files
+        .archive_cleanup_candidates(&service.store)?;
+    let archive_tokens: Vec<_> = archive_cleanup
+        .iter()
+        .map(|(token, _)| token.clone())
+        .collect();
+    let archive_bytes = archive_cleanup.iter().map(|(_, bytes)| bytes).sum::<u64>();
     let expires = (chrono::Utc::now() + chrono::Duration::minutes(15)).to_rfc3339();
-    service.store.transaction_as(actor,|tx,actor|{if !actor.admin{return Err(crate::engine::error::error(403,"无引用回收仅限管理员。"));}tx.set_settings("file-collection-cursor",1,&json!({"identity":config.identity,"after":cursor}))?;tx.set_settings(PLAN,1,&json!({"token":token,"expiresAt":expires,"identity":config.identity,"revision":config.revision,"objects":objects,"owner":actor.id}))?;Ok(())})?;
+    service.store.transaction_as(actor,|tx,actor|{if !actor.admin{return Err(crate::engine::error::error(403,"无引用回收仅限管理员。"));}tx.set_settings("file-collection-cursor",1,&json!({"identity":config.identity,"after":cursor}))?;tx.set_settings(PLAN,1,&json!({"token":token,"expiresAt":expires,"identity":config.identity,"revision":config.revision,"objects":objects,"archiveCleanup":archive_tokens,"owner":actor.id}))?;Ok(())})?;
     Ok(
-        json!({"token":token,"expiresAt":expires,"count":objects.len(),"bytes":bytes,"waitingObjects":waiting,"message":"仅回收无业务或档案引用、隔离至少 24 小时的对象；每轮最多 1000 个。"}),
+        json!({"token":token,"expiresAt":expires,"count":objects.len()+archive_tokens.len(),"bytes":bytes+archive_bytes,"archiveCleanupCount":archive_tokens.len(),"waitingObjects":waiting,"message":"无引用对象须隔离至少 24 小时；已归档的旧副本须重新核验正式副本后清理。每类本轮最多 1000 个。"}),
     )
 }
 pub(super) fn execute(
@@ -113,7 +122,10 @@ pub(super) fn execute(
             return Err(conflict("候选对象出现新引用，已停止本轮回收，请重新预览。"));
         }
     }
-    let mut bytes = 0;
+    let archive_tokens: Vec<String> = serde_json::from_value(plan["archiveCleanup"].clone())?;
+    let mut bytes = store
+        .files
+        .reconcile_archive_sources(store, &archive_tokens)?;
     let mut removed = std::collections::BTreeSet::new();
     for object in objects {
         crate::operation::check()?;

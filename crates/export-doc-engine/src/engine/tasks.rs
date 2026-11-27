@@ -34,6 +34,8 @@ mod managed_output;
 mod sensitive;
 pub(in crate::engine) use output::resolve_control;
 pub struct TaskOutput {
+    /// Durable business changes already applied by the worker, before publication.
+    pub committed: bool,
     pub(crate) archive: Option<ArchiveOutput>,
     pub managed_file: Option<ManagedOutput>,
     pub file: Option<FileOutput>,
@@ -89,6 +91,7 @@ impl TaskOutput {
     pub fn managed_file(path: std::path::PathBuf, detail: String) -> Result<Self> {
         let (size, digest) = super::backup_io::digest_file(&path)?;
         Ok(Self {
+            committed: false,
             file: None,
             detail,
             destination: None,
@@ -100,6 +103,7 @@ impl TaskOutput {
     }
     pub fn file(file_name: String, media_type: &str, content: Vec<u8>) -> Self {
         Self {
+            committed: false,
             file: Some(FileOutput {
                 file_name,
                 media_type: media_type.into(),
@@ -325,8 +329,12 @@ impl Jobs {
                 let flag = scope.cancellation_flag();
                 let mut publication = None;
                 let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    scope.run_result(|| {
+                    scope.run(|| {
+                        crate::operation::check()?;
                         let output = work(&flag)?;
+                        if !output.committed {
+                            crate::operation::check()?;
+                        }
                         publication = output::prepare(&store, &worker_id, &output)?;
                         persistence::prepare_output(&store, output)
                     })

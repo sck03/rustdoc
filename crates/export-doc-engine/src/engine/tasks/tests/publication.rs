@@ -1,6 +1,55 @@
 use super::*;
 use crate::engine::store;
 
+#[test]
+fn committed_task_receipts_survive_late_cancellation() {
+    use std::sync::atomic::AtomicBool;
+    for success in [true, false] {
+        let fixture = Fixture::new();
+        let store = fixture.store();
+        let job =
+            persistence::create(&store, &fixture.actor, "FileArchive", "归档提交回执").unwrap();
+        let id = job["jobId"].as_str().unwrap();
+        let result = if success {
+            persistence::prepare_output(
+                &store,
+                TaskOutput {
+                    committed: true,
+                    detail: "已迁移 1 个对象".into(),
+                    file: None,
+                    managed_file: None,
+                    destination: None,
+                    directory: None,
+                    publication: None,
+                    archive: None,
+                },
+            )
+        } else {
+            let mut error = unavailable("已迁移 1 个对象，旧副本清理失败。")
+                .coded(crate::api::ErrorCode::PartialCommit);
+            error.partially_committed = true;
+            Err(error)
+        };
+        persistence::finish_controlled(
+            &store,
+            &fixture.actor,
+            id,
+            result,
+            Some(&AtomicBool::new(true)),
+            None,
+        )
+        .unwrap();
+        let saved = persistence::get(&store, &fixture.actor, id).unwrap();
+        assert_eq!(
+            saved["status"],
+            if success { "Succeeded" } else { "Failed" }
+        );
+        if !success {
+            assert_eq!(saved["failure"]["outcome"], "PartiallyCommitted");
+        }
+    }
+}
+
 fn file_output(path: &std::path::Path, bytes: &[u8]) -> TaskOutput {
     let mut output = TaskOutput::file("suggested.pdf".into(), "application/pdf", bytes.to_vec());
     output.destination = Some(path.into());
@@ -36,6 +85,7 @@ fn restore_control_receipts_resolve_before_database_replacement() {
 
 fn directory_output(path: &std::path::Path, files: &[(&str, &[u8])]) -> TaskOutput {
     TaskOutput {
+        committed: false,
         file: None,
         managed_file: None,
         destination: None,

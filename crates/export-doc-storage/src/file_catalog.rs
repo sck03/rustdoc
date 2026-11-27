@@ -195,6 +195,18 @@ pub(crate) fn pending_copies(
     rows(db, &format!("SELECT {constructor}('digest',o.digest,'size',o.size_bytes,'archiveIdentity',COALESCE((SELECT storage_identity FROM file_locations l WHERE l.digest=o.digest AND l.archived=1),'')) AS body FROM file_migration_queue q JOIN file_objects o ON o.digest=q.digest WHERE q.storage_identity={identity} ORDER BY q.digest LIMIT 200"), &values)?
         .into_iter().map(|value| serde_json::from_value(value).map_err(Into::into)).collect()
 }
+pub(crate) fn object(db: &(impl Adapter + ?Sized), digest: &str) -> Result<Option<FileObject>> {
+    let pg = db.provider() == "PostgreSQL";
+    let mut values = vec![];
+    let digest = sql::bind(&mut values, digest, pg);
+    let json = if pg {
+        "jsonb_build_object"
+    } else {
+        "json_object"
+    };
+    rows(db, &format!("SELECT {json}('digest',o.digest,'size',o.size_bytes,'archiveIdentity',COALESCE((SELECT storage_identity FROM file_locations l WHERE l.digest=o.digest AND l.archived=1),'')) AS body FROM file_objects o WHERE o.digest={digest}"), &values)?
+        .into_iter().next().map(|value| serde_json::from_value(value).map_err(Into::into)).transpose()
+}
 pub(crate) fn locate(db: &(impl Adapter + ?Sized), identity: &str, digest: &str) -> Result<()> {
     let pg = db.provider() == "PostgreSQL";
     let mut values = vec![];

@@ -34,6 +34,11 @@ fn exercise(db: &Connection) {
     assert_eq!(rows.len(), 2);
     assert_eq!(rows[0]["basisDate"], serde_json::Value::Null);
     assert!(db.file_is_referenced(&object.digest).unwrap());
+    assert_eq!(
+        db.file_object(&object.digest).unwrap(),
+        Some(object.clone())
+    );
+    assert_eq!(db.file_object(&"f".repeat(64)).unwrap(), None);
     assert!(db.file_objects("", 100, true).unwrap().is_empty());
     assert_eq!(db.file_statistics().unwrap()["protectedBytes"], 7);
     db.archive_file(&"c".repeat(32), &object.digest).unwrap();
@@ -42,6 +47,13 @@ fn exercise(db: &Connection) {
         "c".repeat(32)
     );
     db.archive_file(&"d".repeat(32), &object.digest).unwrap();
+    assert_eq!(
+        db.file_object(&object.digest)
+            .unwrap()
+            .unwrap()
+            .archive_identity,
+        "d".repeat(32)
+    );
     assert_eq!(
         db.file_objects("", 100, false).unwrap()[0].archive_identity,
         "d".repeat(32)

@@ -162,7 +162,7 @@ pub(in crate::engine) fn handle(
             Ok(())
         })?;
     }
-    observe(service, true)?;
+    observe(service, operation == SAVE_STORAGE_CAPACITY_POLICY)?;
     status(&service.store)
 }
 fn status(store: &Store) -> Result<Value> {

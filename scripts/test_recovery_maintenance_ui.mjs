@@ -19,21 +19,40 @@ const listener=net.createServer();await new Promise(resolve=>listener.listen(0,"
 const env={...process.env,EXPORTDOCMANAGER_POSTGRES_CONNECTION_FILE:path.join(root,"app.txt"),EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_CONNECTION_FILE:path.join(root,"maintenance.txt"),EXPORTDOCMANAGER_MAINTENANCE_TOKEN_FILE:path.join(root,"token.txt"),EXPORTDOCMANAGER_POSTGRES_OWNER:"native_owner"};
 for(const key of ["EXPORTDOCMANAGER_POSTGRES_CONNECTION","EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_CONNECTION","EXPORTDOCMANAGER_MAINTENANCE_TOKEN","EXPORTDOCMANAGER_FILE_STORE_ROOTS"])delete env[key];
 const binary=path.join(cargoArtifactDirectory(repo),`export-doc-server${process.platform==="win32"?".exe":""}`);
-const server=spawnProcessTree(binary,["--app-root",root,"--data-root",data,"--web-root",path.join(repo,"apps/export-doc-web/dist"),"--bind",`127.0.0.1:${port}`,"--maintenance-web"],{cwd:repo,env,windowsHide:true,stdio:["ignore","pipe","pipe"]});
-let log="";server.stdout.on("data",v=>{log+=v;});server.stderr.on("data",v=>{log+=v;});
+let log="";
+const startServer=()=>{
+ const child=spawnProcessTree(binary,["--app-root",root,"--data-root",data,"--web-root",path.join(repo,"apps/export-doc-web/dist"),"--bind",`127.0.0.1:${port}`,"--maintenance-web"],{cwd:repo,env,windowsHide:true,stdio:["ignore","pipe","pipe"]});
+ child.stdout.on("data",v=>{log+=v;});child.stderr.on("data",v=>{log+=v;});return child;
+};
+let server=startServer();
 let browser;
 try{
  const deadline=Date.now()+30000;let ready=false;
  while(Date.now()<deadline){try{const response=await fetch(url,{signal:AbortSignal.timeout(1000)});if(response.ok){ready=true;break;}}catch{}if(server.exitCode!==null)throw new Error(`Maintenance exited ${server.exitCode}`);await new Promise(r=>setTimeout(r,150));}assert(ready,"Independent maintenance started with an empty business database");
  assert.equal((await fetch(`${url}/maintenance-api/status`)).status,401);
+ assert.equal((await fetch(`${url}/maintenance-api/session`)).status,401);
  const require=createRequire(path.join(repo,"apps/export-doc-web/package.json"));const {chromium}=require("playwright");
  browser=await chromium.launchPersistentContext(path.join(root,"Chrome"),{executablePath:locateChromeForTesting(repo),headless:true,viewport:{width:1440,height:1000}});
  const page=await browser.newPage();const errors=[];page.on("pageerror",e=>errors.push(e.message));page.setDefaultTimeout(15000);
  await page.goto(url+"/#/maintenance");await page.getByLabel("部署端一次性凭证").fill(token);await page.getByRole("button",{name:"进入维护",exact:true}).click();await page.getByRole("button",{name:"解锁仓库",exact:true}).waitFor();
  const status=await page.evaluate(async()=>{const r=await fetch("/maintenance-api/status");return {status:r.status,body:await r.json()};});assert.equal(status.status,200);assert(Array.isArray(status.body.locations));assert(!JSON.stringify(status.body).includes("password="));
  const noCsrf=await page.evaluate(async()=>{const r=await fetch("/maintenance-api/cancel",{method:"POST",headers:{"content-type":"application/json"},body:"{}"});return r.status;});assert.equal(noCsrf,403);
- const cookies=await browser.cookies(url);const cookie=cookies.map(c=>`${c.name}=${c.value}`).join("; ");const cross=await fetch(`${url}/maintenance-api/cancel`,{method:"POST",headers:{cookie,origin:"https://untrusted.invalid","content-type":"application/json"},body:"{}"});assert.equal(cross.status,403);
+ await page.reload();await page.getByRole("button",{name:"解锁仓库",exact:true}).waitFor();
+ assert.equal(await page.getByLabel("部署端一次性凭证").count(),0);
+ const resume=await page.evaluate(async()=>{const response=await fetch("/maintenance-api/session");const session=await response.json();return (await fetch("/maintenance-api/cancel",{method:"POST",headers:{"content-type":"application/json","X-Maintenance-Csrf":session.csrfToken},body:"{}"})).status;});assert.equal(resume,200);
+ const cookies=await browser.cookies(url+"/maintenance-api");assert(cookies.some(cookie=>cookie.httpOnly&&cookie.sameSite==="Strict"));const cookie=cookies.map(c=>`${c.name}=${c.value}`).join("; ");const cross=await fetch(`${url}/maintenance-api/cancel`,{method:"POST",headers:{cookie,origin:"https://untrusted.invalid","content-type":"application/json"},body:"{}"});assert.equal(cross.status,403);
+ const resumeCross=await fetch(`${url}/maintenance-api/session`,{headers:{cookie,origin:"https://untrusted.invalid"}});assert.equal(resumeCross.status,403);
+ await page.getByRole("button",{name:"放弃本次维护",exact:true}).click();await page.getByText("未切换业务数据。",{exact:false}).waitFor();
+ assert(!fs.existsSync(path.join(data,".exportdoc-recovery-maintenance.json")));
+ await stopProcessTree(server);await browser.clearCookies();
+ // A terminal persisted history must start a new fenced, usable maintenance session.
+ fs.writeFileSync(path.join(data,"Recovery/maintenance-state.json"),JSON.stringify({state:"Completed",message:"previous run",planId:"stale",points:[]}));
+ server=startServer();
+ const restarted=Date.now()+30000;let reopened=false;while(Date.now()<restarted){try{if((await fetch(url,{signal:AbortSignal.timeout(1000)})).ok){reopened=true;break;}}catch{}await new Promise(r=>setTimeout(r,150));}assert(reopened);
+ await page.reload();await page.getByLabel("部署端一次性凭证").fill(token);await page.getByRole("button",{name:"进入维护",exact:true}).click();await page.getByRole("button",{name:"放弃本次维护",exact:true}).waitFor();
+ const fresh=await page.evaluate(()=>fetch("/maintenance-api/status").then(r=>r.json()));assert.equal(fresh.state,"Locked");assert.equal(fresh.planId,"");assert(fs.existsSync(path.join(data,".exportdoc-recovery-maintenance.json")));
+ await page.getByRole("button",{name:"放弃本次维护",exact:true}).click();await page.getByText("未切换业务数据。",{exact:false}).waitFor();assert(!fs.existsSync(path.join(data,".exportdoc-recovery-maintenance.json")));
  await page.screenshot({path:path.join(root,"maintenance-desktop.png"),fullPage:true});await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(root,"maintenance-mobile.png"),fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth),false);assert.deepEqual(errors,[]);
- fs.writeFileSync(path.join(root,"result.json"),JSON.stringify({checks:["empty database independent startup","React login","maintenance session status","missing CSRF rejected","foreign origin rejected","390px layout"],passed:true},null,2));console.log(`Independent recovery maintenance UI passed: ${root}`);
+ fs.writeFileSync(path.join(root,"result.json"),JSON.stringify({checks:["empty database independent startup","React login","maintenance session status","reload resumes cookie session and CSRF","missing CSRF rejected","foreign origin rejected","terminal history reopens fenced session","abandon removes maintenance fence","390px layout"],passed:true},null,2));console.log(`Independent recovery maintenance UI passed: ${root}`);
 }catch(error){fs.writeFileSync(path.join(root,"server.log"),log);if(browser)await browser.pages().at(-1)?.screenshot({path:path.join(root,"failure.png"),fullPage:true}).catch(()=>{});throw error;}
 finally{if(browser)await browser.close();await stopProcessTree(server);for(const name of ["app.txt","maintenance.txt","token.txt"])fs.rmSync(path.join(root,name),{force:true});}

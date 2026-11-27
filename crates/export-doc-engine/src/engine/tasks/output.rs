@@ -131,6 +131,7 @@ pub(super) fn prepare(store: &Store, id: &str, output: &TaskOutput) -> Result<Op
         .and_then(|check| check.restore.as_ref())
     {
         let marker = TaskOutput {
+            committed: false,
             file: Some(super::FileOutput {
                 file_name: ".pending-restore.json".into(),
                 media_type: "application/json".into(),

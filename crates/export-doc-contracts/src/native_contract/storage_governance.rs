@@ -61,6 +61,8 @@ pub(super) fn schemas() -> Vec<(&'static str, Schema)> {
                 ("bytes", bytes()),
                 ("expiresAt", s()),
                 ("requestedBy", i()),
+                ("reason", s().max_length(500)),
+                ("items", a(r("ApiRetentionRow")).max_items(100)),
             ]),
         ),
         (
@@ -225,6 +227,7 @@ pub(super) fn schemas() -> Vec<(&'static str, Schema)> {
                 ("bytes", bytes()),
                 ("protectedObjects", i()),
                 ("waitingObjects", i()),
+                ("archiveCleanupCount", i()),
                 ("message", s()),
                 ("verifiedAt", s()),
             ])

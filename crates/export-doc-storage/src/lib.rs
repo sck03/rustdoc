@@ -426,6 +426,7 @@ delegate! {
     invoice_status_history(record:i64,before:Option<i64>,limit:i64)->Value;
     attachment_history(record:i64,kind:&str,before:Option<i64>,limit:i64)->Value;
     file_is_referenced(digest:&str)->bool;
+    file_object(digest:&str)->Option<FileObject>;
     remove_unused_file(digest:&str)->();
     access_restrictions(kind:&str,id:i64,resolved:bool)->Vec<Value>;
     save_access_restriction(kind:&str,id:i64,body:&Value)->Value;

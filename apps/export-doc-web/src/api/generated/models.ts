@@ -1251,7 +1251,7 @@ export interface ApiEmailTestResponse {
   success: boolean;
 }
 
-export type ApiErrorCode = "VALIDATION_FAILED" | "AUTHENTICATION_REQUIRED" | "PERMISSION_DENIED" | "RESOURCE_NOT_FOUND" | "STATE_CONFLICT" | "ConcurrencyConflict" | "RESOURCE_BUSY" | "OPERATION_CANCELLED" | "CAPABILITY_UNAVAILABLE" | "DEPENDENCY_UNAVAILABLE" | "OPERATION_TIMEOUT" | "UNCLASSIFIED_FAILURE" | "DATABASE_UNAVAILABLE" | "DATABASE_AUTHENTICATION_FAILED" | "DATABASE_CONNECTION_FAILED" | "DATABASE_MODEL_MISMATCH" | "DATABASE_OUTCOME_UNKNOWN" | "FILE_MISSING" | "FILE_PERMISSION_DENIED" | "FILE_SPACE_EXHAUSTED" | "FILE_UNAVAILABLE" | "STORED_DATA_INVALID" | "OA_HANDLING_SERVICE_REQUIRED" | "OA_HANDLING_SERVICE_UNCONFIGURED" | "OA_HANDLING_SERVICE_UNAVAILABLE" | "OA_HANDLER_UNAVAILABLE" | "OA_HANDLER_PERMISSION_MISSING" | "OA_PUBLICATION_STALE" | "STORAGE_IDENTITY_MISMATCH" | "OBJECT_INTEGRITY_FAILED" | "BACKUP_INCOMPLETE" | "RECOVERY_BLOCKED";
+export type ApiErrorCode = "VALIDATION_FAILED" | "AUTHENTICATION_REQUIRED" | "PERMISSION_DENIED" | "RESOURCE_NOT_FOUND" | "STATE_CONFLICT" | "ConcurrencyConflict" | "RESOURCE_BUSY" | "OPERATION_CANCELLED" | "CAPABILITY_UNAVAILABLE" | "DEPENDENCY_UNAVAILABLE" | "OPERATION_TIMEOUT" | "UNCLASSIFIED_FAILURE" | "PARTIAL_COMMIT" | "DATABASE_UNAVAILABLE" | "DATABASE_AUTHENTICATION_FAILED" | "DATABASE_CONNECTION_FAILED" | "DATABASE_MODEL_MISMATCH" | "DATABASE_OUTCOME_UNKNOWN" | "FILE_MISSING" | "FILE_PERMISSION_DENIED" | "FILE_SPACE_EXHAUSTED" | "FILE_UNAVAILABLE" | "STORED_DATA_INVALID" | "OA_HANDLING_SERVICE_REQUIRED" | "OA_HANDLING_SERVICE_UNCONFIGURED" | "OA_HANDLING_SERVICE_UNAVAILABLE" | "OA_HANDLER_UNAVAILABLE" | "OA_HANDLER_PERMISSION_MISSING" | "OA_PUBLICATION_STALE" | "STORAGE_IDENTITY_MISMATCH" | "OBJECT_INTEGRITY_FAILED" | "BACKUP_INCOMPLETE" | "RECOVERY_BLOCKED";
 
 export interface ApiErrorContext {
   node?: string;
@@ -1273,7 +1273,7 @@ export interface ApiErrorResponse {
   issues: ApiErrorIssue[];
   jobId?: string;
   message: string;
-  outcome: "NotCommitted" | "Committed" | "Unknown";
+  outcome: "NotCommitted" | "Committed" | "PartiallyCommitted" | "Unknown";
   requestId: string;
   retryability: "Never" | "AfterCorrection" | "ReadOnly" | "CheckReceipt";
 }
@@ -3127,6 +3127,7 @@ export interface ApiRepositoryMaintenanceRequest {
 }
 
 export interface ApiRepositoryMaintenanceStatus {
+  archiveCleanupCount?: number;
   bytes?: number;
   count?: number;
   expiresAt?: string;
@@ -3162,6 +3163,8 @@ export interface ApiRetentionPlan {
   bytes: number;
   count: number;
   expiresAt: string;
+  items: ApiRetentionRow[];
+  reason: string;
   requestedBy: number;
   token: string;
 }
@@ -4795,6 +4798,7 @@ export interface MaintenanceSession {
 
 export interface MaintenanceStatus {
   artifacts?: { id: string; location: string; state: string }[];
+  busy: boolean;
   failure?: ApiErrorResponse;
   locations: { id: string; name: string }[];
   message: string;

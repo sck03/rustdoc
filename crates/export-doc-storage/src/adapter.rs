@@ -71,6 +71,7 @@ pub(crate) trait Adapter: Send {
         invoice_status_history(record:i64,before:Option<i64>,limit:i64)->Value => invoice_status_history::page;
         attachment_history(record:i64,kind:&str,before:Option<i64>,limit:i64)->Value => attachment_history::page;
         file_is_referenced(digest:&str)->bool => file_catalog::referenced;
+        file_object(digest:&str)->Option<FileObject> => file_catalog::object;
         remove_unused_file(digest:&str)->() => file_catalog::remove_unused;
         email_template_name_exists(owner:i64,id:i64,name:&str,category:&str) -> bool => template_query::email_name_exists;
         scan_hs(query: &HsQuery<'_>, after: Option<&Value>) -> (Option<Value>, Vec<Value>) => hs_query::scan;

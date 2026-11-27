@@ -26,6 +26,7 @@ codes! {
     DependencyUnavailable => "DEPENDENCY_UNAVAILABLE",
     Timeout => "OPERATION_TIMEOUT",
     Unknown => "UNCLASSIFIED_FAILURE",
+    PartialCommit => "PARTIAL_COMMIT",
     DatabaseUnavailable => "DATABASE_UNAVAILABLE",
     DatabaseAuthentication => "DATABASE_AUTHENTICATION_FAILED",
     DatabaseConnection => "DATABASE_CONNECTION_FAILED",
@@ -118,7 +119,7 @@ pub(super) fn schemas() -> Vec<(&'static str, Schema)> {
                 ),
                 (
                     "outcome",
-                    choices(&["NotCommitted", "Committed", "Unknown"]),
+                    choices(&["NotCommitted", "Committed", "PartiallyCommitted", "Unknown"]),
                 ),
                 ("requestId", s()),
                 ("jobId", s()),

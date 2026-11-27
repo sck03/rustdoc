@@ -41,6 +41,7 @@ use super::s3_transport as s3;
 mod capture;
 pub mod maintenance;
 mod maintenance_artifacts;
+mod maintenance_state;
 pub(in crate::engine) mod repository;
 pub(in crate::engine) mod scheduled;
 mod scratch;

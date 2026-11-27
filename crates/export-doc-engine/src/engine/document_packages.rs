@@ -226,6 +226,7 @@ pub fn handle(
             } else {
                 let path = destination.ok_or_else(|| invalid("缺少输出文件夹。"))?;
                 Ok(TaskOutput {
+                    committed: false,
                     managed_file: None,
                     file: None,
                     destination: None,

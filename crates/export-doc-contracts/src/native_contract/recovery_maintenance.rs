@@ -97,6 +97,7 @@ pub(super) fn schemas() -> Vec<(&'static str, Schema)> {
                 ),
                 ("nextCursor", s()),
                 ("state", s()),
+                ("busy", b()),
                 ("message", s()),
                 ("planId", s()),
                 ("failure", r("ApiErrorResponse")),
@@ -118,7 +119,14 @@ pub(super) fn schemas() -> Vec<(&'static str, Schema)> {
                     .additional(Additional::Allowed(false))),
                 ),
             ])
-            .required(vec!["state", "message", "planId", "locations", "points"])
+            .required(vec![
+                "state",
+                "busy",
+                "message",
+                "planId",
+                "locations",
+                "points",
+            ])
             .additional(Additional::Allowed(false)),
         ),
     ]
@@ -132,6 +140,14 @@ pub(super) fn endpoints() -> Vec<Endpoint> {
             Some("MaintenanceLogin"),
             "MaintenanceSession",
             false,
+        ),
+        (
+            "get",
+            "/maintenance-api/session",
+            "ResumeMaintenanceSession",
+            None,
+            "MaintenanceSession",
+            true,
         ),
         (
             "get",

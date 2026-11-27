@@ -494,6 +494,7 @@ fn document_email(
             )?;
             let count = delivered["attachmentCount"].as_u64().unwrap_or_default();
             Ok(TaskOutput {
+                committed: true,
                 file: None,
                 destination: None,
                 detail: format!(

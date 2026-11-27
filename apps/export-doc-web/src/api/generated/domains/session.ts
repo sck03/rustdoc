@@ -144,6 +144,11 @@ export default function createApi(transport: ApiTransport) {
     return transport.request<ApiLoginResponse>("POST", path, { init });
   },
 
+  resumeMaintenanceSession(init?: ApiRequestInit): Promise<MaintenanceSession> {
+    const path = "/maintenance-api/session";
+    return transport.request<MaintenanceSession>("GET", path, { init });
+  },
+
   switchUnitContext(request: SwitchUnitContextRequest, init?: ApiRequestInit): Promise<ApiLoginResponse> {
     const path = "/api/auth/unit-context";
     return transport.request<ApiLoginResponse>("POST", path, {

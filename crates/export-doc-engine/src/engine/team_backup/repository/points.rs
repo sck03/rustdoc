@@ -223,6 +223,22 @@ pub(super) fn visit_commit(
     commit: Commit,
     visitor: &mut impl Visitor,
 ) -> Result<Commit> {
+    walk(repository, commit, &mut ReadMode::Content(visitor))
+}
+pub(super) fn references(
+    repository: &Repository,
+    commit: Commit,
+    visitor: &mut dyn FnMut(&str, u64, &str) -> Result<()>,
+) -> Result<Commit> {
+    walk(repository, commit, &mut ReadMode::References(visitor))
+}
+enum ReadMode<'a> {
+    Content(&'a mut dyn Visitor),
+    References(&'a mut dyn FnMut(&str, u64, &str) -> Result<()>),
+}
+// Both modes authenticate the entire manifest, names, lengths and record order.
+// References permits GC to verify each shared block once across all live points.
+fn walk(repository: &Repository, commit: Commit, mode: &mut ReadMode<'_>) -> Result<Commit> {
     let id = &commit.id;
     let mut manifest_hash = Sha256::new();
     let mut active: Option<(u64, String, u64, Sha256)> = None;
@@ -253,7 +269,9 @@ pub(super) fn visit_commit(
                         return Err(invalid("恢复点文件缺少结束记录。"));
                     }
                     validate_file(&role, &name, size, &digest)?;
-                    visitor.begin(&role, &name, size, &digest)?;
+                    if let ReadMode::Content(visitor) = mode {
+                        visitor.begin(&role, &name, size, &digest)?;
+                    }
                     active = Some((size, digest, 0, Sha256::new()));
                 }
                 Record::Chunk { key, size, digest } => {
@@ -266,12 +284,6 @@ pub(super) fn visit_commit(
                     {
                         return Err(invalid("恢复点数据块身份或长度无效。"));
                     }
-                    let data = repository.read(&key)?;
-                    if data.len() as u64 != size
-                        || super::super::hex(&Sha256::digest(data.as_slice())) != digest
-                    {
-                        return Err(invalid("恢复点数据块摘要不符。"));
-                    }
                     state.2 = state
                         .2
                         .checked_add(size)
@@ -279,17 +291,29 @@ pub(super) fn visit_commit(
                     if state.2 > state.0 {
                         return Err(invalid("恢复点文件超过声明长度。"));
                     }
-                    state.3.update(data.as_slice());
-                    visitor.data(&data)?;
+                    match mode {
+                        ReadMode::Content(visitor) => {
+                            let data = repository.read(&key)?;
+                            verify_chunk(&data, size, &digest)?;
+                            state.3.update(data.as_slice());
+                            visitor.data(&data)?;
+                        }
+                        ReadMode::References(visitor) => visitor(&key, size, &digest)?,
+                    }
                 }
                 Record::EndFile => {
                     let (expected, digest, size, hash) = active
                         .take()
                         .ok_or_else(|| invalid("恢复点文件结束记录无效。"))?;
-                    if size != expected || super::super::hex(&hash.finalize()) != digest {
+                    if size != expected
+                        || (matches!(mode, ReadMode::Content(_))
+                            && super::super::hex(&hash.finalize()) != digest)
+                    {
                         return Err(invalid("恢复点文件不完整或摘要不符。"));
                     }
-                    visitor.end()?;
+                    if let ReadMode::Content(visitor) = mode {
+                        visitor.end()?;
+                    }
                     files += 1;
                     total = total
                         .checked_add(size)
@@ -316,4 +340,10 @@ pub(super) fn visit_commit(
     }
     repository.io.check()?;
     Ok(commit)
+}
+pub(super) fn verify_chunk(data: &[u8], size: u64, digest: &str) -> Result<()> {
+    if data.len() as u64 != size || super::super::hex(&Sha256::digest(data)) != digest {
+        return Err(invalid("恢复点数据块摘要不符。"));
+    }
+    Ok(())
 }

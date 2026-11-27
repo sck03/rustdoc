@@ -1,6 +1,7 @@
 import { readJobMessage } from "../jobs/jobPresentation.ts";
 import type { ApiBackupS3Settings, ExportDocManagerApiClient } from "../../api/index.ts";
 import { Button } from "../../ui/Button.tsx";
+import { JobTrackingRecovery } from "../jobs/JobTrackingRecovery.tsx";
 import { FieldShell, NumberField, SelectField, TextField } from "../../ui/FormFields.tsx";
 import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 import { CollapsibleSection } from "../../ui/primitives/Card.tsx";
@@ -20,7 +21,8 @@ export default function FileStorageSettingsPanel({ client, canManage }: { client
   const patchS3 = (key: keyof ApiBackupS3Settings, value: string | boolean) => c.setTarget(current => ({ ...current, s3: { ...current.s3!, [key]: value } }));
   return <section className="form-section" aria-label="文件与存储">
     <div className="section-header"><h2>文件与存储</h2><Button variant="secondary" disabled={c.busy} onClick={() => void c.query.refetch()}>检查状态</Button></div>
-    {c.message && <InlineNotice tone="error" action={c.jobError ? <Button variant="secondary" onClick={c.retryJob}>重新读取任务</Button> : undefined}>{c.message}</InlineNotice>}
+    {c.message && <InlineNotice tone="error">{c.message}</InlineNotice>}
+    {c.tracking.uncertain && <JobTrackingRecovery jobId={c.tracking.jobId} pending={c.tracking.job.isFetching} retry={c.tracking.retry} dismiss={c.tracking.dismiss} />}
     {c.success && <InlineNotice tone="success">{c.success}</InlineNotice>}
     {!status && c.query.isPending && <PageState tone="loading" title="正在读取文件存储" />}
     {status && <>

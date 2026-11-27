@@ -42,6 +42,11 @@ fn archive_routes_are_verified_and_retention_requires_an_independent_reviewer() 
         json!({"ids":[id],"reason":"到期复核"}),
     )
     .unwrap();
+    assert_eq!(plan["reason"], "到期复核");
+    assert_eq!(plan["items"][0]["id"], id);
+    assert_eq!(plan["items"][0]["fileName"], "signed.pdf");
+    let listed = call(QUERY_FILE_RETENTION, json!({})).unwrap();
+    assert_eq!(listed["plan"], plan);
     assert_eq!(
         call(APPROVE_RETENTION_DELETION, json!({"token":plan["token"]}))
             .unwrap_err()
@@ -49,15 +54,59 @@ fn archive_routes_are_verified_and_retention_requires_an_independent_reviewer() 
         Some(403)
     );
     let version = service.store.files.configuration().unwrap().revision;
-    assert_eq!(
-        super::super::archive::run(
-            &service.store,
-            &actor,
-            &json!({"ids":[id],"location":"archive","expectedVersion":version,"reason":"低频资料"})
-        )
-        .unwrap(),
-        (1, 15)
+    let source_path = root
+        .0
+        .join("Files/objects")
+        .join(&digest[..2])
+        .join(&digest);
+    #[cfg(windows)]
+    let blocker = {
+        use std::os::windows::fs::OpenOptionsExt;
+        fs::OpenOptions::new()
+            .read(true)
+            .share_mode(1 | 2)
+            .open(&source_path)
+            .unwrap()
+    };
+    let archived = super::super::archive::run(
+        &service.store,
+        &actor,
+        &json!({"ids":[id],"location":"archive","expectedVersion":version,"reason":"低频资料"}),
     );
+    #[cfg(windows)]
+    {
+        let cause = archived.unwrap_err();
+        assert_eq!(
+            cause.public_body("archive-test")["outcome"],
+            "PartiallyCommitted"
+        );
+        assert!(cause.message.contains("已切换 1 个对象、15 字节"));
+        assert!(source_path.exists());
+        drop(blocker);
+        let cleanup = super::super::cleanup::preview(&service, &actor).unwrap();
+        assert_eq!(cleanup["archiveCleanupCount"], 1);
+        assert_eq!(cleanup["count"], 1);
+        let token = cleanup["token"].as_str().unwrap();
+        let active_upload = service.store.files.prepare(b"signed evidence").unwrap();
+        assert_eq!(
+            super::super::cleanup::execute(&service.store, &actor, token)
+                .unwrap_err()
+                .status,
+            Some(429)
+        );
+        assert!(source_path.exists());
+        drop(active_upload);
+        assert_eq!(
+            super::super::cleanup::execute(&service.store, &actor, token).unwrap(),
+            15
+        );
+        assert_eq!(
+            super::super::cleanup::preview(&service, &actor).unwrap()["archiveCleanupCount"],
+            0
+        );
+    }
+    #[cfg(not(windows))]
+    assert_eq!(archived.unwrap(), (1, 15));
     let row = service
         .store
         .connection()
@@ -69,6 +118,7 @@ fn archive_routes_are_verified_and_retention_requires_an_independent_reviewer() 
     let info =
         super::super::retention::download_info(&service.store, &actor, &[("id", id.clone())])
             .unwrap();
+    service.store.files.verify_object(&info.object).unwrap();
     assert_eq!(
         service.store.files.load(&info, 100).unwrap().content,
         b"signed evidence"
@@ -146,6 +196,10 @@ fn archive_routes_are_verified_and_retention_requires_an_independent_reviewer() 
             .unwrap()
             .admin
     );
+    let review =
+        super::super::retention::handle(&service, &reviewer, QUERY_FILE_RETENTION, &json!({}))
+            .unwrap();
+    assert_eq!(review["plan"], plan);
     // Archive location change invalidates the old deletion preflight.
     assert_eq!(
         super::super::retention::handle(

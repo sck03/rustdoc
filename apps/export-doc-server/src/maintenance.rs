@@ -133,7 +133,13 @@ async fn execute(
         .get("origin")
         .and_then(|value| value.to_str().ok())
         .ok_or_else(|| error(403, "维护请求缺少来源信息，请从维护页面操作。"));
-    let secure = if operation.method != "GET" {
+    if headers
+        .get("sec-fetch-site")
+        .is_some_and(|value| value == "cross-site")
+    {
+        return Err(error(403, "维护请求必须来自当前服务页面。"));
+    }
+    let secure = if operation.method != "GET" || headers.contains_key("origin") {
         let origin = url::Url::parse(origin?).map_err(|_| error(403, "维护来源无效。"))?;
         let host = headers
             .get("host")
@@ -150,6 +156,7 @@ async fn execute(
         false
     };
     let mut refreshed_cookie = None;
+    let mut resumed_session = None;
     if operation.requires_authentication {
         let mut credentials = state
             .credentials
@@ -186,6 +193,9 @@ async fn execute(
             return Err(error(403, "维护页面校验已失效，请重新登录。"));
         }
         session.expires = (Instant::now() + Duration::from_secs(3600)).min(session.deadline);
+        resumed_session = Some(
+            json!({"csrfToken":session.csrf,"expiresInSeconds":session.expires.saturating_duration_since(Instant::now()).as_secs()}),
+        );
         refreshed_cookie = Some(format!(
             "{COOKIE}={}; Path=/maintenance-api; HttpOnly; SameSite=Strict; Max-Age={}{}",
             session.token,
@@ -254,6 +264,10 @@ async fn execute(
             credentials.session = Some(session);
             Ok((response, Some(cookie)))
         }
+        "ResumeMaintenanceSession" => Ok((
+            resumed_session.ok_or_else(|| error(401, "维护会话无效。"))?,
+            refreshed_cookie,
+        )),
         "GetMaintenanceStatus" => Ok((state.engine.status()?, refreshed_cookie)),
         "CancelMaintenanceOperation" => Ok((state.engine.cancel()?, refreshed_cookie)),
         "AbandonMaintenance" => Ok((state.engine.abandon()?, refreshed_cookie)),

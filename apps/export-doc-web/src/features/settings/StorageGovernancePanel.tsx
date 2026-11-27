@@ -11,6 +11,8 @@ import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { ViewJobButton } from "../jobs/ViewJobButton.tsx";
 import { readJobMessage } from "../jobs/jobPresentation.ts";
 import { useStorageGovernance } from "./useStorageGovernance.ts";
+import { JobTrackingRecovery } from "../jobs/JobTrackingRecovery.tsx";
+import { RetentionReview } from "./RetentionReview.tsx";
 const stateLabels: Record<string, string> = { Normal: "正常", Warning: "预警", Critical: "容量不足", Unavailable: "不可用", Unknown: "未知" };
 export function StorageGovernancePanel({ client, enabled }: { client: ExportDocManagerApiClient; enabled: boolean }) {
   const c = useStorageGovernance(client, enabled);
@@ -61,9 +63,10 @@ export function StorageGovernancePanel({ client, enabled }: { client: ExportDocM
       </fieldset>}
       <div className="field-grid"><label><span>归档位置</span><select value={archiveLocation} disabled={disabled} onChange={event=>setArchiveLocation(event.target.value)}><option value="">选择已登记位置</option>{(c.locations.data?.registeredRoots??[]).map(name=><option key={name}>{name}</option>)}</select></label><Button disabled={disabled||!archiveLocation||!selected.length||!reason||selected.some(id=>!rows.find(row=>row.id===id)?.basisDate)} onClick={()=>void c.run(signal=>client.archiveRetainedFiles({body:{ids:selected,location:archiveLocation,expectedVersion:c.locations.data!.versionNumber!,reason}},{signal})).then(ok=>{if(ok)setSelected([]);})}>迁移所选档案</Button></div>
       {c.job&&<div className="settings-notice"><p role="status">{c.job.statusText} {readJobMessage(c.job)}</p><ViewJobButton jobId={c.job.jobId}/></div>}
+      {c.tracking.uncertain && <JobTrackingRecovery jobId={c.tracking.jobId} pending={c.tracking.job.isFetching} retry={c.tracking.retry} dismiss={c.tracking.dismiss} />}
       <TextField label="归档或处置理由" value={reason} onChange={setReason} />
       <Button disabled={disabled || !selected.length || !reason || selected.some(id=>!rows.find(row=>row.id===id)?.eligible)} onClick={() => void c.run(signal => client.previewRetentionDeletion({ body: { ids: selected, reason } }, { signal })).then(ok => { if (ok) setSelected([]); })}>预检所选档案</Button>
-      {c.retention.data?.plan && <InlineNotice tone="warning" action={<Button disabled={disabled} onClick={() => void c.run(signal => client.approveRetentionDeletion({ body: { token: c.retention.data!.plan!.token } }, { signal }))}>独立复核并批准</Button>}>待批准 {c.retention.data.plan.count} 个归档引用，共 {formatBytes(c.retention.data.plan.bytes)}；申请账号 #{c.retention.data.plan.requestedBy}；预检有效至 {formatRuntimeDate(c.retention.data.plan.expiresAt)}。</InlineNotice>}
+      {c.retention.data?.plan && <RetentionReview key={c.retention.data.plan.token} plan={c.retention.data.plan} disabled={disabled} approve={() => { void c.run(signal => client.approveRetentionDeletion({ body: { token: c.retention.data!.plan!.token } }, { signal })); }} />}
     </CollapsibleSection>
   </>;
 }

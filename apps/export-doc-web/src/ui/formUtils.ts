@@ -23,11 +23,20 @@ export function readApiError(error: unknown): string {
   return error instanceof Error ? error.message : "请求失败，未取得可识别的错误详情。";
 }
 export function formatErrorResponse(parsed: Partial<ApiErrorResponse>, includeTrace = true): string {
-  const suggestions = Array.isArray(parsed.issues)
-    ? [...new Set(parsed.issues.slice(0,32).map(issue=>issue?.suggestion).filter((value):value is string=>typeof value==="string"&&!!value))] : [];
-  const receipt = parsed.outcome === "Unknown" ? "结果尚未确认，请先查询处理回执，避免重复提交。" : "";
+  const details = Array.isArray(parsed.issues) ? parsed.issues.slice(0, 32).flatMap(issue => {
+    if (!issue) return [];
+    const field = typeof issue.field === "string" ? issue.field : "";
+    const message = typeof issue.message === "string" && (field || issue.message !== parsed.message) ? issue.message : "";
+    const suggestion = typeof issue.suggestion === "string" ? issue.suggestion : "";
+    return [message && (field ? `${field}：${message}` : message), suggestion].filter(Boolean);
+  }) : [];
+  const context = ([['stage', '阶段'], ['node', '流程节点'], ['object', '对象']] as const).flatMap(([key, label]) => {
+    const value = parsed.context?.[key];
+    return typeof value === "string" && value ? [`${label}：${value}`] : [];
+  });
+  const receipt = parsed.outcome === "Unknown" ? "结果尚未确认，请先查询处理回执，避免重复提交。" : parsed.outcome === "PartiallyCommitted" ? "已有部分操作提交，请先核对回执与当前数据，避免重复提交。" : "";
   const trace = includeTrace && typeof parsed.requestId === "string" && parsed.requestId ? `追踪编号：${parsed.requestId}` : "";
-  return [parsed.message,...suggestions,receipt,trace].filter(Boolean).join(" ");
+  return [...new Set([parsed.message, ...context, ...details, receipt, trace].filter(Boolean))].join(" ");
 }
 
 export function isConcurrencyConflict(error: unknown): boolean {

@@ -42,7 +42,7 @@ pub(in crate::engine) fn maintain(
             _=>return Err(invalid("恢复仓库维护操作无效。")),
         };
         store.transaction_as(&actor,|tx,actor|{if result.get("verifiedAt").is_none(){if let Some(at)=tx.settings(CACHE)?.and_then(|v|v.get("verifiedAt").cloned()){result["verifiedAt"]=at;}}tx.set_settings(CACHE,1,&result)?;tx.append_audit_details(&AuditWrite{kind:"recovery-repository",record_id:0,version:saved.revision,action:body["action"].as_str().unwrap_or(""),actor_id:actor.id,occurred_at:&store::timestamp(),note:body["reason"].as_str().unwrap_or("")},&json!({"repository":saved.repository,"result":result}))?;Ok(())})?;
-        Ok(tasks::TaskOutput{detail:result["message"].as_str().unwrap_or("仓库维护已完成。").into(),file:None,destination:None,directory:None,managed_file:None,publication:None,archive:None})
+        Ok(tasks::TaskOutput{committed:true,detail:result["message"].as_str().unwrap_or("仓库维护已完成。").into(),file:None,destination:None,directory:None,managed_file:None,publication:None,archive:None})
     })
 }
 struct Verify;

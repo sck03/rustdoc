@@ -37,10 +37,10 @@ pub(super) fn start(
             let cleanup=fs::remove_dir_all(&working);let commit=capture?;cleanup?;
             if let Err(cause)=repository.retain(saved.plan.retention_count,saved.plan.retention_days) {
                 finish_state(&store,&id,json!({"lastResult":"Partial","lastError":cause.message,"lastPointId":commit.id}))?;
-                return Ok(tasks::TaskOutput{file:None,managed_file:None,destination:None,directory:None,publication:None,archive:None,detail:"恢复点已提交；保留策略未完成，请检查灾备状态。".into()});
+                return Ok(tasks::TaskOutput{committed:true,file:None,managed_file:None,destination:None,directory:None,publication:None,archive:None,detail:"恢复点已提交；保留策略未完成，请检查灾备状态。".into()});
             }
             finish_state(&store,&id,json!({"lastResult":"Succeeded","lastError":"","lastPointId":commit.id,"repositoryId":commit.repository,"logicalBytes":commit.size_bytes,"newBytes":commit.new_bytes}))?;
-            Ok(tasks::TaskOutput{file:None,managed_file:None,destination:None,directory:None,publication:None,archive:None,detail:format!("恢复点已提交并核验：{} 个文件，新增 {} 字节。",commit.files,commit.new_bytes)})
+            Ok(tasks::TaskOutput{committed:true,file:None,managed_file:None,destination:None,directory:None,publication:None,archive:None,detail:format!("恢复点已提交并核验：{} 个文件，新增 {} 字节。",commit.files,commit.new_bytes)})
         })();
         if let Err(cause)=&result {let _=finish_state(&store,&id,json!({"lastResult":"Failed","lastError":cause.message}));}
         result

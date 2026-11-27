@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "c3a8e4464afbe1d2136625221b78a01ffd82002a1d297e91de8e8acad3f0cd3d",
+  "digest": "007904df59c7937292de44505712b21ffca8fb286f47108838f313dcd4878f98",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -73354,6 +73354,58 @@
       "requiresProcessingSlot": false,
       "validatesDecimalInput": false
     },
+    "ResumeMaintenanceSession": {
+      "policy": {
+        "authenticationContext": "Maintenance",
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": false,
+        "requiresLicense": false,
+        "access": {
+          "bypass": true
+        }
+      },
+      "office": null,
+      "parameters": [],
+      "requestBody": null,
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MaintenanceSession"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "409": {
+          "description": "Conflict"
+        },
+        "429": {
+          "description": "Too Many Requests"
+        },
+        "503": {
+          "description": "Service Unavailable"
+        }
+      },
+      "request": null,
+      "response": {
+        "$ref": "#/components/schemas/MaintenanceSession"
+      },
+      "timeoutSeconds": 30,
+      "maxJsonResponseBytes": 67108864,
+      "requiresProcessingSlot": false,
+      "validatesDecimalInput": false
+    },
     "RetryJob": {
       "policy": {
         "requiresAuthentication": true,
@@ -98688,6 +98740,7 @@
         "DEPENDENCY_UNAVAILABLE",
         "OPERATION_TIMEOUT",
         "UNCLASSIFIED_FAILURE",
+        "PARTIAL_COMMIT",
         "DATABASE_UNAVAILABLE",
         "DATABASE_AUTHENTICATION_FAILED",
         "DATABASE_CONNECTION_FAILED",
@@ -98795,6 +98848,7 @@
           "enum": [
             "NotCommitted",
             "Committed",
+            "PartiallyCommitted",
             "Unknown"
           ]
         },
@@ -107432,6 +107486,9 @@
     "ApiRepositoryMaintenanceStatus": {
       "type": "object",
       "properties": {
+        "archiveCleanupCount": {
+          "type": "integer"
+        },
         "bytes": {
           "type": "integer",
           "format": "int64",
@@ -107558,6 +107615,17 @@
         "expiresAt": {
           "type": "string"
         },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ApiRetentionRow"
+          },
+          "maxItems": 100
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 500
+        },
         "requestedBy": {
           "type": "integer"
         },
@@ -107570,7 +107638,9 @@
         "count",
         "bytes",
         "expiresAt",
-        "requestedBy"
+        "requestedBy",
+        "reason",
+        "items"
       ],
       "additionalProperties": false
     },
@@ -115286,6 +115356,9 @@
             "additionalProperties": false
           }
         },
+        "busy": {
+          "type": "boolean"
+        },
         "failure": {
           "$ref": "#/components/schemas/ApiErrorResponse"
         },
@@ -115351,6 +115424,7 @@
       },
       "required": [
         "state",
+        "busy",
         "message",
         "planId",
         "locations",

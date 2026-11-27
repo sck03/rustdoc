@@ -209,7 +209,8 @@ pub(super) fn finish_controlled(
             .as_i64()
             .ok_or_else(|| unavailable("任务记录编号缺失。"))?;
         connection.delete_blob(record_id, OUTPUT)?;
-        if job["cancelRequested"] == true || canceled.is_some_and(|flag| flag.load(std::sync::atomic::Ordering::Acquire)) {
+        let committed = match &result { Ok(output) => output.committed, Err(cause) => cause.partially_committed || cause.outcome_unknown };
+        if !committed && (job["cancelRequested"] == true || canceled.is_some_and(|flag| flag.load(std::sync::atomic::Ordering::Acquire))) {
             job["status"] = json!("Canceled");
             job["statusText"] = json!("已取消");
             job["detailText"] = json!("任务已取消，未发布输出。");

@@ -3,7 +3,7 @@
 use super::*;
 use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 const MAX_MARKS: usize = 1_000_000;
 const MAX_DELETE: usize = 10_000;
 const GRACE_HOURS: i64 = 24;
@@ -47,28 +47,6 @@ impl Drop for Exclusive<'_> {
                 Ok::<_, crate::api::ApiError>(())
             },
         );
-    }
-}
-struct Roots<'a> {
-    repo: &'a Repository,
-    names: BTreeSet<String>,
-}
-impl Visitor for Roots<'_> {
-    fn begin(&mut self, _: &str, _: &str, _: u64, _: &str) -> Result<()> {
-        Ok(())
-    }
-    fn data(&mut self, bytes: &[u8]) -> Result<()> {
-        self.names.insert(
-            self.repo
-                .blob_name(&super::super::hex(&Sha256::digest(bytes)))?,
-        );
-        if self.names.len() > MAX_MARKS {
-            return Err(invalid("仓库标记超过本轮一百万对象预算，未删除任何对象。"));
-        }
-        Ok(())
-    }
-    fn end(&mut self) -> Result<()> {
-        Ok(())
     }
 }
 impl Repository {
@@ -130,11 +108,8 @@ impl Repository {
         }
         self.io.delete("gc-lock")
     }
-    fn roots(&self) -> Result<(BTreeSet<String>, String)> {
-        let mut roots = Roots {
-            repo: self,
-            names: BTreeSet::new(),
-        };
+    fn roots(&self) -> Result<(BTreeMap<String, u64>, String)> {
+        let mut roots = BTreeMap::new();
         let mut fingerprint = Sha256::new();
         let mut cursor = String::new();
         let mut count = 0;
@@ -155,12 +130,28 @@ impl Repository {
                     fingerprint.update(hold);
                 }
                 for page in 0..point.pages {
-                    roots.names.insert(points::page_name(&point.id, page));
+                    roots.insert(points::page_name(&point.id, page), 0);
+                    if roots.len() > MAX_MARKS {
+                        return Err(invalid("仓库标记超过本轮一百万对象预算，未删除任何对象。"));
+                    }
                 }
-                self.verify(&point.id, &mut roots)?;
+                points::references(self, point, &mut |key, size, digest| {
+                    if let Some(previous) = roots.get(key) {
+                        if *previous != size {
+                            return Err(invalid("共享恢复块的声明长度不一致。"));
+                        }
+                    } else {
+                        points::verify_chunk(&self.read(key)?, size, digest)?;
+                        roots.insert(key.to_owned(), size);
+                    }
+                    if roots.len() > MAX_MARKS {
+                        return Err(invalid("仓库标记超过本轮一百万对象预算，未删除任何对象。"));
+                    }
+                    Ok(())
+                })?;
             }
         }
-        Ok((roots.names, super::super::hex(&fingerprint.finalize())))
+        Ok((roots, super::super::hex(&fingerprint.finalize())))
     }
     pub fn hold(&self, id: &str, reason: &str, enabled: bool) -> Result<()> {
         let _guard = Exclusive::acquire(self)?;
@@ -204,14 +195,15 @@ impl Repository {
                 if page.is_empty() {
                     break;
                 }
+                guard.check()?;
                 for name in page {
+                    crate::operation::check()?;
                     cursor = name.clone();
                     examined += 1;
                     if examined > MAX_MARKS {
                         return Err(invalid("仓库扫描超过本轮对象预算，未执行删除。"));
                     }
-                    guard.check()?;
-                    if roots.contains(&name) {
+                    if roots.contains_key(&name) {
                         continue;
                     }
                     let mark = format!("mark-{name}");
@@ -282,7 +274,8 @@ impl Repository {
             return Err(invalid("回收计划超出预算。"));
         }
         for (name, _) in &candidates {
-            if roots.contains(name) || !(name.starts_with("blob-") || name.starts_with("manifest-"))
+            if roots.contains_key(name)
+                || !(name.starts_with("blob-") || name.starts_with("manifest-"))
             {
                 return Err(invalid("回收计划包含受保护对象，已拒绝执行。"));
             }

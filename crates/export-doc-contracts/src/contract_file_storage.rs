@@ -17,7 +17,11 @@ pub(super) fn apply(baseline: &mut Value) {
 pub(super) fn apply_oa_recovery(baseline: &mut Value) {
     changes(
         baseline,
-        include_str!("../tests/fixtures/oa-recovery-refactor-changes.jsonl").lines(),
+        include_str!("../tests/fixtures/oa-recovery-refactor-changes.jsonl")
+            .lines()
+            .chain(
+                include_str!("../tests/fixtures/storage-recovery-hardening-changes.jsonl").lines(),
+            ),
     );
 }
 

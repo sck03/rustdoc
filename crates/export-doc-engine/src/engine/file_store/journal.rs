@@ -1,6 +1,7 @@
 //! Durable upload intents bridge immutable object publication and SQL commit.
 //! An interrupted upload remains observable until the administrator reconciles it.
 use super::*;
+mod archive_cleanup;
 #[cfg(test)]
 #[path = "tests/journal.rs"]
 mod tests;
@@ -42,6 +43,7 @@ impl Drop for UploadLease {
 struct Intent {
     identity: String,
     object: FileObject,
+    archive_source: bool,
 }
 impl FileStore {
     fn journal_root(&self) -> PathBuf {
@@ -54,6 +56,21 @@ impl FileStore {
         &self,
         config: &Configuration,
         object: &FileObject,
+    ) -> Result<UploadLease> {
+        self.begin_intent(config, object, false)
+    }
+    pub(super) fn begin_archive_cleanup(
+        &self,
+        config: &Configuration,
+        object: &FileObject,
+    ) -> Result<UploadLease> {
+        self.begin_intent(config, object, true)
+    }
+    fn begin_intent(
+        &self,
+        config: &Configuration,
+        object: &FileObject,
+        archive_source: bool,
     ) -> Result<UploadLease> {
         let token = paths::nonce().map_err(unavailable)?;
         let lease = UploadLease {
@@ -83,6 +100,7 @@ impl FileStore {
             &serde_json::to_vec(&Intent {
                 identity: config.identity.clone(),
                 object: object.clone(),
+                archive_source,
             })?,
         )
         .map_err(unavailable)?;
@@ -123,6 +141,9 @@ impl FileStore {
             let intent: Intent = serde_json::from_reader(file.take(4096))
                 .map_err(|_| invalid("文件上传回收记录损坏，请核对文件存储维护记录。"))?;
             validate(&intent.object)?;
+            if intent.archive_source {
+                continue;
+            }
 
             let token = path.file_stem().and_then(|v| v.to_str()).unwrap_or("");
             let active = self
@@ -180,7 +201,8 @@ impl FileStore {
                     .uploads
                     .lock()
                     .map_err(|_| unavailable("文件上传状态异常。"))?;
-                if intent.identity == config.identity
+                if !intent.archive_source
+                    && intent.identity == config.identity
                     && removed.contains(&intent.object.digest)
                     && !active
                         .uploads

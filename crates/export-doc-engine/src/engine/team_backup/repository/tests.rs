@@ -1,5 +1,73 @@
 use super::*;
 use std::{fs, io::Write};
+struct CountReads {
+    inner: io::Directory,
+    blobs: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+}
+impl io::ObjectStore for CountReads {
+    fn read(&self, name: &str, limit: usize) -> Result<Option<Vec<u8>>> {
+        if name.starts_with("blob-") {
+            self.blobs
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
+        self.inner.read(name, limit)
+    }
+    fn create(&self, name: &str, bytes: &[u8]) -> Result<bool> {
+        self.inner.create(name, bytes)
+    }
+    fn delete(&self, name: &str) -> Result<()> {
+        self.inner.delete(name)
+    }
+    fn list(&self, prefix: &str, after: &str, limit: usize) -> Result<Vec<String>> {
+        self.inner.list(prefix, after, limit)
+    }
+    fn check(&self) -> Result<()> {
+        self.inner.check()
+    }
+}
+
+#[test]
+fn garbage_collection_verifies_shared_chunks_once_and_rejects_corruption() {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+    let work = super::super::tests::Workspace::new();
+    let root = work.0.join("shared-repository");
+    fs::create_dir(&root).unwrap();
+    let reads = Arc::new(AtomicUsize::new(0));
+    let repo = Repository::open(
+        Box::new(CountReads {
+            inner: io::Directory::open(root.clone(), None).unwrap(),
+            blobs: reads.clone(),
+        }),
+        "11111111111111111111111111111111",
+        "independent-recovery-password",
+        true,
+    )
+    .unwrap();
+    let bytes = b"shared archive";
+    let digest = super::super::hex(&Sha256::digest(bytes));
+    for n in 1..=3 {
+        let mut writer = repo
+            .writer(&format!("{n:032x}"), "SQLite", serde_json::json!({}))
+            .unwrap();
+        writer
+            .file("Attachment", &digest, bytes.len() as u64, &digest, |out| {
+                out.write_all(bytes)?;
+                Ok(())
+            })
+            .unwrap();
+        writer.finish().unwrap();
+    }
+    reads.store(0, Ordering::Relaxed);
+    let plan = repo.preview_gc().unwrap();
+    assert_eq!(plan["protectedObjects"], 4);
+    assert_eq!(reads.load(Ordering::Relaxed), 1);
+    let key = repo.blob_name(&digest).unwrap();
+    fs::write(root.join(key), b"corrupt").unwrap();
+    assert!(repo.preview_gc().is_err());
+}
 struct Readback(Vec<u8>);
 impl Visitor for Readback {
     fn begin(&mut self, _: &str, _: &str, _: u64, _: &str) -> Result<()> {

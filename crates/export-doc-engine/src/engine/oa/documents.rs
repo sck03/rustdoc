@@ -141,6 +141,7 @@ pub(super) fn start(
             }
             crate::operation::check()?;
             Ok(TaskOutput {
+                committed: false,
                 file: None,
                 managed_file: None,
                 destination: None,

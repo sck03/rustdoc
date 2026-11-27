@@ -104,6 +104,7 @@ impl PreparedRestore {
     ) -> super::tasks::TaskOutput {
         let note = detail.to_owned();
         super::tasks::TaskOutput {
+            committed: false,
             file: None,
             destination: None,
             directory: None,

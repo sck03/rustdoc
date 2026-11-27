@@ -200,7 +200,7 @@ impl FileStore {
         Ok(file)
     }
     pub(super) fn verify_object(&self, object: &FileObject) -> Result<()> {
-        let config = self.configuration()?;
+        let config = self.object_configuration(object)?;
         match config.backend {
             Backend::Local { .. } => {
                 self.local_identity(&config)?;

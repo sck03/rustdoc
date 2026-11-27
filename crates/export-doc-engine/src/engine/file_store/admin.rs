@@ -170,6 +170,7 @@ pub(in crate::engine) fn handle(
             }
             let _ = context;
             Ok(TaskOutput {
+                committed: operation != VERIFY_FILE_STORAGE,
                 detail: if body["cancel"] == true {
                     "未完成迁移已撤销，当前存储与已复制文件保留。".into()
                 } else {

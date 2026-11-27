@@ -13,6 +13,8 @@ pub struct ApiError {
     pub suggestion: Option<&'static str>,
     /// A failed transport or commit cannot establish that a write was rolled back.
     pub outcome_unknown: bool,
+    /// Some durable steps committed before the remaining work failed.
+    pub partially_committed: bool,
 }
 
 impl ApiError {
@@ -48,7 +50,7 @@ impl ApiError {
         });
         let unknown =
             self.outcome_unknown || code == ErrorCode::Unknown || matches!(status, 500 | 504);
-        let (retryability, action) = if unknown {
+        let (retryability, action) = if unknown || self.partially_committed {
             ("CheckReceipt", "QueryReceipt")
         } else {
             match status {
@@ -69,7 +71,7 @@ impl ApiError {
             "issues": [{"code": code.as_str(), "field": self.field.unwrap_or(""),
                 "message": message, "suggestion": self.suggestion.unwrap_or("")}],
             "actions": [action], "retryability": retryability,
-            "outcome": if unknown { "Unknown" } else { "NotCommitted" },
+            "outcome": if self.partially_committed { "PartiallyCommitted" } else if unknown { "Unknown" } else { "NotCommitted" },
             "requestId": request_id,
         })
     }
