@@ -165,7 +165,7 @@ try {
   const schedule = page.locator('[aria-label="日常灾备"]');
   await schedule.getByLabel('启用日常灾备', { exact: true }).waitFor();
   assert.equal(await schedule.getByLabel('启用日常灾备', { exact: true }).isChecked(), false);
-  await schedule.getByLabel('备份包密码', { exact: true }).fill('Scheduled-password-2026');
+  await schedule.getByLabel('恢复凭证', { exact: true }).fill('Scheduled-password-2026');
   await schedule.getByLabel('再次输入新密码', { exact: true }).fill('Scheduled-password-2026');
   await page.getByRole('button', { name: '保存计划', exact: true }).click();
   await page.getByText('灾备设置已保存。', { exact: true }).waitFor();
@@ -186,18 +186,18 @@ try {
   assert.equal((await fetch(new URL(archiveTicket.downloadUrl, origin))).status, 404);
   const archiveDownload = await fetch(new URL(archiveTicket.downloadUrl, origin), { headers: { cookie: archiveCookie } });
   assert(archiveDownload.ok);
-  assert(Buffer.from(await archiveDownload.arrayBuffer()).subarray(0, 22).toString().startsWith('EDM-SERVER-MIGRATION-2'));
+  assert(Buffer.from(await archiveDownload.arrayBuffer()).subarray(0, 21).toString().startsWith('EDM-RECOVERY-POINT-1\n'));
   await createUnit('After scheduled archive');
   await page.getByRole('button', { name: '重新加载灾备设置', exact: true }).click();
-  await sections.getByRole('tab', { name: '备份文件', exact: true }).click();
-  await page.locator('[aria-label="完整备份列表"]').getByRole('button', { name: '用于恢复' }).first().click();
-  const archiveRestore = page.locator('[aria-label="从本地完整备份恢复"]');
-  await page.getByText('完整包恢复到服务器数据盘', { exact: true }).waitFor();
+  await sections.getByRole('tab', { name: '恢复点', exact: true }).click();
+  await page.locator('[aria-label="恢复点列表"]').getByRole('button', { name: '用于恢复' }).first().click();
+  const archiveRestore = page.locator('[aria-label="从恢复点恢复"]');
+  assert.equal(await archiveRestore.getByLabel('附件恢复方式').inputValue(), 'Local');
   await archiveRestore.getByLabel('所选备份的密码').fill('Scheduled-password-2026');
   await archiveRestore.getByLabel('管理员当前密码').fill(password);
   await archiveRestore.getByLabel('恢复确认文本').fill('MIGRATE');
   const stagedArchive = page.waitForResponse(response => response.url().endsWith(`/api/disaster-recovery/archives/${archive.id}/restore`) && response.request().method() === 'POST');
-  await archiveRestore.getByRole('button', { name: '校验并安排完整恢复' }).click();
+  await archiveRestore.getByRole('button', { name: '校验并安排恢复' }).click();
   await waitForJob(operation, (await (await stagedArchive).json()).jobId);
   await page.screenshot({ path: path.join(root, 'scheduled-archive-restore.png'), fullPage: true });
   await restoreOffline();
@@ -236,7 +236,7 @@ try {
   await recovery.getByRole('button', { name: '恢复上传文件', exact: true }).click();
   await page.getByRole('region', { name: '后台任务状态', exact: true }).getByText('恢复已暂存。停止服务后运行 --restore-pending 维护命令，再启动服务。', { exact: true }).waitFor();
   assert(await page.locator('details[aria-label="服务器维护步骤"]').evaluate(element => element.open));
-  assert((await page.locator('details[aria-label="服务器维护步骤"]').innerText()).includes('仅支持 schema 18，不自动升级旧库'));
+  assert((await page.locator('details[aria-label="服务器维护步骤"]').innerText()).includes('仅支持 schema 19，不自动升级旧库'));
   assert.equal(await page.getByText('恢复已暂存。停止服务后运行 --restore-pending 维护命令，再启动服务。', { exact: true }).count(), 1);
   await page.getByText(/docker compose run --rm --no-deps restore/u).waitFor();
   assert(await backup.getByRole('button', { name: '创建备份', exact: true }).isDisabled());
@@ -256,14 +256,12 @@ try {
   await migration.getByLabel('创建确认文本', { exact: true }).fill('MIGRATE');
   const migrationDownload = page.waitForEvent('download', { timeout: 120000 });
   await migration.getByRole('button', { name: '创建并下载迁移包', exact: true }).click();
-  await (await migrationDownload).saveAs(path.join(root, 'created-in-browser.edmmigration'));
-  // Existing API-created packages may have valid passwords weaker than the new
-  // password suggestion. Restoring them must not apply the creation-only policy.
-  const legacyPassword = '12345678';
+  await (await migrationDownload).saveAs(path.join(root, 'created-in-browser.edmpoint'));
+  const recoveryPassword = 'Recovery-password-2026';
   const job = await (await operation('CreateServerMigrationPackage', {
-    body: { password: legacyPassword, adminPassword: password, confirmationText: 'MIGRATE' },
+    body: { password: recoveryPassword, adminPassword: password, confirmationText: 'MIGRATE' },
   })).json();
-  const packageFile = path.join(root, 'valid-password.edmmigration');
+  const packageFile = path.join(root, 'valid-password.edmpoint');
   await downloadPackage(job, packageFile);
   const key = fs.readFileSync(path.join(data, 'Security/native-master-key.bin'));
   await createUnit('After migration snapshot');
@@ -292,14 +290,14 @@ try {
   assert.notDeepEqual(fs.readFileSync(path.join(data, 'Security/native-master-key.bin')), key);
   await page.locator('details[aria-label="完整迁移与换机"] > summary').click();
   await migration.locator('input[type=file]').setInputFiles(packageFile);
-  for (const candidate of ['wrong-password', legacyPassword]) {
+  for (const candidate of ['wrong-password', recoveryPassword]) {
     await migration.getByLabel('管理员当前密码').fill(password);
     await migration.getByLabel('迁移包密码', { exact: true }).fill(candidate);
     await migration.getByLabel('恢复确认文本', { exact: true }).fill('MIGRATE');
     const response = page.waitForResponse(r => new URL(r.url()).pathname === operations.get('StageServerMigrationRestore').route && r.request().method() === 'POST');
     await migration.getByRole('button', { name: '安排完整恢复', exact: true }).click();
     assert.equal((await response).status(), 202);
-    if (candidate !== legacyPassword) {
+    if (candidate !== recoveryPassword) {
       await page.getByText(/包密码错误/u).waitFor();
       assert.equal((await (await operation('GetServerMigrationStatus')).json()).pendingRestore, false);
     }

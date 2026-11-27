@@ -200,7 +200,7 @@ try {
     await page.getByLabel('所选备份的密码').fill('SYNTHETIC-BACKUP');
     await page.getByLabel('管理员当前密码').fill('SYNTHETIC-ADMIN');
     await page.getByLabel('恢复确认文本').fill('MIGRATE');
-    await page.getByRole('button', { name: '校验并安排完整恢复' }).click();
+    await page.getByRole('button', { name: '校验并安排恢复' }).click();
     await page.waitForFunction(() => window.calls.length === 1);
     await page.evaluate(() => window.calls[0].resolve({jobId:'review-job'}));
     await page.waitForFunction(() => window.jobs.length === 1);

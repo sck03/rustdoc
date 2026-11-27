@@ -18,20 +18,33 @@ export async function verifyDesktopBackupSave({run,request,token,cdp,output,data
   const job=await call('RunBackupPlan');
   await wait(async()=>{const current=await call('GetJob',undefined,{jobId:job.jobId});assert(!['Failed','Canceled'].includes(current.status),JSON.stringify(current));return current.status==='Succeeded';});
   const archive=(await call('ListRecoveryArchives')).items[0];
-  const manifest=JSON.parse(fs.readFileSync(path.join(dataRoot,'Backups/ScheduledRecovery',`${archive.id}.backup.json`),'utf8'));
-  const destination=path.join(output,'saved-desktop.edmrecovery');
+  const savedStatus=await call('GetBackupPlan');
+  const repository=path.join(dataRoot,'Backups/RecoveryRepositories',`recovery-${savedStatus.repositoryId}`);
+  const destination=path.join(output,'saved-desktop.edmpoint');
   // Supply the user's selection at the native-dialog boundary; keep the real React,
   // generated client, desktop header, HTTP adapter, worker and filesystem publication.
-  await run("location.hash='#/system/backup?section=archives';true");
+  await run("location.hash='#/system/backup?section=points';true");
   await withNativeFilePicker({run,command:'select_save_file_path',destination},async()=>{
     await wait(()=>run("[...document.querySelectorAll('button')].some(button=>button.textContent.trim()==='下载'&&!button.disabled)"));
     await run("[...document.querySelectorAll('button')].find(button=>button.textContent.trim()==='下载'&&!button.disabled).click();true");
     await wait(()=>fs.existsSync(destination));
-    await wait(()=>run("document.body.innerText.includes('完整灾备已保存到所选文件')"));
+    await wait(()=>run("document.body.innerText.includes('便携恢复点已导出')"));
     const bytes=fs.readFileSync(destination);
-    assert.equal(bytes.length,archive.sizeBytes);
-    assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),manifest.sha256.toLowerCase());
+    const magic=Buffer.from('EDM-RECOVERY-POINT-1\n');
+    assert.deepEqual(bytes.subarray(0,magic.length),magic);
+    let offset=magic.length,lastName='',frames=0;
+    while(true) {
+      const length=bytes.readUInt16LE(offset);offset+=2;if(!length)break;
+      const name=bytes.subarray(offset,offset+length).toString();offset+=length;
+      assert.match(name,/^(repository\.json|(?:blob|manifest|point)-[a-zA-Z0-9.-]+)$/u);
+      const size=bytes.readUInt32LE(offset);offset+=4;
+      assert.deepEqual(bytes.subarray(offset,offset+size),fs.readFileSync(path.join(repository,name)),name);
+      offset+=size;lastName=name;frames++;
+    }
+    assert.equal(offset,bytes.length,'portable export has no truncation or trailing bytes');
+    assert.equal(lastName,`point-${archive.id}.commit`);assert(frames>=3);
+    const sha256=crypto.createHash('sha256').update(bytes).digest('hex');
     await captureScreenshot(cdp,path.join(output,'Full-backup-saved.png'));
-    fs.writeFileSync(path.join(output,'backup-save-result.json'),JSON.stringify({id:archive.id,size:bytes.length,sha256:manifest.sha256,saved:true},null,2));
+    fs.writeFileSync(path.join(output,'backup-save-result.json'),JSON.stringify({id:archive.id,size:bytes.length,sha256,saved:true},null,2));
   });
 }

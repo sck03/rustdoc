@@ -1,8 +1,8 @@
-export type BackupSection = "plan" | "replica" | "archives" | "recovery" | "migration";
+export type BackupSection = "plan" | "destination" | "points" | "recovery" | "migration";
 export type MaintenanceSection = "diagnostics" | "logs" | "ownership" | "invoice-cleanup" | "support" | "jobs";
 export const backupSections = [
-  { key: "plan", label: "备份计划" }, { key: "replica", label: "异机副本" },
-  { key: "archives", label: "备份文件" }, { key: "recovery", label: "恢复" }, { key: "migration", label: "整机迁移" },
+  { key: "plan", label: "备份计划" }, { key: "destination", label: "备份位置" },
+  { key: "points", label: "恢复点" }, { key: "recovery", label: "恢复" }, { key: "migration", label: "整机迁移" },
 ] as const;
 export const maintenanceSections = [
   { key: "diagnostics", label: "运行检查" }, { key: "logs", label: "日志管理" },

@@ -31,5 +31,19 @@ for (const [status, body] of [
 for (const text of ["invalid JSON", "null", "[]", "42"]) {
   assert.equal(isConcurrencyConflict(new ApiError(409, "Conflict", text)), false);
 }
-assert.equal(readApiError(new ApiError(503, "Unavailable", "plain response")), "plain response");
+for (const response of ["plain response", "<html>gateway credentials</html>", "null", "[]", '{"message":42}']) {
+  const message = readApiError(new ApiError(503, "Unavailable", response));
+  assert.match(message, /HTTP 503/);
+  assert.match(message, /先查询处理结果/);
+  assert(!message.includes(response), "unrecognized upstream content must not be rendered");
+}
+const unavailable = readApiError(new ApiError(503, "Unavailable", JSON.stringify({
+  message: "文件库离线，无法读取附件。", requestId: "request-fixture", outcome: "Unknown",
+  issues: [{ suggestion: "重新连接已登记介质。" }, { suggestion: "重新连接已登记介质。" }],
+})));
+assert.match(unavailable, /文件库离线/);
+assert.equal(unavailable.match(/重新连接已登记介质/g)?.length, 1);
+assert.match(unavailable, /先查询处理回执/);
+assert.match(unavailable, /追踪编号：request-fixture/);
+assert.match(readApiError(new TypeError("fetch failed")), /检查网络和服务状态/);
 console.log("frontend structured concurrency feedback tests passed");

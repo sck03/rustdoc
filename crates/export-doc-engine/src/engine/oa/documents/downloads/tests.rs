@@ -104,6 +104,7 @@ fn busy_document_generation_recovers_and_download_rechecks_request_access() {
         None,
     );
     let node = fixture::node("review", &[], "Named", json!([reviewer_id]));
+    settings["handlingServices"] = json!([fixture::handling_service("Other", reviewer_id)]);
     let mut handling = fixture::node("handle", &["review"], "Named", json!([reviewer_id]));
     handling["kind"] = json!("Handling");
     handling["phase"] = json!("Fulfillment");
@@ -130,7 +131,7 @@ fn busy_document_generation_recovers_and_download_rechecks_request_access() {
         admin,
         crate::generated_api::CREATE_GENERAL_REQUEST,
         Some(
-            json!({"requestKey":crate::paths::nonce().unwrap(),"employeeId":applicant["employee"]["id"],"title":"完整下载并发边界","reason":"下载准备之后撤销申请查看权限","category":"Other"}),
+            json!({"requestKey":crate::paths::nonce().unwrap(),"employeeId":applicant["employee"]["id"],"title":"完整下载并发边界","reason":"下载准备之后撤销申请查看权限","category":"Other","serviceId":"fixture-Other"}),
         ),
     );
     let id = draft["id"].as_i64().unwrap();

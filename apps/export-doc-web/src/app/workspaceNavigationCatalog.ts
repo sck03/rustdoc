@@ -175,7 +175,7 @@ const navigationEntries = {
       { label: "授权注册", description: "查看试用状态，办理软件授权", to: "/system/license", icon: KeyRound,
         isActive: isLicenseRoute, requiresAdmin: true },
       ] },
-  backup: { label: "备份与恢复", description: "管理备份计划、异机副本、恢复与整机迁移", to: "/system/backup", icon: Archive, requiresAdmin: true, isActive: path => path.startsWith("/system/backup"), searchItems: settingsFeatureLinks.filter(item => item.to.startsWith("/system/backup")).map(item => ({...item, icon: Archive, isActive: (path: string) => path.startsWith("/system/backup")})) },
+  backup: { label: "备份与恢复", description: "管理备份位置、恢复点与整机迁移", to: "/system/backup", icon: Archive, requiresAdmin: true, isActive: path => path.startsWith("/system/backup"), searchItems: settingsFeatureLinks.filter(item => item.to.startsWith("/system/backup")).map(item => ({...item, icon: Archive, isActive: (path: string) => path.startsWith("/system/backup")})) },
   maintenance: { label: "系统维护", description: "检查运行状态，管理日志、数据归属和诊断", to: "/system/maintenance", icon: Wrench, requiresAdmin: true, isActive: path => path.startsWith("/system/maintenance"), searchItems: settingsFeatureLinks.filter(item => item.to.startsWith("/system/maintenance")).map(item => ({...item, icon: Wrench, isActive: (path: string) => path.startsWith("/system/maintenance")})) },
 } satisfies Record<string, WorkspaceNavItem>;
 

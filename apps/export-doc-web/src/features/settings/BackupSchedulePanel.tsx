@@ -17,7 +17,7 @@ export function BackupSchedulePanel({ controller: c, disabled }: { controller: B
         {plan.frequency === "Weekly" && <label><span>每周执行日</span><select value={plan.weekday} onChange={(event) => c.updatePlan("weekday", Number(event.target.value))}>{["日", "一", "二", "三", "四", "五", "六"].map((day, index) => <option key={day} value={index}>星期{day}</option>)}</select></label>}
       </div>}
       <div className="field-grid">
-        <label><span>{c.status.encryptionPasswordSet ? "更换备份包密码" : "备份包密码"}</span><input type="password" autoComplete="new-password" value={c.draft.encryptionPassword} placeholder={c.status.encryptionPasswordSet ? "留空保留已保存密码" : "至少 12 个字符"} onChange={(event) => c.setPassword(event.target.value)} /></label>
+        <label><span>{c.status.encryptionPasswordSet ? "更换恢复凭证" : "恢复凭证"}</span><input type="password" autoComplete="new-password" value={c.draft.encryptionPassword} placeholder={c.status.encryptionPasswordSet ? "留空保留已保存密码" : "至少 12 个字符"} onChange={(event) => c.setPassword(event.target.value)} /></label>
         <label><span>再次输入新密码</span><input type="password" autoComplete="new-password" value={c.confirmation} onChange={(event) => c.setConfirmation(event.target.value)} /></label>
       </div>
       <p className="settings-helper-text">请单独保管密码。旧备份仍须用创建时的密码打开；修改密码不会重新加密旧包。</p>

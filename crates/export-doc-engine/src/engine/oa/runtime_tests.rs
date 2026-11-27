@@ -54,6 +54,7 @@ fn future_personnel_changes_and_reminders_survive_restart_without_duplicates() {
         ),
     );
     let mut settings = workflow::request(&service, admin, GET_OA_APPROVAL_SETTINGS, None);
+    settings["handlingServices"] = json!([workflow::handling_service("Other", reviewer_id)]);
     for rule in settings["rules"]
         .as_array_mut()
         .unwrap()
@@ -225,7 +226,7 @@ fn future_personnel_changes_and_reminders_survive_restart_without_duplicates() {
         admin,
         CREATE_GENERAL_REQUEST,
         Some(
-            json!({"requestKey":nonce().unwrap(),"employeeId":people[1]["employee"]["id"],"title":"重启提醒","reason":"提醒不应代签","category":"Other"}),
+            json!({"requestKey":nonce().unwrap(),"employeeId":people[1]["employee"]["id"],"title":"重启提醒","reason":"提醒不应代签","category":"Other","serviceId":"fixture-Other"}),
         ),
     );
     let pending = command(&service, admin, SUBMIT_GENERAL_REQUEST, &pending).unwrap();
@@ -291,6 +292,7 @@ fn scheduled_publication_and_hierarchical_escalation_are_durable_and_never_sign(
     );
     let mut settings = workflow::request(&service, admin, GET_OA_APPROVAL_SETTINGS, None);
     let mut stage = workflow::node("timer-review", &[], "Named", json!([first]));
+    settings["handlingServices"] = json!([workflow::handling_service("Other", first)]);
     stage["escalations"] = json!([{"afterHours":1,"action":"Remind"},{"afterHours":2,"action":"NotifySupervisor","target":{"source":"Named","userIds":[next]}},{"afterHours":3,"action":"Reassign","target":{"source":"Named","userIds":[next]}},{"afterHours":4,"action":"Exception"}]);
     settings["rules"]
         .as_array_mut()
@@ -301,7 +303,7 @@ fn scheduled_publication_and_hierarchical_escalation_are_durable_and_never_sign(
     settings["expectedVersion"] = settings["versionNumber"].clone();
     let settings = workflow::save_settings(&service, admin, settings).unwrap();
     let at = chrono::Utc::now() + chrono::Duration::minutes(2);
-    let body = json!({"expectedVersion":settings["versionNumber"],"expectedRevision":settings["revisions"]["rule:general"],"definitionKey":"general","activateAt":at.to_rfc3339(),"commandKey":nonce().unwrap(),"samples":[{"employeeId":applicant["employee"]["id"],"appointmentId":applicant["organization"]["primaryAssignmentId"],"amount":"0","currency":"CNY","duration":"1","category":"Other"}]});
+    let body = json!({"expectedVersion":settings["versionNumber"],"expectedRevision":settings["revisions"]["rule:general"],"definitionKey":"general","activateAt":at.to_rfc3339(),"commandKey":nonce().unwrap(),"samples":[{"employeeId":applicant["employee"]["id"],"appointmentId":applicant["organization"]["primaryAssignmentId"],"amount":"0","currency":"CNY","duration":"1","category":"Other","serviceId":"fixture-Other"}]});
     let scheduled = workflow::request(&service, admin, SCHEDULE_OA_DEFINITION, Some(body.clone()));
     let replayed = workflow::request(&service, admin, SCHEDULE_OA_DEFINITION, Some(body));
     assert_eq!(replayed["versionNumber"], scheduled["versionNumber"]);
@@ -321,7 +323,7 @@ fn scheduled_publication_and_hierarchical_escalation_are_durable_and_never_sign(
         admin,
         CREATE_GENERAL_REQUEST,
         Some(
-            json!({"requestKey":nonce().unwrap(),"employeeId":applicant["employee"]["id"],"title":"逐级升级","reason":"系统不得代签","category":"Other"}),
+            json!({"requestKey":nonce().unwrap(),"employeeId":applicant["employee"]["id"],"title":"逐级升级","reason":"系统不得代签","category":"Other","serviceId":"fixture-Other"}),
         ),
     );
     let pending = command(&service, admin, SUBMIT_GENERAL_REQUEST, &draft).unwrap();
@@ -364,7 +366,7 @@ fn scheduled_publication_and_hierarchical_escalation_are_durable_and_never_sign(
         admin,
         SCHEDULE_OA_DEFINITION,
         Some(
-            json!({"expectedVersion":current["versionNumber"],"definitionKey":"general","activateAt":at.to_rfc3339(),"commandKey":nonce().unwrap(),"samples":[{"employeeId":applicant["employee"]["id"],"appointmentId":applicant["organization"]["primaryAssignmentId"],"category":"Other"}]}),
+            json!({"expectedVersion":current["versionNumber"],"definitionKey":"general","activateAt":at.to_rfc3339(),"commandKey":nonce().unwrap(),"samples":[{"employeeId":applicant["employee"]["id"],"appointmentId":applicant["organization"]["primaryAssignmentId"],"category":"Other","serviceId":"fixture-Other"}]}),
         ),
     );
     workflow::request(

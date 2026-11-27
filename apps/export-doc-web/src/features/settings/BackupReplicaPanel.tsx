@@ -11,8 +11,8 @@ export function BackupReplicaPanel({ controller: c, disabled }: { controller: Ba
   if (!c.draft || !c.status) return null;
   const { plan, webDav } = c.draft;
   const s3 = plan.s3;
-  return <section className="form-section" aria-label="备份目标">
-    <div className="section-header"><h2>备份目标</h2></div>
+  return <section className="form-section" aria-label="备份位置">
+    <div className="section-header"><h2>备份位置</h2></div>
     <p className="section-description">恢复点直接写入所选仓库。同机备份不能抵御整机故障。</p>
     <fieldset className="settings-fieldset" disabled={disabled}>
       <label><span>备份存储</span><select value={plan.replicaMode} onChange={(event) => c.updatePlan("replicaMode", event.target.value as typeof plan.replicaMode)}><option value="None">服务器／本机</option><option value="Directory">已登记目录／移动硬盘</option><option value="WebDav">WebDAV／NAS</option><option value="S3" disabled={!c.status.s3Available}>S3／兼容对象存储</option></select></label>

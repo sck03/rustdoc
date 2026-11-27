@@ -7,11 +7,11 @@ import { replicaResultLabel } from "./backupPlanModel.ts";
 import { formatBytes, formatRuntimeDate } from "./settingsFormatters.ts";
 
 export function BackupArchivesPanel({ controller: c, disabled, onRestore }: { controller: BackupPlanController; disabled: boolean; onRestore: (id: string) => void }) {
-  return <section className="form-section" aria-label="完整备份">
-    <div className="section-header"><h3>完整备份</h3></div>
+  return <section className="form-section" aria-label="恢复点">
+    <div className="section-header"><h3>恢复点</h3></div>
     {c.archiveQuery.isError && <InlineNotice tone="error">{readApiError(c.archiveQuery.error)}</InlineNotice>}
-    <ResponsiveTableFrame className="backup-table-frame" label="完整备份列表"><table className="backup-table" aria-label="完整备份列表">
-      <thead><tr><th>创建时间</th><th>大小</th><th>异机副本</th><th>操作</th></tr></thead>
+    <ResponsiveTableFrame className="backup-table-frame" label="恢复点列表"><table className="backup-table" aria-label="恢复点列表">
+      <thead><tr><th>创建时间</th><th>大小</th><th>核验状态</th><th>操作</th></tr></thead>
       <tbody>{c.archives.length ? c.archives.map((archive) => <tr key={archive.id}>
         <td title={archive.fileName}>{formatRuntimeDate(archive.createdAt)}</td><td>{formatBytes(archive.sizeBytes)}</td>
         <td title={archive.message}>{!archive.available && <span role="status">{archive.integrityMessage}</span>}{replicaResultLabel(archive.replicaStatus)}{archive.message && <small className="settings-helper-text">{archive.message}</small>}</td>

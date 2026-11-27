@@ -14,7 +14,7 @@ export function BackupRecoveryPage({ client, canManageSettings }: { client: Expo
   const [error, setError] = useState<string | null>(null);
   const health = useQuery({ queryKey: queryKeys.health(), queryFn: ({ signal }) => client.getHealth({ signal }), enabled: canManageSettings });
   if (!canManageSettings) return <PageState tone="permission" title="需要系统设置管理权限" />;
-  return <RecordWorkspace title="备份与恢复" description="选择备份计划、文件、恢复或迁移任务。">
+  return <RecordWorkspace title="备份与恢复">
     {error && <InlineNotice tone="error">{error}</InlineNotice>}
     {health.isError ? <PageState tone="error" title="无法读取运行模式" description={readApiError(health.error)} action={<button type="button" onClick={() => void health.refetch()}>重试</button>} />
       : !health.data ? <PageState tone="loading" title="正在读取运行模式" />

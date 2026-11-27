@@ -21,7 +21,7 @@ export function MaintenanceOperationsGuide({ pending }: { pending: boolean }) {
       <h3>升级：先备份，再更新镜像，最后核对</h3>
       <ol>
         <li>在网页“完整迁移与换机”中创建并下载完整迁移包，另外保管部署配置及包密码。</li>
-        <li>确认新版支持当前数据库模型，再取得镜像、停止旧服务并启动新版。当前仅支持 schema 18，不自动升级旧库。</li>
+        <li>确认新版支持当前数据库模型，再取得镜像、停止旧服务并启动新版。当前仅支持 schema 19，不自动升级旧库。</li>
         <li>服务就绪后核对版本、登录、附件及 PDF。程序更新不使用恢复参数；数据库模型不匹配时保留原数据并停止部署。</li>
       </ol>
       <pre className="settings-helper-text">{"docker compose pull\ndocker compose down\ndocker compose up -d --wait"}</pre>

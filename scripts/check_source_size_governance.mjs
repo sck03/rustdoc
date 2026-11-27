@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { walkSourceFiles } from "./lib/source-files.mjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,6 +8,9 @@ const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url))
 const baselinePath = path.join(repositoryRoot, "scripts", "baselines", "source-size-governance.json");
 
 const baseline = JSON.parse(readFileSync(baselinePath, "utf8"));
+// Count public source, including new files, while respecting local-only tools and secrets.
+const sourcePaths = new Set(execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+  { cwd: repositoryRoot, encoding: "utf8", windowsHide: true }).split("\0"));
 const ignoredDirectoryNames = new Set([
   ".codex-runtime",
   ".git",
@@ -32,7 +36,7 @@ for (const rule of baseline.rules ?? []) {
     .filter((file) => regex.test(path.basename(file)))
     .filter((file) => {
       const relativePath = path.relative(repositoryRoot, file).replaceAll(path.sep, "/");
-      return (!relativePathRegex || relativePathRegex.test(relativePath))
+      return sourcePaths.has(relativePath) && (!relativePathRegex || relativePathRegex.test(relativePath))
         && (!excludeRegex || !excludeRegex.test(relativePath));
     });
   const entries = files.map((file) => ({

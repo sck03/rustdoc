@@ -30,7 +30,7 @@ export function BackupArchiveRestorePanel({ client, controller: c, disabled, pos
     <div className="section-header"><h3>从恢复点恢复</h3></div>
     {message && <InlineNotice tone="error">{message}</InlineNotice>}
     <fieldset className="settings-fieldset" disabled={busy}><div className="field-grid">
-      <label><span>选择完整备份</span><select value={id} onChange={(event) => setId(event.target.value)}><option value="">请选择备份</option>{c.archives.map((archive) => <option key={archive.id} value={archive.id} disabled={!archive.available}>{formatRuntimeDate(archive.createdAt)} · {formatBytes(archive.sizeBytes)}</option>)}</select></label>
+      <label><span>选择恢复点</span><select value={id} onChange={(event) => setId(event.target.value)}><option value="">请选择恢复点</option>{c.archives.map((archive) => <option key={archive.id} value={archive.id} disabled={!archive.available}>{formatRuntimeDate(archive.createdAt)} · {formatBytes(archive.sizeBytes)}</option>)}</select></label>
       <label><span>所选备份的密码</span><input type="password" autoComplete="off" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
       <label><span>附件恢复方式</span><select value={fileMode} onChange={event => setFileMode(event.target.value as typeof fileMode)}><option value="Local">重建到本机文件库</option><option value="Directory">重建到已登记位置</option><option value="Reconnect">接回完好的原文件库</option></select></label>
       {fileMode === "Directory" && <label><span>目标位置</span><select value={targetLocation} onChange={event => setTargetLocation(event.target.value)}><option value="">请选择目标位置</option>{c.status?.locations?.map(location => <option key={location.id} value={location.id}>{location.name}</option>)}</select></label>}

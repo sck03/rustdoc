@@ -17,7 +17,7 @@ export function validateBackupPlan(draft: ApiBackupPlanSaveRequest, status: ApiB
   const { plan, encryptionPassword: password } = draft;
   if (password && ([...password].length < 12 || [...password].length > 1024)) return "新备份密码须为 12–1024 个字符。";
   if (password !== confirmation) return "两次输入的备份密码不一致。";
-  if (plan.enabled && !password && !status.encryptionPasswordSet) return "启用日常灾备前，请先设置备份包密码。";
+  if (plan.enabled && !password && !status.encryptionPasswordSet) return "启用日常灾备前，请先设置恢复凭证。";
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(plan.time)) return "请选择有效的备份时间。";
   if (!Number.isInteger(plan.retentionCount) || plan.retentionCount < 1 || plan.retentionCount > 365) return "保留份数须为 1–365。";
   if (!Number.isInteger(plan.retentionDays) || plan.retentionDays < 0 || plan.retentionDays > 3650) return "保留天数须为 0–3650，0 表示只按份数保留。";

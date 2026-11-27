@@ -43,6 +43,14 @@ pub fn rule(kind: &str, variant: &str, stages: Value) -> Value {
     );
     json!({"key":key,"kind":kind,"variant":variant,"name":key,"stages":stages,"notifyUserIds":[]})
 }
+pub fn handling_service(category: &str, reviewer: i64) -> Value {
+    let name = export_doc_contracts::native_contract::general_categories::CATEGORIES
+        .iter()
+        .find(|(key, _)| *key == category)
+        .unwrap()
+        .1;
+    json!({"key":format!("fixture-{category}"),"name":name,"category":category,"handlerUserIds":[reviewer],"isActive":true})
+}
 #[track_caller]
 pub fn request(service: &NativeService, token: &str, op: Operation, body: Option<Value>) -> Value {
     call(service, token, op, 0, body).unwrap_or_else(|error| panic!("{}: {error:?}", op.id))
@@ -238,7 +246,12 @@ pub fn configure(service: &NativeService, admin: &str, reviewer: i64) -> Value {
     );
     let mut settings = request(service, admin, GET_OA_APPROVAL_SETTINGS, None);
     if services(service, admin).unwrap().is_empty() {
-        settings["handlingServices"] = json!(export_doc_contracts::native_contract::general_categories::CATEGORIES.iter().map(|(category,name)| json!({"key":format!("fixture-{category}"),"name":name,"category":category,"handlerUserIds":[reviewer],"isActive":true})).collect::<Vec<_>>());
+        settings["handlingServices"] = json!(
+            export_doc_contracts::native_contract::general_categories::CATEGORIES
+                .iter()
+                .map(|(category, _)| handling_service(category, reviewer))
+                .collect::<Vec<_>>()
+        );
     }
     for rule in settings["rules"]
         .as_array_mut()

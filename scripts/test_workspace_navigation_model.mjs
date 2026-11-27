@@ -306,7 +306,8 @@ assert(model.findWorkspaceNavItem("/audit-logs")?.requiresSystemAdministration =
 assert(model.findWorkspaceNavItem("/system/access-control")?.requiresSystemAdministration === true, "access control route requires system administration capability");
 assert(model.findWorkspaceNavItem("/system/update")?.desktopOnly === true, "updater route requires desktop runtime");
 const routes = model.searchWorkspaceNavGroups("WebDAV", adminGroups).flatMap(group => group.items);
-assert(routes.some(item => item.to === "/system/backup?section=replica" && item.locationLabel.includes("系统管理 / 备份与恢复") && item.label === "异机副本"), "search resolves the current replica settings and displays their location");
+assert(routes.some(item => item.to === "/system/backup?section=destination" && item.locationLabel.includes("系统管理 / 备份与恢复") && item.label === "备份位置"), "search resolves backup destinations and displays their location");
+assert(model.searchWorkspaceNavGroups("恢复点", adminGroups).flatMap(group => group.items).some(item => item.to === "/system/backup?section=points" && item.label === "恢复点"), "search exposes recovery points");
 assert(model.searchWorkspaceNavGroups("WebDAV", salesGroups).length === 0, "feature search preserves administrative boundaries");
 const dictionaryOnly = model.filterWorkspaceNavGroups({ canUseDocumentWorkspace: true, ...moduleGrants(["document.declaration-dictionary"]), permissions: [permissionGrant("document.declaration-dictionary", "view")] });
 assert(dictionaryOnly[0].items[0].label === "单一窗口" && dictionaryOnly[0].items[0].to === "/single-window/reference-catalog", "a merged area opens its first authorized destination");

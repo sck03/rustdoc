@@ -41,7 +41,7 @@ export default function BackupSettingsPanel({ client, databaseProvider, disabled
     {c.success && <InlineNotice tone="success">{c.success}</InlineNotice>}
     <div className="section-header backup-plan-toolbar"><span role="status">{c.dirty ? "灾备设置有未保存修改" : "灾备设置已保存"}</span><div className="toolbar-actions">
       <button className="command-button secondary" type="button" disabled={c.busy || c.query.isFetching} onClick={() => void c.reload()}><RefreshCw size={16} aria-hidden="true" /><span>重新加载灾备设置</span></button>
-      {(section === "plan" || section === "replica") && <button className="command-button" type="button" disabled={busy || !c.draft || !c.dirty} onClick={c.save}><Save size={16} aria-hidden="true" /><span>{section === "plan" ? "保存计划" : "保存副本设置"}</span></button>}
+      {(section === "plan" || section === "destination") && <button className="command-button" type="button" disabled={busy || !c.draft || !c.dirty} onClick={c.save}><Save size={16} aria-hidden="true" /><span>{section === "plan" ? "保存计划" : "保存备份位置"}</span></button>}
     </div></div>
     {!c.status && c.query.isLoading && <PageState tone="loading" title="正在读取灾备设置" />}
     {section === "plan" && c.status && <InlineNotice tone={c.status.lastError ? "warning" : "info"} title={`最近灾备：${backupResultLabel(c.status.lastResult)}`}>
@@ -54,9 +54,9 @@ export default function BackupSettingsPanel({ client, databaseProvider, disabled
       {c.jobError || (c.job ? readJobMessage(c.job) : "正在读取任务状态")}
     </InlineNotice>}
     {section === "plan" && <BackupSchedulePanel controller={c} disabled={busy} />}
-    {section === "archives" && <BackupArchivesPanel controller={c} disabled={busy} onRestore={(id) => setSection("recovery", id)} />}
-    {section === "archives" && <RecoveryRepositoryPanel client={client} disabled={busy} />}
-    {section === "replica" && <BackupReplicaPanel controller={c} disabled={busy} />}
+    {section === "points" && <BackupArchivesPanel controller={c} disabled={busy} onRestore={(id) => setSection("recovery", id)} />}
+    {section === "points" && <RecoveryRepositoryPanel client={client} disabled={busy} />}
+    {section === "destination" && <BackupReplicaPanel controller={c} disabled={busy} />}
     {section === "recovery" && databaseProvider && <>
       {postgres && <InlineNotice tone="warning" title="恢复前须隔离旧实例">请选择接回原文件库或重建到新位置。核验通过后，在维护期间切换数据库与配置。</InlineNotice>}
       <BackupArchiveRestorePanel client={client} controller={c} disabled={busy} postgres={postgres} selectedId={selectedId} />
