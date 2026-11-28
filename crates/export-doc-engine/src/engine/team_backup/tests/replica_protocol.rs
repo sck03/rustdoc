@@ -35,7 +35,9 @@ fn webdav_repository_objects_are_conditional_and_read_back_before_commit() {
             .iter()
             .map(|c| c.split_once(' ').unwrap().0)
             .collect::<Vec<_>>(),
-        ["MKCOL", "PUT", "GET", "MKCOL", "PUT", "DELETE"]
+        [
+            "MKCOL", "MKCOL", "PUT", "GET", "MKCOL", "MKCOL", "PUT", "DELETE"
+        ]
     );
 }
 #[cfg(feature = "s3-backup")]

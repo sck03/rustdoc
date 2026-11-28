@@ -3,7 +3,7 @@ import { formatRuntimeDate } from "./settingsFormatters.ts";
 import { CollapsibleSection } from "../../ui/primitives/Card.tsx";
 import { Button } from "../../ui/Button.tsx";
 
-export function BackupSchedulePanel({ controller: c, disabled }: { controller: BackupPlanController; disabled: boolean }) {
+export function BackupSchedulePanel({ controller: c, disabled, onCredentials }: { controller: BackupPlanController; disabled: boolean; onCredentials: () => void }) {
   if (!c.draft || !c.status) return null;
   const { plan } = c.draft;
   return <section className="form-section" aria-label="日常灾备">
@@ -16,11 +16,11 @@ export function BackupSchedulePanel({ controller: c, disabled }: { controller: B
         <label><span>备份时间（{c.status.timeZone}）</span><input type="time" value={plan.time} onChange={(event) => c.updatePlan("time", event.target.value)} /></label>
         {plan.frequency === "Weekly" && <label><span>每周执行日</span><select value={plan.weekday} onChange={(event) => c.updatePlan("weekday", Number(event.target.value))}>{["日", "一", "二", "三", "四", "五", "六"].map((day, index) => <option key={day} value={index}>星期{day}</option>)}</select></label>}
       </div>}
-      <div className="field-grid">
-        <label><span>{c.status.encryptionPasswordSet ? "更换恢复凭证" : "恢复凭证"}</span><input type="password" autoComplete="new-password" value={c.draft.encryptionPassword} placeholder={c.status.encryptionPasswordSet ? "留空保留已保存密码" : "至少 12 个字符"} onChange={(event) => c.setPassword(event.target.value)} /></label>
+      {c.status.encryptionPasswordSet ? <Button variant="secondary" onClick={onCredentials}>管理恢复凭证</Button> : <div className="field-grid">
+        <label><span>恢复凭证</span><input type="password" autoComplete="new-password" value={c.draft.encryptionPassword} placeholder="至少 12 个字符" onChange={(event) => c.setPassword(event.target.value)} /></label>
         <label><span>再次输入新密码</span><input type="password" autoComplete="new-password" value={c.confirmation} onChange={(event) => c.setConfirmation(event.target.value)} /></label>
-      </div>
-      <p className="settings-helper-text">请单独保管密码。旧备份仍须用创建时的密码打开；修改密码不会重新加密旧包。</p>
+      </div>}
+      {!c.status.encryptionPasswordSet && <p className="settings-helper-text">请单独保管恢复凭证，恢复时需要使用。</p>}
       <CollapsibleSection className="maintenance-advanced-details" title="保留策略" error={Boolean(c.message)}>
         <div className="field-grid">
           <label><span>保留最新份数</span><input type="number" min={1} max={365} step={1} value={plan.retentionCount} onChange={(event) => c.updatePlan("retentionCount", Number(event.target.value))} /></label>

@@ -111,6 +111,7 @@ fn publication_checks_typed_business_fields_currency_and_no_implicit_approver() 
         duration: None,
         department: "D".into(),
         category: "".into(),
+        service_id: "".into(),
         personnel_action: "".into(),
         returnable: "".into(),
     };

@@ -13,6 +13,7 @@ use std::{
 };
 pub(super) mod capture;
 mod catalog;
+pub(super) mod names;
 pub(in crate::engine) use catalog::Catalog;
 mod garbage;
 pub(super) mod io;
@@ -28,6 +29,7 @@ use io::ObjectStore;
 pub(super) use points::{PointWriter, Visitor};
 const KEY_MAGIC: &[u8] = b"EDM-REPOSITORY-KEY-1\0";
 const HEADER: &str = "repository.json";
+const FORMAT: u32 = 2;
 const PAGE_BYTES: usize = 64 * 1024;
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -55,6 +57,10 @@ pub(in crate::engine::team_backup) struct Repository {
     io: Box<dyn ObjectStore>,
     pub id: String,
     root: zeroize::Zeroizing<[u8; 32]>,
+}
+pub(in crate::engine::team_backup) struct PointPage {
+    pub items: Vec<Commit>,
+    pub next_cursor: String,
 }
 impl Repository {
     pub fn open(
@@ -91,7 +97,7 @@ impl Repository {
             writer.write_all(root.as_ref())?;
             writer.finish()?;
             let header = Header {
-                format: 1,
+                format: FORMAT,
                 id: expected_id.into(),
                 wrapped_key: wrapped,
             };
@@ -100,7 +106,7 @@ impl Repository {
             }
             header
         };
-        if header.format != 1 || header.id != expected_id {
+        if header.format != FORMAT || header.id != expected_id {
             return Err(invalid("备份仓库身份或格式不匹配，禁止接管另一个仓库。"));
         }
         let mut decoded = zeroize::Zeroizing::new(Vec::new());
@@ -226,6 +232,19 @@ impl Repository {
             }
         }
         Ok(points)
+    }
+    pub fn page(&self, after: &str, limit: usize) -> Result<PointPage> {
+        let items = self.list(after, limit)?;
+        let mut next_cursor = String::new();
+        if items.len() == limit
+            && let Some(last) = items.last()
+        {
+            let after = format!("point-{}.commit", last.id);
+            if !self.list(&after, 1)?.is_empty() {
+                next_cursor = after;
+            }
+        }
+        Ok(PointPage { items, next_cursor })
     }
     pub fn writer(
         &self,

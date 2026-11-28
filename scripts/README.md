@@ -1,5 +1,7 @@
 # 脚本使用说明
 
+2026-11-28 恢复契约专项：`node scripts/test_recovery_pagination_ui.mjs` 使用真实 React 和模拟 HTTP 验证准确翻页、返回首页、空页刷新导航、选择/预检失效及唯一凭证入口，已登记到 `test:storage-governance-lifecycle`。`test_async_draft_ui.mjs` 按容量保存的独立版本回执验证续编；Rust 仅执行恢复、容量、维护执行器、审批图和契约定向测试。结果、仓库格式 2 边界与空间清理见[本批记录](../docs/archive/2026-11/2026-11-28恢复契约与资源优化.md)。
+
 2026-11-28 异步草稿专项：`npm --prefix apps/export-doc-web run test:async-draft-ui` 使用真实邮件模板/容量界面，验证客户响应乱序、手工草稿保留、过期搜索/预览/跳转拦截、策略保存版本推进及历史告警。复用受管 Chromium 和 React fixture；相关后端定向测试、清理与边界见[本批记录](../docs/archive/2026-11/2026-11-28异步草稿与备份性能修复.md)。
 
 2026-11-28 存储恢复专项：`npm --prefix apps/export-doc-web run test:storage-governance-lifecycle` 检查任务查询恢复、跨面板刷新、取消作用域、档案复核明细、样例去重和结构化错误。`test-native-postgres.ps1 -PostgresBin <PostgreSQL18的bin目录> -Scope StorageRecovery` 仅运行档案存储实库合同及独立维护网页的真实 Cookie/CSRF、刷新恢复和终态重开验证；需要已构建 Web。完整 workspace 与全灾难恢复验收不在该专项范围，详见[实施记录](../docs/archive/2026-11/2026-11-28存储恢复稳定性与清理.md)。

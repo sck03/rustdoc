@@ -13,7 +13,6 @@ pub struct BackupPlan {
     pub replica_mode: String,
     #[serde(default)]
     pub backup_location: String,
-    pub verify_replica: bool,
     pub s3: S3Settings,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -56,7 +55,6 @@ impl Default for BackupPlan {
             retention_days: 0,
             replica_mode: "None".into(),
             backup_location: String::new(),
-            verify_replica: true,
             s3: Default::default(),
         }
     }

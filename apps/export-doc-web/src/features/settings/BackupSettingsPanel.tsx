@@ -53,7 +53,7 @@ export default function BackupSettingsPanel({ client, databaseProvider, disabled
       </div>}>
       {c.jobError || (c.job ? readJobMessage(c.job) : "正在读取任务状态")}
     </InlineNotice>}
-    {section === "plan" && <BackupSchedulePanel controller={c} disabled={busy} />}
+    {section === "plan" && <BackupSchedulePanel controller={c} disabled={busy} onCredentials={() => setSection("points")} />}
     {section === "points" && <BackupArchivesPanel controller={c} disabled={busy} onRestore={(id) => setSection("recovery", id)} />}
     {section === "points" && <RecoveryRepositoryPanel client={client} disabled={busy} />}
     {section === "destination" && <BackupReplicaPanel controller={c} disabled={busy} />}

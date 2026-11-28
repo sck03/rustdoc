@@ -165,7 +165,7 @@ pub(in crate::engine) fn handle(
         if policy["warningPercent"].as_u64() >= policy["criticalPercent"].as_u64() {
             return Err(invalid("严重阈值必须高于预警阈值。"));
         }
-        service.store.transaction_as(actor, |tx, actor| {
+        return service.store.transaction_as(actor, |tx, actor| {
             auth::authorize_operation(actor, operation, &[])?;
             let current = tx
                 .settings(POLICY)?
@@ -174,15 +174,12 @@ pub(in crate::engine) fn handle(
                 return Err(conflict("容量策略已变化，请刷新。"));
             }
             let revision = current["revision"].as_i64().unwrap_or(0) + 1;
-            tx.set_settings(
-                POLICY,
-                revision,
-                &json!({"revision":revision,"policy":policy}),
-            )?;
-            Ok(())
-        })?;
+            let saved = json!({"revision":revision,"policy":policy});
+            tx.set_settings(POLICY, revision, &saved)?;
+            Ok(saved)
+        });
     }
-    observe_locked(service, operation == SAVE_STORAGE_CAPACITY_POLICY)?;
+    observe_locked(service, false)?;
     status(&service.store)
 }
 fn status(store: &Store) -> Result<Value> {

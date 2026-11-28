@@ -81,7 +81,8 @@ impl RecoveryMaintenance {
                 .transpose()?;
             let pending =
                 migration::marker_path(&paths)?.try_exists()? || postgres::has_pending(&paths)?;
-            let state = super::maintenance_state::reopen(previous.as_ref(), pending);
+            let mut state = super::maintenance_state::reopen(previous.as_ref(), pending);
+            state["artifacts"] = super::maintenance_artifacts::list(&paths)?;
             paths::atomic_write(
                 &paths
                     .data_root
@@ -120,7 +121,6 @@ impl RecoveryMaintenance {
                 .map(|id| json!({"id":id,"name":id}))
                 .collect::<Vec<_>>()
         );
-        state["artifacts"] = super::maintenance_artifacts::list(&self.paths)?;
         Ok(state)
     }
     fn state(&self, name: &str, message: &str, plan: &str) -> Result<()> {
@@ -132,9 +132,11 @@ impl RecoveryMaintenance {
         state["message"] = json!(message);
         state["planId"] = json!(plan);
         state.as_object_mut().unwrap().remove("failure");
+        let snapshot = serde_json::to_vec(&*state)?;
+        drop(state);
         paths::atomic_write(
             &self.paths.data_root.join("Recovery/maintenance-state.json"),
-            &serde_json::to_vec(&*state)?,
+            &snapshot,
         )
         .map_err(unavailable)
     }
@@ -216,19 +218,38 @@ impl RecoveryMaintenance {
                     );
                     if let Ok(mut state) = service.state.lock() {
                         state["failure"] = public;
-                        let _ = paths::atomic_write(
-                            &service
-                                .paths
-                                .data_root
-                                .join("Recovery/maintenance-state.json"),
-                            &serde_json::to_vec(&*state).unwrap_or_default(),
-                        );
+                        let snapshot = serde_json::to_vec(&*state);
+                        drop(state);
+                        if let Ok(snapshot) = snapshot {
+                            let _ = paths::atomic_write(
+                                &service
+                                    .paths
+                                    .data_root
+                                    .join("Recovery/maintenance-state.json"),
+                                &snapshot,
+                            );
+                        }
                     }
                 }
-                service.busy.store(false, Ordering::Release);
+                let artifacts = crate::operation::OperationScope::detached(Duration::from_secs(30))
+                    .run(|| super::maintenance_artifacts::list(&service.paths));
+                if let Ok(mut state) = service.state.lock() {
+                    match artifacts {
+                        Ok(artifacts) => {
+                            state["artifacts"] = artifacts;
+                            state.as_object_mut().unwrap().remove("artifactFailure");
+                        }
+                        Err(cause) => {
+                            state["artifactFailure"] = cause.public_body(
+                                &paths::nonce().unwrap_or_else(|_| "maintenance".into()),
+                            );
+                        }
+                    }
+                }
                 if let Ok(mut slot) = service.scope.lock() {
                     *slot = None;
                 }
+                service.busy.store(false, Ordering::Release);
             });
         match spawned {
             Ok(worker) => {
@@ -322,30 +343,24 @@ impl RecoveryMaintenance {
         self.list(json!({"after":""}))
     }
     fn list(&self, body: Value) -> Result<()> {
-        let selected = self
+        let mut selected = self
             .selection
             .lock()
             .map_err(|_| unavailable("恢复仓库状态不可用。"))?;
         let selected = selected
-            .as_ref()
+            .as_mut()
             .ok_or_else(|| invalid("请先解锁恢复仓库。"))?;
-        let points = selected
+        selected.plan = None;
+        let page = selected
             .repository
-            .list(body["after"].as_str().unwrap_or(""), 100)?;
+            .page(body["after"].as_str().unwrap_or(""), 100)?;
         {
             let mut state = self
                 .state
                 .lock()
                 .map_err(|_| unavailable("维护状态锁不可用。"))?;
-            state["nextCursor"] = json!(if points.len() == 100 {
-                points
-                    .last()
-                    .map(|p| format!("point-{}.commit", p.id))
-                    .unwrap_or_default()
-            } else {
-                String::new()
-            });
-            state["points"]=json!(points.iter().map(|p|json!({"id":p.id,"createdAt":p.created_at,"provider":p.provider,"sizeBytes":p.size_bytes})).collect::<Vec<_>>());
+            state["nextCursor"] = json!(page.next_cursor);
+            state["points"]=json!(page.items.iter().map(|p|json!({"id":p.id,"createdAt":p.created_at,"provider":p.provider,"sizeBytes":p.size_bytes})).collect::<Vec<_>>());
         }
         self.state("Unlocked", "仓库已解锁，请选择恢复点与目标。", "")
     }

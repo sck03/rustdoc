@@ -72,7 +72,7 @@ fn portable_export_emits_shared_objects_once_and_rejects_inconsistent_manifests(
         .unwrap()
         .replacen(&digest, &"0".repeat(64), 1);
     fs::write(
-        root.join(&page),
+        root.join("objects").join(&page),
         repo.encrypted(&page, changed.as_bytes()).unwrap(),
     )
     .unwrap();

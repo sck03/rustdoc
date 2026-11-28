@@ -38,6 +38,17 @@ fn capacity_concurrent_sampling_publishes_each_transition_once() {
     assert!(state["revision"].as_i64().unwrap() >= 4);
     let saved = capacity::handle(&service, &administrator(), SAVE_STORAGE_CAPACITY_POLICY, &json!({"expectedVersion":1,"policy":{"warningPercent":99,"criticalPercent":100,"minimumFreeBytes":0,"growthDays":14}})).unwrap();
     assert_eq!(saved["revision"], 2);
+    // Saving returns the committed policy even when a later sample cannot finish.
+    assert!(saved.get("areas").is_none());
+    assert_eq!(
+        service
+            .store
+            .settings("storage-capacity-state")
+            .unwrap()
+            .unwrap()["policyRevision"],
+        1
+    );
+    capacity::handle(&service, &administrator(), GET_STORAGE_CAPACITY, &json!({})).unwrap();
     assert_eq!(
         service
             .store

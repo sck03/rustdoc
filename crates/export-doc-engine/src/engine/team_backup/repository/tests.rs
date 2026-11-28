@@ -73,7 +73,7 @@ fn garbage_collection_verifies_shared_chunks_once_and_rejects_corruption() {
     assert_eq!(plan["protectedObjects"], 4);
     assert_eq!(reads.load(Ordering::Relaxed), 1);
     let key = repo.blob_name(&digest).unwrap();
-    fs::write(root.join(key), b"corrupt").unwrap();
+    fs::write(root.join("objects").join(key), b"corrupt").unwrap();
     assert!(repo.preview_gc().is_err());
 }
 struct Readback(Vec<u8>);
@@ -147,7 +147,9 @@ fn recovery_points_are_discoverable_independent_deduplicated_and_authenticated()
     assert!(Repository::open(Box::new(io), id, "wrong-recovery-password", false).is_err());
     let io = io::Directory::open(root.clone(), None).unwrap();
     let repo = Repository::open(Box::new(io), id, "independent-recovery-password", false).unwrap();
-    let page = root.join(format!("manifest-{second}-0000000000"));
+    let page = root
+        .join("objects")
+        .join(format!("manifest-{second}-0000000000"));
     let mut corrupt = fs::read(&page).unwrap();
     let last = corrupt.len() - 1;
     corrupt[last] ^= 1;
@@ -257,7 +259,7 @@ fn garbage_collection_rechecks_roots_holds_and_readers_and_rotation_keeps_object
         )
         .is_err()
     );
-    let page = root.join(points::page_name(point, 0));
+    let page = root.join("objects").join(points::page_name(point, 0));
     let mut bytes = fs::read(&page).unwrap();
     let end = bytes.len() - 1;
     bytes[end] ^= 1;

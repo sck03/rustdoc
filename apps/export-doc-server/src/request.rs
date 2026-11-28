@@ -689,6 +689,6 @@ mod header_tests {
     }
 }
 
-fn request_seconds(operation: Operation) -> u64 {
+pub(crate) fn request_seconds(operation: Operation) -> u64 {
     export_doc_contracts::request_limits::execution_seconds(operation.id)
 }

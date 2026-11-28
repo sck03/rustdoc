@@ -137,6 +137,10 @@ pub(super) fn schemas() -> Vec<(&'static str, Schema)> {
             ]),
         ),
         (
+            "ApiCapacityPolicyReceipt",
+            object(vec![("revision", i()), ("policy", r("ApiCapacityPolicy"))]),
+        ),
+        (
             "ApiCapacityPolicyRequest",
             object(vec![
                 ("expectedVersion", i()),
@@ -305,7 +309,7 @@ pub(super) fn endpoints() -> Vec<Endpoint> {
             "/api/file-storage/capacity/policy",
             "SaveStorageCapacityPolicy",
             Some("ApiCapacityPolicyRequest"),
-            "ApiStorageCapacityStatus",
+            "ApiCapacityPolicyReceipt",
         ),
         (
             "post",

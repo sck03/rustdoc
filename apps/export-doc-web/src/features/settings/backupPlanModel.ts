@@ -15,6 +15,7 @@ export function backupPlanDraft(status: ApiBackupPlanStatus): ApiBackupPlanSaveR
 
 export function validateBackupPlan(draft: ApiBackupPlanSaveRequest, status: ApiBackupPlanStatus, confirmation: string): string | null {
   const { plan, encryptionPassword: password } = draft;
+  if (status.encryptionPasswordSet && password) return "已有仓库请通过管理恢复凭证更换密码。";
   if (password && ([...password].length < 12 || [...password].length > 1024)) return "新备份密码须为 12–1024 个字符。";
   if (password !== confirmation) return "两次输入的备份密码不一致。";
   if (plan.enabled && !password && !status.encryptionPasswordSet) return "启用日常灾备前，请先设置恢复凭证。";

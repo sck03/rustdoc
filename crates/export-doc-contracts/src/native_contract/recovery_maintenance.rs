@@ -101,6 +101,7 @@ pub(super) fn schemas() -> Vec<(&'static str, Schema)> {
                 ("message", s()),
                 ("planId", s()),
                 ("failure", r("ApiErrorResponse")),
+                ("artifactFailure", r("ApiErrorResponse")),
                 (
                     "locations",
                     a(o(vec![("id", s()), ("name", s())])

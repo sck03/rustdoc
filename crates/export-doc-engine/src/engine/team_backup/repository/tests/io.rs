@@ -4,10 +4,13 @@ fn repository_directory_pages_share_one_bounded_index_and_track_mutations() {
     let work = crate::engine::test_support::ScratchDirectory::new();
     let root = work.0.join("repository");
     fs::create_dir(&root).unwrap();
+    fs::create_dir(root.join("objects")).unwrap();
     for i in 0..501 {
-        fs::write(root.join(format!("blob-{i:04}")), b"x").unwrap();
+        fs::write(root.join("objects").join(format!("blob-{i:04}")), b"x").unwrap();
     }
-    let io = Directory::open(root, None).unwrap();
+    let io = Directory::open(root.clone(), None).unwrap();
+    assert!(io.list("point-", "", 20).unwrap().is_empty());
+    assert_eq!(io.scans.load(std::sync::atomic::Ordering::Relaxed), 1);
     let mut after = String::new();
     let mut count = 0;
     loop {
@@ -20,10 +23,10 @@ fn repository_directory_pages_share_one_bounded_index_and_track_mutations() {
         assert!(io.list("reader-", "", 1).unwrap().is_empty());
     }
     assert_eq!(count, 501);
-    assert_eq!(io.scans.load(std::sync::atomic::Ordering::Relaxed), 1);
+    assert_eq!(io.scans.load(std::sync::atomic::Ordering::Relaxed), 2);
     io.create("reader-current", b"x").unwrap();
     assert_eq!(io.list("reader-", "", 1).unwrap(), ["reader-current"]);
     io.delete("reader-current").unwrap();
     assert!(io.list("reader-", "", 1).unwrap().is_empty());
-    assert_eq!(io.scans.load(std::sync::atomic::Ordering::Relaxed), 1);
+    assert_eq!(io.scans.load(std::sync::atomic::Ordering::Relaxed), 2);
 }

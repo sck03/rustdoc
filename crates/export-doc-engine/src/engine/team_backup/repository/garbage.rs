@@ -61,7 +61,7 @@ impl Repository {
         writer.write_all(self.root.as_ref())?;
         writer.finish()?;
         let header = Header {
-            format: 1,
+            format: FORMAT,
             id: self.id.clone(),
             wrapped_key: wrapped,
         };

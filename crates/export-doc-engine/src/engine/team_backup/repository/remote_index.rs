@@ -1,26 +1,14 @@
-//! A WebDAV enumeration belongs to one protected repository session. Reader
-//! markers are live; writers update their index after each successful mutation.
+//! Immutable names are cached per protected handle; reader markers stay live.
+use super::names::{Names, Namespace};
 use super::*;
-use std::{collections::BTreeSet, sync::Mutex};
 #[derive(Default)]
-pub(super) struct Names(Mutex<Option<BTreeSet<String>>>);
-impl Names {
+pub(super) struct RemoteNames(Names);
+impl RemoteNames {
     pub(super) fn changed(&self, name: &str, present: bool) -> Result<()> {
-        let mut snapshot = self
-            .0
-            .lock()
-            .map_err(|_| unavailable("仓库目录索引不可用。"))?;
-        if let Some(names) = snapshot.as_mut() {
-            if present {
-                names.insert(name.to_owned());
-            } else {
-                names.remove(name);
-            }
-            if names.len() > 1_000_000 {
-                *snapshot = None;
-            }
+        if name.starts_with("reader-") {
+            return Ok(());
         }
-        Ok(())
+        self.0.changed(name, present)
     }
     pub(super) fn list(
         &self,
@@ -36,39 +24,24 @@ impl Names {
         if matches!(target, Target::S3(_)) {
             return target.list(prefix, after, limit);
         }
-        let mut snapshot = self
-            .0
-            .lock()
-            .map_err(|_| unavailable("仓库目录索引不可用。"))?;
-        if snapshot.is_none() {
+        let mut names = self.0.list(prefix, after, limit, |space| {
             let names = match target {
-                Target::WebDav(target) => target.object_names()?,
+                Target::WebDav(target) => target.object_names(space.directory())?,
                 #[cfg(feature = "s3-backup")]
                 Target::S3(_) => unreachable!(),
             };
-            for name in &names {
-                io::valid_name(name)?;
-                if name.starts_with("reader-") {
-                    return Err(invalid(
-                        "恢复仓库含旧布局的读取保护，请停止旧程序并显式处理后再使用。",
-                    ));
-                }
+            if names.iter().any(|name| {
+                name.starts_with("reader-") || Namespace::of(name) as usize != space as usize
+            }) {
+                return Err(invalid("恢复仓库对象布局不符，请使用当前格式的新仓库。"));
             }
-            *snapshot = Some(names.into_iter().collect());
-        }
-        let mut names: BTreeSet<_> = snapshot
-            .as_ref()
-            .unwrap()
-            .range(prefix.max(after).to_owned()..)
-            .take_while(|name| name.starts_with(prefix))
-            .filter(|name| name.as_str() > after)
-            .take(limit)
-            .cloned()
-            .collect();
-        drop(snapshot);
+            Ok(names)
+        })?;
         if prefix.is_empty() {
             names.extend(target.list("reader-", after, limit)?);
+            names.sort();
+            names.truncate(limit);
         }
-        Ok(names.into_iter().take(limit).collect())
+        Ok(names)
     }
 }

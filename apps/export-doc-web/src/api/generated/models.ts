@@ -309,7 +309,6 @@ export interface ApiBackupPlan {
   retentionDays: number;
   s3: ApiBackupS3Settings;
   time: string;
-  verifyReplica: boolean;
   weekday: number;
 }
 
@@ -389,6 +388,11 @@ export interface ApiCapacityPolicy {
   growthDays: number;
   minimumFreeBytes: number;
   warningPercent: number;
+}
+
+export interface ApiCapacityPolicyReceipt {
+  policy: ApiCapacityPolicy;
+  revision: number;
 }
 
 export interface ApiCapacityPolicyRequest {
@@ -4797,6 +4801,7 @@ export interface MaintenanceSession {
 }
 
 export interface MaintenanceStatus {
+  artifactFailure?: ApiErrorResponse;
   artifacts?: { id: string; location: string; state: string }[];
   busy: boolean;
   failure?: ApiErrorResponse;
@@ -7449,7 +7454,6 @@ export const ApiBackupPlanDefaults = {
   retentionCount: 14,
   retentionDays: 0,
   time: "02:00",
-  verifyReplica: true,
   weekday: 1,
 } as const satisfies Partial<ApiBackupPlan>;
 

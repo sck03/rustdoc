@@ -1,4 +1,33 @@
 use super::*;
+
+#[test]
+fn point_pages_do_not_offer_an_empty_page_at_exact_boundaries() {
+    let work = super::super::super::tests::Workspace::new();
+    let root = work.0.join("pages");
+    fs::create_dir(&root).unwrap();
+    let repo = Repository::open(
+        Box::new(io::Directory::open(root, None).unwrap()),
+        "11111111111111111111111111111111",
+        "independent-recovery-password",
+        true,
+    )
+    .unwrap();
+    for n in 1..=3 {
+        repo.writer(&format!("{n:032x}"), "SQLite", serde_json::json!({}))
+            .unwrap()
+            .finish()
+            .unwrap();
+    }
+    let exact = repo.page("", 3).unwrap();
+    assert_eq!(exact.items.len(), 3);
+    assert!(exact.next_cursor.is_empty());
+    let first = repo.page("", 2).unwrap();
+    assert!(!first.next_cursor.is_empty());
+    let last = repo.page(&first.next_cursor, 2).unwrap();
+    assert_eq!(last.items.len(), 1);
+    assert!(last.next_cursor.is_empty());
+    assert_eq!(repo.page("", 2).unwrap().items[0].id, first.items[0].id);
+}
 #[test]
 fn catalog_orders_instants_and_reuses_bounded_summaries_until_roots_change() {
     use std::sync::{

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ApiCapacityPolicy, ExportDocManagerApiClient } from "../../api/index.ts";
+import type { ApiCapacityPolicy, ApiStorageCapacityStatus, ExportDocManagerApiClient } from "../../api/index.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useScopedSave } from "../../ui/useScopedSave.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
@@ -38,8 +38,9 @@ export function useStorageGovernance(client: ExportDocManagerApiClient, enabled:
     const submitted = policy;
     if (!submitted || !enabled) return;
     await run(signal => client.saveStorageCapacityPolicy({ body: { expectedVersion: submitted.version, policy: submitted.value } }, { signal }), saved => {
-      cache.setQueryData(["storage-governance", "capacity"], saved);
+      cache.setQueryData<ApiStorageCapacityStatus>(["storage-governance", "capacity"], current => current && { ...current, ...saved });
       setPolicy(current => current === submitted ? null : current && { ...current, version: saved.revision });
+      setMessage("容量策略已保存。");
     });
   }
   return { capacity, policy, setPolicy, savePolicy, retention, locations, tracking, job:job.data, after, setAfter, error: error || (job.isError ? readApiError(job.error) : locations.isError ? readApiError(locations.error) : capacity.isError ? readApiError(capacity.error) : retention.isError ? readApiError(retention.error) : ""), message, busy: command.isSaving || active, run };

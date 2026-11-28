@@ -48,12 +48,32 @@ fn webdav_snapshot_keeps_reader_checks_live_and_rejects_lost_ownership() {
         .unwrap();
     assert!(repo.io.list("blob-", "", 10).is_err());
     drop(repo);
+    // Reopening a display-only request loads metadata without enumerating blobs.
+    target().delete("writer-session").unwrap();
+    let remote = remote::Remote::open(
+        remote::Target::WebDav(target()),
+        "22222222222222222222222222222222",
+        false,
+    )
+    .unwrap();
+    let repo =
+        Repository::open(Box::new(remote), id, "independent-recovery-password", false).unwrap();
+    assert!(repo.page("", 20).unwrap().items.is_empty());
+    drop(repo);
     let calls = fixture.finish();
     let root = format!("PROPFIND /backups/exportdoc-recovery-{id}/");
     assert_eq!(
         calls.iter().filter(|call| *call == &root).count(),
         2,
         "{calls:?}"
+    );
+    assert_eq!(
+        calls
+            .iter()
+            .filter(|call| *call == &format!("{root}objects/"))
+            .count(),
+        2,
+        "only writer initialization and the explicit reader enumerate data objects"
     );
     assert!(
         calls

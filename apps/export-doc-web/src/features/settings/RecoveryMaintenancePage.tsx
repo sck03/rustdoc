@@ -26,6 +26,7 @@ export function RecoveryMaintenancePage() {
   return <main className="recovery-maintenance"><EditorWorkspace title="灾备维护"><section className="form-section dashboard-section-stack">
     {c.error && <InlineNotice tone="error">{c.error}</InlineNotice>}
     {c.status.isError && <InlineNotice tone="error">{readApiError(c.status.error)}</InlineNotice>}
+    {data?.artifactFailure && <InlineNotice tone="warning" title="恢复工件列表未刷新">{formatErrorResponse(data.artifactFailure)}</InlineNotice>}
     {!c.csrf ? <form className="dashboard-section-stack" onSubmit={event => { event.preventDefault(); void c.login(token).then(ok => { if (ok) setToken(""); }); }}>
       <label><span>部署端一次性凭证</span><input type="password" autoComplete="off" value={token} onChange={event => setToken(event.target.value)} /></label>
       <Button type="submit" disabled={c.pending || c.resuming || token.length < 32}>{c.resuming ? "正在恢复会话…" : "进入维护"}</Button>
@@ -46,15 +47,18 @@ export function RecoveryMaintenancePage() {
         </div>}
         {source.sourceKind === "Directory" && <CollapsibleSection title="从便携文件读取"><label><span>维护收件目录中的文件名</span><input value={source.portableFile ?? ""} onChange={event => patch("portableFile", event.target.value)} /></label><p className="settings-helper-text">将 .edmpoint 文件放入 DataRoot/Recovery/Inbox。</p></CollapsibleSection>}
         <label className="checkbox-field"><input type="checkbox" checked={source.oldInstanceIsolated} onChange={event => patch("oldInstanceIsolated", event.target.checked)} /><span>旧业务实例已停止并隔离，不能继续写入文件库和备份仓库</span></label>
-        <Button variant="secondary" type="button" disabled={!source.oldInstanceIsolated || !source.password || (!source.portableFile && source.repositoryId.length !== 32)} onClick={() => void c.call(async signal => { await c.client.unlockRecoveryRepository({ body: source }, { ...c.init, signal }); setSource(current => ({ ...current, password: "", secretAccessKey: "", sessionToken: "", webDavPassword: "" })); })}>解锁仓库</Button>
+        <Button variant="secondary" type="button" disabled={!source.oldInstanceIsolated || !source.password || (!source.portableFile && source.repositoryId.length !== 32)} onClick={() => void c.unlock(source).then(accepted => { if (accepted) setSource(current => ({ ...current, password: "", secretAccessKey: "", sessionToken: "", webDavPassword: "" })); })}>解锁仓库</Button>
       </fieldset>
+      <div className="toolbar-actions">
+        {!c.isFirstPage && (data?.state === "Unlocked" || Boolean(data?.points.length)) && <Button variant="secondary" disabled={c.active || finished} onClick={() => void c.listPoints("")}>返回首页恢复点</Button>}
+        {data?.nextCursor && <Button variant="secondary" disabled={c.active || finished} onClick={() => void c.listPoints(data.nextCursor!)}>下一页恢复点</Button>}
+      </div>
       <fieldset className="settings-fieldset dashboard-section-stack" disabled={c.active || !data?.points.length || finished}>
         <div className="field-grid">
           <label><span>恢复点</span><select value={c.request.pointId} onChange={event => c.update("pointId", event.target.value)}><option value="">请选择恢复点</option>{data?.points.map(point => <option key={point.id} value={point.id}>{formatRuntimeDate(point.createdAt)} · {point.provider} · {formatBytes(point.sizeBytes)}</option>)}</select></label>
           <label><span>附件恢复方式</span><select value={c.request.fileMode} onChange={event => c.update("fileMode", event.target.value as typeof c.request.fileMode)}><option value="Local">重建到本机</option><option value="Directory">重建到登记位置</option><option value="S3">重建到新 S3 文件库</option><option value="Reconnect">接回完好的原文件库</option></select></label>
           {c.request.fileMode === "Directory" && <label><span>新文件库位置</span><select value={c.request.targetLocation} onChange={event => c.update("targetLocation", event.target.value)}><option value="">请选择目标</option>{data?.locations.map(location => <option key={location.id} value={location.id}>{location.name}</option>)}</select></label>}
         </div>
-        {data?.nextCursor && <Button variant="secondary" onClick={() => void c.call(signal => c.client.listMaintenancePoints({ body: { after: data.nextCursor } }, { ...c.init, signal }))}>下一页恢复点</Button>}
         {(c.request.fileMode === "S3" || c.request.fileMode === "Reconnect") && <CollapsibleSection title={c.request.fileMode === "S3" ? "新 S3 文件库" : "重签 S3 访问凭据（可选）"} defaultOpen={c.request.fileMode === "S3"}><RecoveryConnectionFields value={c.request.s3 ?? emptyRecoveryS3} onChange={value => c.update("s3", value)} secret={c.request.secretAccessKey ?? ""} onSecret={value => c.update("secretAccessKey", value)} token={c.request.sessionToken ?? ""} onToken={value => c.update("sessionToken", value)} /></CollapsibleSection>}
         <div className="toolbar-actions"><Button variant="secondary" disabled={!c.request.pointId} onClick={() => void c.preflight()}>完整预检</Button><Button variant="danger" disabled={data?.state !== "Ready" || !c.ready} onClick={() => void c.apply()}>执行恢复与切换</Button></div>
       </fieldset>

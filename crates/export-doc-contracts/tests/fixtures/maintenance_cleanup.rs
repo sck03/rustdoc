@@ -1,6 +1,32 @@
 //! Explicitly reviewed removal of inert configuration and unimplemented diagnostic options.
 use serde_json::{Value, json};
 
+/// Reviewed current-contract cleanup; this is a test projection, not runtime compatibility.
+pub(super) fn recovery_receipts(baseline: &mut Value) {
+    let schemas = &mut baseline["components"]["schemas"];
+    assert!(
+        schemas["ApiBackupPlan"]["properties"]
+            .as_object_mut()
+            .unwrap()
+            .remove("verifyReplica")
+            .is_some()
+    );
+    schemas["ApiBackupPlan"]["required"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|field| field != "verifyReplica");
+    schemas["ApiCapacityPolicyReceipt"] = json!({
+        "type":"object", "properties":{"revision":{"type":"integer"},"policy":{"$ref":"#/components/schemas/ApiCapacityPolicy"}},
+        "required":["revision","policy"], "additionalProperties":false
+    });
+    schemas["MaintenanceStatus"]["properties"]["artifactFailure"] =
+        json!({"$ref":"#/components/schemas/ApiErrorResponse"});
+    let response = &mut baseline["paths"]["/api/file-storage/capacity/policy"]["put"]["responses"]
+        ["200"]["content"]["application/json"]["schema"]["$ref"];
+    assert_eq!(response, "#/components/schemas/ApiStorageCapacityStatus");
+    *response = json!("#/components/schemas/ApiCapacityPolicyReceipt");
+}
+
 pub(super) fn apply(baseline: &mut Value) {
     let fields = [
         "backupRetentionDays",

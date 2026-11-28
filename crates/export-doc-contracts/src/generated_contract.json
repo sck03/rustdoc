@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "007904df59c7937292de44505712b21ffca8fb286f47108838f313dcd4878f98",
+  "digest": "7eb2fcaf5e7f5499ea0b389cf4bf653df0ba3205d0dfabf972faf34911140334",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -77622,7 +77622,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ApiStorageCapacityStatus"
+                "$ref": "#/components/schemas/ApiCapacityPolicyReceipt"
               }
             }
           }
@@ -77692,7 +77692,7 @@
         "$ref": "#/components/schemas/ApiCapacityPolicyRequest"
       },
       "response": {
-        "$ref": "#/components/schemas/ApiStorageCapacityStatus"
+        "$ref": "#/components/schemas/ApiCapacityPolicyReceipt"
       },
       "timeoutSeconds": 30,
       "maxJsonResponseBytes": 67108864,
@@ -94471,10 +94471,6 @@
           "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
           "default": "02:00"
         },
-        "verifyReplica": {
-          "type": "boolean",
-          "default": true
-        },
         "weekday": {
           "type": "integer",
           "default": 1,
@@ -94490,7 +94486,6 @@
         "retentionCount",
         "retentionDays",
         "replicaMode",
-        "verifyReplica",
         "s3"
       ],
       "additionalProperties": false
@@ -94845,6 +94840,22 @@
         "criticalPercent",
         "minimumFreeBytes",
         "growthDays"
+      ],
+      "additionalProperties": false
+    },
+    "ApiCapacityPolicyReceipt": {
+      "type": "object",
+      "properties": {
+        "policy": {
+          "$ref": "#/components/schemas/ApiCapacityPolicy"
+        },
+        "revision": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "revision",
+        "policy"
       ],
       "additionalProperties": false
     },
@@ -115333,6 +115344,9 @@
     "MaintenanceStatus": {
       "type": "object",
       "properties": {
+        "artifactFailure": {
+          "$ref": "#/components/schemas/ApiErrorResponse"
+        },
         "artifacts": {
           "type": "array",
           "items": {

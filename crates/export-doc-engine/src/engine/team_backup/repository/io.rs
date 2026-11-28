@@ -1,9 +1,9 @@
 //! Storage capabilities for the recovery repository. Object names are flat and
 //! bounded so all adapters share exactly the same namespace and safety checks.
+use super::names::{Names, Namespace};
 use super::*;
 use fs2::FileExt;
 use std::fs;
-use std::{collections::BTreeSet, sync::Mutex};
 
 pub(in crate::engine::team_backup) trait ObjectStore:
     Send + Sync
@@ -19,7 +19,7 @@ pub(in crate::engine::team_backup) struct Directory {
     medium: String,
     _lock: fs::File,
     // Valid only while this handle owns the exclusive OS repository lock.
-    names: Mutex<Option<BTreeSet<String>>>,
+    names: Names,
     #[cfg(test)]
     scans: std::sync::atomic::AtomicUsize,
 }
@@ -52,7 +52,7 @@ impl Directory {
             root,
             medium,
             _lock: lock,
-            names: Mutex::new(None),
+            names: Names::default(),
             #[cfg(test)]
             scans: std::sync::atomic::AtomicUsize::new(0),
         })
@@ -60,13 +60,14 @@ impl Directory {
     fn path(&self, name: &str) -> Result<PathBuf> {
         self.check()?;
         valid_name(name)?;
-        let path = self.root.join(name);
+        let path = self.root.join(Namespace::of(name).directory()).join(name);
         paths::ensure_safe_absolute(&path).map_err(invalid)?;
         Ok(path)
     }
 }
 impl ObjectStore for Directory {
     fn check(&self) -> Result<()> {
+        crate::operation::check()?;
         paths::ensure_safe_absolute(&self.root).map_err(invalid)?;
         if !self.root.is_dir()
             || paths::volume_identity(&self.root).map_err(unavailable)? != self.medium
@@ -99,6 +100,10 @@ impl ObjectStore for Directory {
         if path.try_exists()? {
             return Ok(false);
         }
+        if matches!(Namespace::of(name), Namespace::Objects) {
+            fs::create_dir_all(path.parent().unwrap())?;
+            paths::ensure_safe_absolute(path.parent().unwrap()).map_err(invalid)?;
+        }
         let pending = self.path(&format!("pending-{}", paths::nonce().map_err(unavailable)?))?;
         let result: Result<bool> = (|| {
             let mut file = fs::OpenOptions::new()
@@ -114,14 +119,7 @@ impl ObjectStore for Directory {
                 return Ok(false);
             }
             fs::rename(&pending, &path)?;
-            if let Some(names) = self
-                .names
-                .lock()
-                .map_err(|_| unavailable("仓库目录索引不可用。"))?
-                .as_mut()
-            {
-                names.insert(name.to_owned());
-            }
+            self.names.changed(name, true)?;
             Ok(true)
         })();
         if pending.try_exists()? {
@@ -129,68 +127,65 @@ impl ObjectStore for Directory {
         }
         let created = result?;
         #[cfg(unix)]
-        fs::File::open(&self.root)?.sync_all()?;
+        {
+            fs::File::open(path.parent().unwrap())?.sync_all()?;
+            fs::File::open(&self.root)?.sync_all()?;
+        }
         self.check()?;
         Ok(created)
     }
     fn delete(&self, name: &str) -> Result<()> {
         let path = self.path(name)?;
-        match fs::remove_file(path) {
+        match fs::remove_file(&path) {
             Ok(()) => {}
             Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => {}
             Err(cause) => return Err(cause.into()),
         }
-        if let Some(names) = self
-            .names
-            .lock()
-            .map_err(|_| unavailable("仓库目录索引不可用。"))?
-            .as_mut()
-        {
-            names.remove(name);
-        }
+        self.names.changed(name, false)?;
         #[cfg(unix)]
-        fs::File::open(&self.root)?.sync_all()?;
+        if path.parent().unwrap().try_exists()? {
+            fs::File::open(path.parent().unwrap())?.sync_all()?;
+        }
         self.check()
     }
     fn list(&self, prefix: &str, after: &str, limit: usize) -> Result<Vec<String>> {
         self.check()?;
-        let mut index = self
-            .names
-            .lock()
-            .map_err(|_| unavailable("仓库目录索引不可用。"))?;
-        if index.is_none() {
-            let mut names = BTreeSet::new();
+        let names = self.names.list(prefix, after, limit, |space| {
             #[cfg(test)]
             self.scans
                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            for entry in fs::read_dir(&self.root)? {
+            let directory = self.root.join(space.directory());
+            paths::ensure_safe_absolute(&directory).map_err(invalid)?;
+            if !directory.try_exists()? {
+                return Ok(Vec::new());
+            }
+            let mut names = Vec::new();
+            for entry in fs::read_dir(&directory)? {
                 crate::operation::check()?;
                 let entry = entry?;
-                let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
-                    return Err(invalid("仓库含无效文件名。"));
-                };
-                valid_name(&name)?;
+                let name = entry
+                    .file_name()
+                    .into_string()
+                    .map_err(|_| invalid("仓库含无效文件名。"))?;
                 paths::ensure_safe_absolute(&entry.path()).map_err(invalid)?;
-                if !entry.file_type()?.is_file() {
-                    return Err(invalid("仓库对象不是普通文件。"));
+                if matches!(space, Namespace::Metadata)
+                    && name == "objects"
+                    && entry.file_type()?.is_dir()
+                {
+                    continue;
                 }
-                names.insert(name);
+                valid_name(&name)?;
+                if !entry.file_type()?.is_file() || Namespace::of(&name) as usize != space as usize
+                {
+                    return Err(invalid("仓库含布局不符的对象，请使用当前格式的新仓库。"));
+                }
+                names.push(name);
                 if names.len() > 2_000_000 {
                     return Err(invalid("仓库目录索引超过两百万对象预算，请分库管理。"));
                 }
             }
-            *index = Some(names);
-        }
-        let names: Vec<_> = index
-            .as_ref()
-            .unwrap()
-            .range(prefix.max(after).to_owned()..)
-            .take_while(|name| name.starts_with(prefix))
-            .filter(|name| name.as_str() > after)
-            .take(limit)
-            .cloned()
-            .collect();
-        drop(index);
+            Ok(names)
+        })?;
         for name in &names {
             let path = self.path(name)?;
             if !fs::metadata(path)?.is_file() {

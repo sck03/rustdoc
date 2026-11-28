@@ -85,14 +85,14 @@ try {
   await warning.fill('80'); await page.getByRole('button',{name:'保存告警策略',exact:true}).click();
   await page.waitForFunction(()=>window.calls.some(call=>call.method==='capacity'));
   await warning.fill('75');
-  await page.evaluate(()=>{window.capacity={...window.capacity,revision:2,policy:{...window.capacity.policy,warningPercent:80}};window.calls.find(call=>call.method==='capacity').resolve(structuredClone(window.capacity));});
+  await page.evaluate(()=>{window.capacity={...window.capacity,revision:2,policy:{...window.capacity.policy,warningPercent:80}};window.calls.find(call=>call.method==='capacity').resolve({revision:window.capacity.revision,policy:structuredClone(window.capacity.policy)});});
   await page.getByRole('button',{name:'保存告警策略',exact:true}).waitFor();
   await page.waitForFunction(()=>!document.querySelector('button[disabled]') || [...document.querySelectorAll('button')].some(b=>b.textContent==='保存告警策略'&&!b.disabled));
   assert.equal(await warning.inputValue(),'75');
   await page.getByRole('button',{name:'保存告警策略',exact:true}).click();
   await page.waitForFunction(()=>window.calls.filter(call=>call.method==='capacity').length===2);
   assert.deepEqual(await page.evaluate(()=>{const body=window.calls.filter(call=>call.method==='capacity')[1].request.body;return [body.expectedVersion,body.policy.warningPercent];}),[2,75]);
-  await page.evaluate(()=>{window.capacity={...window.capacity,revision:3,policy:{...window.capacity.policy,warningPercent:75}};window.calls.filter(call=>call.method==='capacity')[1].resolve(structuredClone(window.capacity));});
+  await page.evaluate(()=>{window.capacity={...window.capacity,revision:3,policy:{...window.capacity.policy,warningPercent:75}};window.calls.filter(call=>call.method==='capacity')[1].resolve({revision:window.capacity.revision,policy:structuredClone(window.capacity.policy)});});
   await page.locator('summary').filter({hasText:/^历史告警（1）$/}).click();
   await page.getByRole('table',{name:'容量历史告警'}).getByText('测试文件库空间不足，请扩容。',{exact:true}).waitFor();
   assert.deepEqual(errors,[]);

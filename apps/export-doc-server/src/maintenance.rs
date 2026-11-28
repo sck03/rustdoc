@@ -20,6 +20,7 @@ use std::{
 };
 use subtle::ConstantTimeEq;
 const COOKIE: &str = "ExportDocManager.Maintenance";
+mod execution;
 struct Session {
     token: String,
     csrf: String,
@@ -34,6 +35,7 @@ struct Credentials {
     next: Instant,
 }
 struct State {
+    execution: execution::Executor,
     engine: Arc<RecoveryMaintenance>,
     credentials: Mutex<Credentials>,
 }
@@ -52,6 +54,7 @@ pub fn run(configuration: Configuration) -> Result<(), Box<dyn std::error::Error
         configuration.owner,
     )?;
     let state = Arc::new(State {
+        execution: execution::Executor::new(),
         engine: engine.clone(),
         credentials: Mutex::new(Credentials {
             bootstrap: Some(configuration.maintenance_token),
@@ -270,7 +273,22 @@ async fn execute(
         )),
         "GetMaintenanceStatus" => Ok((state.engine.status()?, refreshed_cookie)),
         "CancelMaintenanceOperation" => Ok((state.engine.cancel()?, refreshed_cookie)),
-        "AbandonMaintenance" => Ok((state.engine.abandon()?, refreshed_cookie)),
-        _ => Ok((state.engine.start(operation.id, body)?, refreshed_cookie)),
+        _ => {
+            let engine = state.engine.clone();
+            let result = state
+                .execution
+                .run(
+                    Duration::from_secs(crate::request::request_seconds(operation)),
+                    move || {
+                        if operation.id == "AbandonMaintenance" {
+                            engine.abandon()
+                        } else {
+                            engine.start(operation.id, body)
+                        }
+                    },
+                )
+                .await?;
+            Ok((result, refreshed_cookie))
+        }
     }
 }

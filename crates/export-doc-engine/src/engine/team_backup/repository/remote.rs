@@ -45,7 +45,7 @@ pub(in crate::engine::team_backup) struct Remote {
     session: Vec<u8>,
     // WebDAV has no cursor listing. Snapshot immutable object names only while
     // this handle owns writer-session; live reader markers are never cached.
-    names: index::Names,
+    names: index::RemoteNames,
 }
 impl Remote {
     pub fn open(target: Target, owner: &str, fenced: bool) -> Result<Self> {
@@ -159,7 +159,7 @@ pub(in crate::engine::team_backup) struct Reader {
     target: Target,
     name: String,
     value: Vec<u8>,
-    names: index::Names,
+    names: index::RemoteNames,
 }
 impl Reader {
     pub fn open(target: Target) -> Result<Self> {

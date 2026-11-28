@@ -48,6 +48,7 @@ pub(super) fn list(paths: &RuntimePaths) -> Result<Value> {
     let active = active(paths)?;
     let mut rows = vec![];
     for entry in std::fs::read_dir(paths.data_root.join("Recovery"))? {
+        crate::operation::check()?;
         let path = entry?.path();
         let Some(id) = path.file_stem().and_then(|v| v.to_str()) else {
             continue;

@@ -9,18 +9,19 @@ use std::{
 };
 struct PortableFile {
     file: Mutex<fs::File>,
-    entries: BTreeMap<String, (u64, usize, String)>,
+    entries: BTreeMap<String, (u64, usize, [u8; 32])>,
     length: u64,
     modified: std::time::SystemTime,
 }
 impl Repository {
     pub fn from_portable(mut file: fs::File, password: &str) -> Result<(Self, String)> {
+        crate::operation::check()?;
         fs2::FileExt::try_lock_shared(&file)
             .map_err(|_| invalid("便携文件正在写入，请等待导出完成。"))?;
         let length = file.metadata()?.len();
         let modified = file.metadata()?.modified()?;
         let mut magic = vec![0; portable::MAGIC.len()];
-        file.read_exact(&mut magic)?;
+        read_exact(&mut file, &mut magic)?;
         if magic != portable::MAGIC {
             return Err(invalid(
                 "仅支持本版本 .edmpoint 格式；旧包请使用原版本工具处理。",
@@ -30,9 +31,10 @@ impl Repository {
         let mut point = None;
         let mut header = None;
         let mut frames = 0usize;
+        let mut bytes = Vec::new();
         loop {
             let mut size = [0; 2];
-            file.read_exact(&mut size)?;
+            read_exact(&mut file, &mut size)?;
             let size = u16::from_le_bytes(size) as usize;
             if size == 0 {
                 break;
@@ -41,19 +43,19 @@ impl Repository {
                 return Err(invalid("便携恢复点名称或结束顺序无效。"));
             }
             let mut name = vec![0; size];
-            file.read_exact(&mut name)?;
+            read_exact(&mut file, &mut name)?;
             let name = String::from_utf8(name).map_err(|_| invalid("便携对象名称无效。"))?;
             io::valid_name(&name)?;
             let mut size = [0; 4];
-            file.read_exact(&mut size)?;
+            read_exact(&mut file, &mut size)?;
             let size = u32::from_le_bytes(size) as usize;
             if size > sealed::object::MAX_PLAIN + sealed::object::OVERHEAD {
                 return Err(invalid("便携对象超过解密窗口。"));
             }
             let offset = file.stream_position()?;
-            let mut bytes = vec![0; size];
-            file.read_exact(&mut bytes)?;
-            let digest = super::super::hex(&Sha256::digest(&bytes));
+            bytes.resize(size, 0);
+            read_exact(&mut file, &mut bytes)?;
+            let digest: [u8; 32] = Sha256::digest(&bytes).into();
             if entries.is_empty() {
                 if name != HEADER || size > 64 * 1024 {
                     return Err(invalid("便携恢复点必须以仓库头开始。"));
@@ -115,8 +117,8 @@ impl ObjectStore for PortableFile {
             .map_err(|_| unavailable("便携文件读取锁不可用。"))?;
         file.seek(SeekFrom::Start(*offset))?;
         let mut bytes = vec![0; *size];
-        file.read_exact(&mut bytes)?;
-        if super::super::hex(&Sha256::digest(&bytes)) != *digest {
+        read_exact(&mut *file, &mut bytes)?;
+        if <[u8; 32]>::from(Sha256::digest(&bytes)) != *digest {
             return Err(invalid("便携文件在恢复过程中发生变化。"));
         }
         Ok(Some(bytes))
@@ -152,3 +154,16 @@ impl ObjectStore for PortableFile {
         Ok(())
     }
 }
+
+// Bound cooperative cancellation latency even while indexing a large frame.
+fn read_exact(reader: &mut impl Read, bytes: &mut [u8]) -> Result<()> {
+    for chunk in bytes.chunks_mut(64 * 1024) {
+        crate::operation::check()?;
+        reader.read_exact(chunk)?;
+    }
+    crate::operation::check()
+}
+
+#[cfg(test)]
+#[path = "tests/portable_read.rs"]
+mod tests;

@@ -1337,10 +1337,6 @@
             "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
             "default": "02:00"
           },
-          "verifyReplica": {
-            "type": "boolean",
-            "default": true
-          },
           "weekday": {
             "type": "integer",
             "default": 1,
@@ -1356,7 +1352,6 @@
           "retentionCount",
           "retentionDays",
           "replicaMode",
-          "verifyReplica",
           "s3"
         ],
         "additionalProperties": false
@@ -1711,6 +1706,22 @@
           "criticalPercent",
           "minimumFreeBytes",
           "growthDays"
+        ],
+        "additionalProperties": false
+      },
+      "ApiCapacityPolicyReceipt": {
+        "type": "object",
+        "properties": {
+          "policy": {
+            "$ref": "#/components/schemas/ApiCapacityPolicy"
+          },
+          "revision": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "policy"
         ],
         "additionalProperties": false
       },
@@ -22242,6 +22253,9 @@
       "MaintenanceStatus": {
         "type": "object",
         "properties": {
+          "artifactFailure": {
+            "$ref": "#/components/schemas/ApiErrorResponse"
+          },
           "artifacts": {
             "type": "array",
             "items": {
@@ -50044,7 +50058,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiStorageCapacityStatus"
+                  "$ref": "#/components/schemas/ApiCapacityPolicyReceipt"
                 }
               }
             }

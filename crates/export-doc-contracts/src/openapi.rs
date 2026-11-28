@@ -316,6 +316,7 @@ mod tests {
         license_validity::apply(&mut baseline);
         oa_resource_cleanup::apply(&mut baseline);
         file_storage::apply_oa_recovery(&mut baseline);
+        maintenance_cleanup::recovery_receipts(&mut baseline);
         if let Some(change) = difference("contract", &document(), &baseline) {
             panic!("undeclared contract change: {change}");
         }

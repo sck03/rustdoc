@@ -31,6 +31,7 @@ export function RecoveryRepositoryPanel({ client, disabled }: { client: ExportDo
     <div className="field-grid"><TextField label="恢复点编号" value={pointId} onChange={setPointId} /><TextField label="暂停或解除原因" value={reason} onChange={setReason} /></div>
     <div className="form-actions"><Button variant="secondary" disabled={busy || pointId.length !== 32 || !reason} onClick={() => void start({ action: "Hold", pointId, reason })}>暂停保留</Button><Button variant="secondary" disabled={busy || pointId.length !== 32 || !reason} onClick={() => void start({ action: "Release", pointId, reason })}>解除暂停</Button></div>
     <CollapsibleSection title="恢复凭证与中断处理">
+      <p className="settings-helper-text">更换后，仓库恢复点统一使用新凭证；已经导出的便携文件仍使用导出时的凭证。</p>
       <label><span>新的恢复凭证</span><input type="password" autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} /></label>
       <Button disabled={busy || password.length < 12} onClick={() => void start({ action: "RotatePassword", newPassword: password })}>更换并核验恢复凭证</Button>
       <label className="checkbox-field"><input type="checkbox" checked={isolated} onChange={event => setIsolated(event.target.checked)} /><span>旧备份、恢复和导出实例均已停止并隔离</span></label>

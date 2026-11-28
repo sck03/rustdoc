@@ -137,9 +137,11 @@ jobs:
       - uses: ./.github/actions/prepare-web
       - name: Check Rust formatting
         run: cargo fmt --all --check
-      # Integration/doc tests and all-features checks run once in the full matrix.
+      # Broad integration/doc tests and all-features checks run in the full matrix.
       - name: Test backend units
         run: cargo test --locked --workspace --exclude export-doc-tauri --lib
+      - name: Test approval graph integration contract
+        run: cargo test --locked -p export-doc-domain --test approval_graph
       - name: Test changed desktop host
         if: needs.changes.outputs.desktop == 'true'
         run: cargo test --locked -p export-doc-tauri
