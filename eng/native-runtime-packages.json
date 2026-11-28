@@ -1,14 +1,16 @@
 {
   "schemaVersion": 1,
-  "verifiedAt": "2026-10-23",
+  "verifiedAt": "2026-11-28",
   "postgresqlClient": {
-    "version": "18.6",
+    "version": "18.7",
     "license": "PostgreSQL",
     "source": "https://www.postgresql.org/download/",
-    "windowsArchive": "https://get.enterprisedb.com/postgresql/postgresql-18.6-1-windows-x64-binaries.zip",
-    "windowsSha256": "fbe23da234ee31547bf8a36d29dfd81e82b849df2d2b78d2eecb43d360252f8c",
-    "linuxImage": "postgres:18.6-bookworm",
-    "macosFormula": "postgresql@18"
+    "windowsArchive": "https://get.enterprisedb.com/postgresql/postgresql-18.7-1-windows-x64-binaries.zip",
+    "windowsSha256": "ead0bbc27fb678fa24dcf86b738981323042abd073c744103bf7f3aed23f9a33",
+    "linuxImage": "postgres:18.7-bookworm",
+    "macosFormula": "exportdoc/postgresql-client/postgresql@18",
+    "macosFormulaSource": "https://raw.githubusercontent.com/Homebrew/homebrew-core/597e1fb3157b2807525c6fadecb392fa015902cb/Formula/p/postgresql@18.rb",
+    "macosFormulaSha256": "6e1eed125ce46319afbc937500bf308fd4dbce92859d5bcce04e88490aceee2b"
   },
   "packages": {
     "bblanchon.pdfium.win32": {

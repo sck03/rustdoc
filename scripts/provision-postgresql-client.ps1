@@ -86,7 +86,7 @@ try {
             -Destination (Join-Path $payloadRoot "POSTGRESQL_THIRD_PARTY_LICENSES.txt")
     } elseif ($Platform -eq 'macos') {
         . (Join-Path $scriptRoot 'lib/postgresql-macos-client.ps1')
-        Copy-PostgreSqlMacClient -PayloadRoot $payloadRoot
+        Copy-PostgreSqlMacClient -PayloadRoot $payloadRoot -Formula $clientManifest.macosFormula
     } else {
         $copyScript = Join-Path $scriptRoot 'lib/copy-postgresql-client.sh'
         Invoke-ExportDocExternal -FilePath "docker" -TimeoutSeconds 1200 -Arguments @(

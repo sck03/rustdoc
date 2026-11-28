@@ -39,7 +39,7 @@ ARG EXPORTDOCMANAGER_BUILD_REVISION=""
 RUN --mount=type=cache,target=/workspace/.cache/cargo/registry,sharing=locked cargo build --locked --release -p export-doc-server \
     && cargo build --locked --release --manifest-path apps/exportdoc-ocr-rs/Cargo.toml
 
-FROM postgres:18.6-trixie AS postgres-client
+FROM postgres:18.7-trixie AS postgres-client
 COPY scripts/lib/copy-postgresql-client.sh /copy-postgresql-client.sh
 RUN sh /copy-postgresql-client.sh /client
 

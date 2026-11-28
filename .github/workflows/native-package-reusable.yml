@@ -116,7 +116,8 @@ jobs:
         run: node scripts/provision-report-fonts.mjs
       - name: Install macOS PostgreSQL 18 client
         if: runner.os == 'macOS' && inputs.product == 'web'
-        run: brew install postgresql@18
+        shell: pwsh
+        run: ./scripts/prepare-postgresql-macos-client.ps1
       - name: Verify desktop dependency boundaries
         if: inputs.product == 'desktop'
         shell: pwsh

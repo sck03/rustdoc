@@ -858,7 +858,7 @@ The rust-workspace scope covers the complete locked desktop/server/build/test gr
 | bblanchon.pdfium.macos | 158.0.8111 | Apache-2.0 | Rust native library only; managed assemblies excluded |
 | bblanchon.pdfium.win32 | 158.0.8111 | Apache-2.0 | Rust native library only; managed assemblies excluded |
 | microsoft.ml.onnxruntime | 1.31.0 | MIT | Rust native library only; managed assemblies excluded |
-| postgresql-client | 18.6 | PostgreSQL | Rust web/server backup and migration clients; excluded from desktop |
+| postgresql-client | 18.7 | PostgreSQL | Rust web/server backup and migration clients; excluded from desktop |
 
 ## Windows OCR app-local CRT assets
 

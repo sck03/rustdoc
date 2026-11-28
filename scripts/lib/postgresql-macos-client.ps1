@@ -1,7 +1,7 @@
 # Copy the native Homebrew PostgreSQL 18 client closure with its license texts.
 function Copy-PostgreSqlMacClient {
-    param([Parameter(Mandatory)][string]$PayloadRoot)
-    $prefixResult = Invoke-ExportDocExternal -FilePath brew -Arguments @('--prefix', 'postgresql@18') -CaptureOutput -TimeoutSeconds 60
+    param([Parameter(Mandatory)][string]$PayloadRoot, [Parameter(Mandatory)][string]$Formula)
+    $prefixResult = Invoke-ExportDocExternal -FilePath brew -Arguments @('--prefix', $Formula) -CaptureOutput -TimeoutSeconds 60
     $prefix = $prefixResult.Output.Trim()
     $queue = [System.Collections.Generic.Queue[string]]::new()
     $copies = [System.Collections.Generic.Dictionary[string,string]]::new([StringComparer]::Ordinal)

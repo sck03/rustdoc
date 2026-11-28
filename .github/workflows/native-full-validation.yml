@@ -154,7 +154,8 @@ jobs:
           toolchain: 1.99.1
       - name: Install macOS PostgreSQL 18 client
         if: runner.os == 'macOS'
-        run: brew install postgresql@18
+        shell: pwsh
+        run: ./scripts/prepare-postgresql-macos-client.ps1
       - name: Assemble browser server package
         shell: pwsh
         run: |

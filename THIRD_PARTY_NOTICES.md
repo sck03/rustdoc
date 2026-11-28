@@ -709,7 +709,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | native-resource | bblanchon.pdfium.macos | 158.0.8111 | Apache-2.0 | Rust native library only; managed assemblies excluded |
 | native-resource | bblanchon.pdfium.win32 | 158.0.8111 | Apache-2.0 | Rust native library only; managed assemblies excluded |
 | native-resource | microsoft.ml.onnxruntime | 1.31.0 | MIT | Rust native library only; managed assemblies excluded |
-| native-resource | postgresql-client | 18.6 | PostgreSQL | Rust web/server backup and migration clients; excluded from desktop |
+| native-resource | postgresql-client | 18.7 | PostgreSQL | Rust web/server backup and migration clients; excluded from desktop |
 | npm | @dimforge/rapier3d-compat | 0.12.0 | Apache-2.0 | web |
 | npm | @esbuild/aix-ppc64 | 0.28.2 | MIT | web |
 | npm | @esbuild/android-arm | 0.28.2 | MIT | web |

@@ -5,7 +5,7 @@ $script:invokeActualExternal = (Get-Command Invoke-ExportDocExternal).ScriptBloc
 $repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $fixture = Join-Path $repository ('.codex-runtime/postgresql-macos-client-tests/' + [Guid]::NewGuid().ToString('N'))
 if (-not $fixture.StartsWith($repository + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Fixture escaped workspace.' }
-$script:original = Join-Path $fixture 'Cellar/client/18.6'
+$script:original = Join-Path $fixture 'Cellar/client/18.7'
 $script:alternate = Join-Path $fixture 'Cellar/other/1.0'
 $script:alias = Join-Path $fixture 'opt/client'
 $output = Join-Path $fixture 'payload'
@@ -13,7 +13,7 @@ $script:changes = [Collections.Generic.List[object]]::new()
 $script:conflict = $false
 function Invoke-ExportDocExternal {
     param($FilePath, $Arguments, [switch]$CaptureOutput, $TimeoutSeconds)
-    if ($FilePath -eq 'brew') { return [pscustomobject]@{ Output = $script:alias } }
+    if ($FilePath -eq 'brew') { if ($Arguments[1] -ne 'exportdoc/postgresql-client/postgresql@18') { throw 'The declared formula must select the client prefix.' }; return [pscustomobject]@{ Output = $script:alias } }
     if ($FilePath -eq 'node') {
         return & $script:invokeActualExternal -FilePath $FilePath -Arguments $Arguments -CaptureOutput -TimeoutSeconds 30
     }
@@ -35,12 +35,12 @@ try {
     [IO.File]::WriteAllText((Join-Path $script:alternate 'lib/libshared.1.dylib'), 'other library')
     [IO.File]::WriteAllText((Join-Path $script:original 'COPYRIGHT'), 'fixture license')
     New-Item -ItemType $(if ($IsWindows) { 'Junction' } else { 'SymbolicLink' }) -Path $script:alias -Target $script:original | Out-Null
-    Copy-PostgreSqlMacClient -PayloadRoot $output
+    Copy-PostgreSqlMacClient -PayloadRoot $output -Formula 'exportdoc/postgresql-client/postgresql@18'
     if (@(Get-ChildItem -LiteralPath "$output/lib" -File).Count -ne 1 -or $script:changes.Count -ne 3) { throw 'Aliases must copy one library and relocate all three original references.' }
     if (-not (Test-Path -LiteralPath "$output/licenses/client-COPYRIGHT")) { throw 'License must be read from the canonical formula directory.' }
     $script:conflict = $true
     $rejected = $false
-    try { Copy-PostgreSqlMacClient -PayloadRoot $output } catch { $rejected = $_.Exception.Message -like 'Conflicting bundled dylib name:*' }
+    try { Copy-PostgreSqlMacClient -PayloadRoot $output -Formula 'exportdoc/postgresql-client/postgresql@18' } catch { $rejected = $_.Exception.Message -like 'Conflicting bundled dylib name:*' }
     if (-not $rejected) { throw 'Distinct same-named libraries must still be rejected.' }
     Write-Output 'macOS PostgreSQL source aliases, relocation and name conflicts passed.'
 } finally {

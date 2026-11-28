@@ -1,6 +1,8 @@
 # 脚本使用说明
 
-2026-11-28 文件发布一致性：`test:storage-governance-lifecycle` 新增 `test_storage_receipts_ui.mjs`，验证保存成功但刷新失败后的版本续用、状态保留和凭据清空；原存储合同增加两库正式位置切换/批量状态、单据待办计数。归档重传、回滚、重启清理和千条日志推进由 Engine 文件存储回归覆盖。本批按用户追加要求执行全量验证，见[实施记录](../docs/archive/2026-11/2026-11-28文件发布一致性与全量验证.md)。
+2026-11-28 文件发布一致性：`test:storage-governance-lifecycle` 新增 `test_storage_receipts_ui.mjs`，验证保存成功但刷新失败后的版本续用、状态保留和凭据清空；原存储合同增加两库正式位置切换/批量状态、单据待办计数。归档重传、回滚、重启清理和千条日志推进由 Engine 文件存储回归覆盖。macOS 网页包的 CI 先调用内部 `prepare-postgresql-macos-client.ps1`，按原生资源清单下载并校验固定 Homebrew 配方；普通构建不自动安装系统依赖。已安装的配方名称必须与清单一致，客户端复制器继续检查精确版本。
+
+本批按用户追加要求执行全量验证，见[实施记录](../docs/archive/2026-11/2026-11-28文件发布一致性与全量验证.md)。
 
 2026-11-28：`test:storage-governance-lifecycle` 增加 `test_backup_selection_download_ui.mjs`，覆盖恢复列表按需读取、延迟/跨页选择、草稿、回执丢失及 API origin 下载。组织引用专项复用 `test-native-postgres.ps1 -Scope Organization`，不需为本批执行完整测试；结果和定向清理见[实施记录](../docs/archive/2026-11/2026-11-28提交回执与查询一致性修复.md)。
 
