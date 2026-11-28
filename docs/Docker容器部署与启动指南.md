@@ -2,11 +2,11 @@
 
 产品界面名称为“业务协同平台”，与独立网页多用户版一致。Docker 表示部署方式；镜像地址、容器服务名和数据目录保持原有规则。分版名称及界面规范见[产品命名规范](./前端视觉与产品命名规范.md)。
 
-核对日期：2026-11-27。适用于包含 `--print-compose`、`--print-uninstall` 和 `--prepare-docker` 的 Rust 镜像。React 网页和 Rust API 在应用容器中，PostgreSQL 18 在独立数据库容器中。无需下载源码、安装 Rust、Node 或 PowerShell。当前只接受全新 schema 19，旧实验数据库必须另存并显式建立新库，不能直接覆盖升级。
+核对日期：2026-11-28。适用于按当前源码构建、包含 `--print-compose`、`--print-uninstall` 和 `--prepare-docker` 的 Rust 镜像。React 网页和 Rust API 在应用容器中，PostgreSQL 18.7 在独立数据库容器中。无需下载源码、安装 Rust、Node 或 PowerShell。当前只接受全新 schema 19，旧实验数据库必须另存并显式建立新库，不能直接覆盖升级。
 
 **首次部署只需 A 一台主机。** 默认 Compose 已包含应用和 PostgreSQL，附件使用 A 的 `data/Files`；不需要预先准备 B、NAS、S3 或移动硬盘。独立附件位置按第 7 节后续接入，备份按第 5 节按需开启；本机备份与独立设备副本的保护范围分别说明。
 
-2026-11-27 [后续重构方案](./通用申请与存储灾备重构实施方案.md)保留上述默认行为，并规划直写备份目标与独立维护网页。当前仍使用本文的一次性 restore 维护流程，新方案不是现行镜像已支持的功能清单。
+当前源码已实现恢复点直接写入所选仓库、独立维护网页，以及接回原文件库／重建到新位置。一次性 restore 服务继续用于已暂存的恢复任务；原业务库损坏或更换 A 时使用独立 maintenance 服务。源码提交不会自动更新已经发布或安装的镜像，部署前确认镜像包含本次实现。
 
 ## 1. 拉取镜像并启动
 
@@ -143,9 +143,11 @@ docker compose run --rm --no-deps restore
 docker compose up -d --no-deps --wait application
 ```
 
-第二条失败时保持 API 停止，保留待恢复标记、安全副本和日志，处理原因后重试。普通重启不会代替恢复维护。Docker 管理面板若能单独停应用、一次性运行原项目的 `restore` 服务并查看退出码，可以用面板完成同样的操作；不要为此重部署整个项目。业务库不可用时，在停止 application 后执行 `docker compose --profile maintenance up -d maintenance`，访问部署主机 `http://127.0.0.1:5189/#/maintenance`，凭据取自部署目录的 `maintenance-token.txt`；完成后停止维护容器并启动 application。恢复后用备份中的账号登录，核对数据、附件、模板、PDF 和权限。
+第二条失败时保持 API 停止，保留待恢复标记、安全副本和日志，处理原因后重试。普通重启不会代替恢复维护。Docker 管理面板若能单独停应用、一次性运行原项目的 `restore` 服务并查看退出码，可以用面板完成同样的操作；不要为此重部署整个项目。业务库不可用时，在停止 application 后执行 `docker compose --profile maintenance up -d maintenance`，访问部署主机 `http://127.0.0.1:5189/#/maintenance`，凭据取自镜像部署目录的 `config/maintenance/maintenance-token.txt`；完成后停止维护容器并启动 application。恢复后用备份中的账号登录，核对数据、附件、模板、PDF 和权限。
 
 更详细的大包导入、跨服务器迁移及失败处理见[恢复指南](./服务器备份迁移与恢复指南.md)。
+
+新 A 接回原 SeaweedFS、S3 双账号设置和完整操作步骤见[局域网存储安装与连接手册](./SeaweedFS局域网存储安装与连接手册.md)。备份计划页的恢复仓库编号、恢复凭证和 S3 访问凭据须在 A 之外保存；只有附件桶不能完整恢复业务数据库。
 
 ## 6. 已有源码脚本部署
 
