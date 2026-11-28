@@ -16,6 +16,12 @@ pub(super) const KEY: &str = "Security/native-master-key.bin";
 pub(super) const SQLITE: &str = crate::paths::SQLITE_DATABASE_RELATIVE_PATH;
 pub(super) const POSTGRES: &str = "Database/postgresql-physical.dump";
 pub(in crate::engine) fn lock(paths: &RuntimePaths) -> Result<fs::File> {
+    acquire(paths, Duration::from_secs(5))
+}
+pub(super) fn try_lock(paths: &RuntimePaths) -> Result<fs::File> {
+    acquire(paths, Duration::ZERO)
+}
+fn acquire(paths: &RuntimePaths, wait: Duration) -> Result<fs::File> {
     let path = paths.data_root.join("Locks").join("backup-restore.lock");
     paths::ensure_safe_absolute(&path).map_err(invalid)?;
     fs::create_dir_all(path.parent().unwrap())?;
@@ -33,7 +39,7 @@ pub(in crate::engine) fn lock(paths: &RuntimePaths) -> Result<fs::File> {
         match file.try_lock_exclusive() {
             Ok(()) => break,
             Err(cause) if cause.raw_os_error() == fs2::lock_contended_error().raw_os_error() => {
-                if started.elapsed() >= Duration::from_secs(5) {
+                if started.elapsed() >= wait {
                     return Err(error(
                         429,
                         "备份或恢复正在进行，请等待当前任务结束后再操作。",

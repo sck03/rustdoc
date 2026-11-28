@@ -301,7 +301,8 @@ impl Scheduler {
                 .unprotect(PASSWORD, &saved.password)
                 .map_err(unavailable)?;
             let id = crate::paths::nonce().map_err(unavailable)?;
-            let package_lock = package::lock(&service.paths)?;
+            // A scheduled tick must defer promptly while holding the scheduler gate.
+            let package_lock = package::try_lock(&service.paths)?;
             update_state(
                 &service.store,
                 None,
