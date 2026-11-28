@@ -59,6 +59,7 @@ fn exercise(postgres: bool) {
             "hireDate":"2026-01-01", "profile":{"fullName":"隔离申请人"}
         })),
     );
+    fixture::configure_handling_services(&service, token, reviewer_id, &["Other"]);
     let mut settings = fixture::request(&service, token, GET_OA_APPROVAL_SETTINGS, None);
     settings["rules"]
         .as_array_mut()

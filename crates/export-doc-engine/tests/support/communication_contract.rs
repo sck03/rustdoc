@@ -420,11 +420,13 @@ pub fn exercise(service: &NativeService, admin: &str) -> i64 {
     let manager = login(users[1]["username"].as_str().unwrap());
     let manager = manager.as_str();
     let reviewer = call(service, manager, GET_CURRENT_USER, 0, &[], None).unwrap();
+    workflow::configure_handling_services(
+        service,
+        admin,
+        reviewer["id"].as_i64().unwrap(),
+        &["Other"],
+    );
     let mut settings = workflow::request(service, admin, GET_OA_APPROVAL_SETTINGS, None);
-    settings["handlingServices"] = json!([workflow::handling_service(
-        "Other",
-        reviewer["id"].as_i64().unwrap()
-    )]);
     let general = settings["rules"]
         .as_array_mut()
         .unwrap()

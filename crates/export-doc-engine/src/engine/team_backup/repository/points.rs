@@ -100,7 +100,7 @@ impl<'a> PointWriter<'a> {
         digest: &str,
         producer: impl FnOnce(&mut ChunkWriter<'_, 'a>) -> Result<()>,
     ) -> Result<()> {
-        validate_file(role, name, size, digest)?;
+        validate_file(role, name, digest)?;
         self.record(&Record::File {
             role: role.into(),
             name: name.into(),
@@ -225,12 +225,11 @@ impl Write for ChunkWriter<'_, '_> {
 pub(super) fn page_name(id: &str, page: u64) -> String {
     format!("manifest-{id}-{page:010}")
 }
-fn validate_file(role: &str, name: &str, size: u64, digest: &str) -> Result<()> {
+fn validate_file(role: &str, name: &str, digest: &str) -> Result<()> {
     if !matches!(
         role,
         "Database" | "MasterKey" | "Template" | "Configuration" | "Attachment"
-    ) || size > super::super::super::backup_io::MAX_FILE_BYTES
-        || digest.len() != 64
+    ) || digest.len() != 64
         || !digest.bytes().all(|c| c.is_ascii_hexdigit())
         || name.is_empty()
         || name.len() > 1024
@@ -318,7 +317,7 @@ fn walk(
                     if active.is_some() {
                         return Err(invalid("恢复点文件缺少结束记录。"));
                     }
-                    validate_file(&role, &name, size, &digest)?;
+                    validate_file(&role, &name, &digest)?;
                     if let ReadMode::Content(visitor) = mode {
                         visitor.begin(&role, &name, size, &digest)?;
                     }
