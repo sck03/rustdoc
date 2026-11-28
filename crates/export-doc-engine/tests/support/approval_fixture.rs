@@ -51,6 +51,29 @@ pub fn handling_service(category: &str, reviewer: i64) -> Value {
         .1;
     json!({"key":format!("fixture-{category}"),"name":name,"category":category,"handlerUserIds":[reviewer],"isActive":true})
 }
+/// Explicit positive-scenario setup; negative configuration tests skip this helper.
+pub fn configure_handling_services(
+    service: &NativeService,
+    admin: &str,
+    handler: i64,
+    categories: &[&str],
+) {
+    let current = services(service, admin).unwrap();
+    for category in categories {
+        let mut value = handling_service(category, handler);
+        value["revision"] = current
+            .iter()
+            .find(|row| row["key"] == value["key"])
+            .map(|row| row["revision"].clone())
+            .unwrap_or(json!(0));
+        request(
+            service,
+            admin,
+            SAVE_HANDLING_SERVICE,
+            Some(json!({"service":value,"commandKey":nonce().unwrap()})),
+        );
+    }
+}
 #[track_caller]
 pub fn request(service: &NativeService, token: &str, op: Operation, body: Option<Value>) -> Value {
     call(service, token, op, 0, body).unwrap_or_else(|error| panic!("{}: {error:?}", op.id))
@@ -245,14 +268,15 @@ pub fn configure(service: &NativeService, admin: &str, reviewer: i64) -> Value {
         ),
     );
     let mut settings = request(service, admin, GET_OA_APPROVAL_SETTINGS, None);
-    if services(service, admin).unwrap().is_empty() {
-        settings["handlingServices"] = json!(
-            export_doc_contracts::native_contract::general_categories::CATEGORIES
-                .iter()
-                .map(|(category, _)| handling_service(category, reviewer))
-                .collect::<Vec<_>>()
-        );
-    }
+    configure_handling_services(
+        service,
+        admin,
+        reviewer,
+        &export_doc_contracts::native_contract::general_categories::CATEGORIES
+            .iter()
+            .map(|(category, _)| *category)
+            .collect::<Vec<_>>(),
+    );
     for rule in settings["rules"]
         .as_array_mut()
         .unwrap()

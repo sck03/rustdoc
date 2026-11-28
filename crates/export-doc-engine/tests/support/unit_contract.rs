@@ -313,9 +313,15 @@ pub fn exercise(service: &NativeService, root: &str) {
     let mut node = workflow::node("group-review", &[], "CompanyExecutive", json!([]));
     node["organizationRoute"] = json!({"mode":"Specified","unitId":hq_row["id"]});
     node["reviewPoints"] = json!(["检查跨单位申请的业务归属"]);
+    workflow::configure_handling_services(
+        service,
+        token(&manager_sub),
+        users[0]["id"].as_i64().unwrap(),
+        &["Other"],
+    );
     let mut rule = workflow::rule("general", "", json!([node]));
     let simulation = |rule: &Value| {
-        call(service,token(&manager_sub),SIMULATE_OA_DEFINITION,0,Some(json!({"definition":rule,"employeeId":people[0]["employee"]["id"],"appointmentId":worker_role["appointmentId"],"amount":"","currency":"","duration":"","category":"Other"}))).unwrap()
+        call(service,token(&manager_sub),SIMULATE_OA_DEFINITION,0,Some(json!({"definition":rule,"employeeId":people[0]["employee"]["id"],"appointmentId":worker_role["appointmentId"],"amount":"","currency":"","duration":"","category":"Other","serviceId":"fixture-Other"}))).unwrap()
     };
     let specified = simulation(&rule);
     assert_eq!(
@@ -340,8 +346,8 @@ pub fn exercise(service: &NativeService, root: &str) {
         0
     );
     policy(service, token(&manager_sub), "general", rule);
-    let draft = call(service,token(&worker_sub),operation("general","create"),0,Some(json!({"requestKey":nonce().unwrap(),"title":"子公司申请","reason":"总部授权审批","category":"Other"}))).unwrap();
-    let other = call(service,token(&worker_sub),operation("general","create"),0,Some(json!({"requestKey":nonce().unwrap(),"title":"未分派草稿","reason":"不可外泄","category":"Other"}))).unwrap();
+    let draft = call(service,token(&worker_sub),operation("general","create"),0,Some(json!({"requestKey":nonce().unwrap(),"title":"子公司申请","reason":"总部授权审批","category":"Other","serviceId":"fixture-Other"}))).unwrap();
+    let other = call(service,token(&worker_sub),operation("general","create"),0,Some(json!({"requestKey":nonce().unwrap(),"title":"未分派草稿","reason":"不可外泄","category":"Other","serviceId":"fixture-Other"}))).unwrap();
     let id = draft["id"].as_i64().unwrap();
     let mut pending = call(
         service,
@@ -561,6 +567,32 @@ pub fn exercise(service: &NativeService, root: &str) {
         approved["approvalPlan"]["steps"][0]["actedByUserId"],
         users[2]["id"]
     );
+    // Complete and retire the explicit handling assignment before revoking its operator.
+    let completed = call(service, token(&worker_sub), EXECUTE_GENERAL_REQUEST_FULFILLMENT, id, Some(json!({"expectedVersion":approved["versionNumber"],"nodeKey":super::oa_contract::fulfillment_node(&approved),"note":"办理完成"}))).unwrap();
+    assert_eq!(completed["status"], "Completed");
+    let manager_sub = switched(&replacement, &manager_role);
+    let services = call(
+        service,
+        token(&manager_sub),
+        LIST_MANAGED_HANDLING_SERVICES,
+        0,
+        None,
+    )
+    .unwrap();
+    let handling = services["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["key"] == "fixture-Other")
+        .unwrap();
+    call(
+        service,
+        token(&manager_sub),
+        REMOVE_HANDLING_SERVICE,
+        0,
+        Some(json!({"service":handling,"commandKey":nonce().unwrap()})),
+    )
+    .unwrap();
     worker_scheme["expectedVersion"] = worker_scheme["versionNumber"].clone();
     worker_scheme["disabledModules"] = json!(["office.general"]);
     let changed_scheme = call(

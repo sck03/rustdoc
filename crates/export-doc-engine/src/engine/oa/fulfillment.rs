@@ -158,7 +158,7 @@ pub(in crate::engine) fn can_handle(
     }
     Ok(false)
 }
-pub(super) fn tasks(tx: &Connection, actor: &Actor, row: &Value) -> Result<Value> {
+pub(in crate::engine) fn tasks(tx: &Connection, actor: &Actor, row: &Value) -> Result<Value> {
     let Some(plan) = approval::plan(row)? else {
         return Ok(json!([]));
     };

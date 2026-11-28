@@ -1428,6 +1428,11 @@ export interface ApiExporterDto {
   swiftCode: string;
 }
 
+export interface ApiFileStorageCredentialsReceipt {
+  accessKeyId: string;
+  credentialVersion: number;
+}
+
 export interface ApiFileStorageCredentialsRequest {
   accessKeyId: string;
   expectedVersion: number;
@@ -1451,6 +1456,11 @@ export interface ApiFileStoragePolicy {
   quotaBytes: number;
   requestBytes: number;
   requestFiles: number;
+}
+
+export interface ApiFileStoragePolicyReceipt {
+  policy: ApiFileStoragePolicy;
+  versionNumber: number;
 }
 
 export interface ApiFileStoragePolicyRequest {
@@ -3164,7 +3174,9 @@ export interface ApiRetentionPage {
 }
 
 export interface ApiRetentionPlan {
+  approvalBlocker: string;
   bytes: number;
+  canApprove: boolean;
   count: number;
   expiresAt: string;
   items: ApiRetentionRow[];
@@ -3191,9 +3203,11 @@ export interface ApiRetentionQuery {
 
 export interface ApiRetentionRow {
   activeReferences: number;
+  archiveBlocker: string;
   archiveClass: string;
   archiveIdentity: string;
   basisDate: string;
+  canArchive: boolean;
   company: string;
   days: number;
   digest: string;

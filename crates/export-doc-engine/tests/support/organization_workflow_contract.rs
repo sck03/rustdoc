@@ -260,8 +260,10 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
         logins[1]["user"]["employee"]["organization"]["additionalAssignments"][0]["departmentId"],
         b
     );
+    let (handler, _) = workflow::reviewer(service, admin);
+    workflow::configure_handling_services(service, admin, handler, &["Other"]);
     let create = |kind: &str, extra: Value| {
-        let mut body = json!({"requestKey":nonce().unwrap(),"title":"组织闭环申请","reason":"分派可见与任职范围合同","departmentId":b,"category":"Other"});
+        let mut body = json!({"requestKey":nonce().unwrap(),"title":"组织闭环申请","reason":"分派可见与任职范围合同","departmentId":b,"category":"Other","serviceId":"fixture-Other"});
         for (key, value) in extra.as_object().unwrap() {
             body[key] = value.clone();
         }
@@ -370,7 +372,7 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
         );
 
         let own = call(service, admin, CREATE_GENERAL_REQUEST, 0,
-            Some(json!({"requestKey":nonce().unwrap(),"employeeId":people[4]["employee"]["id"],"departmentId":b,"title":"兼任负责人本人申请","reason":"代申请同样不得自批","category":"Other"}))).unwrap();
+            Some(json!({"requestKey":nonce().unwrap(),"employeeId":people[4]["employee"]["id"],"departmentId":b,"title":"兼任负责人本人申请","reason":"代申请同样不得自批","category":"Other","serviceId":"fixture-Other"}))).unwrap();
         let rejected = call(
             service,
             admin,
@@ -404,7 +406,7 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
                 Some(json!({
                     "definition":dual_role,"employeeId":people[1]["employee"]["id"],
                     "appointmentId":people[1]["organization"]["primaryAssignmentId"],
-                    "amount":"0","currency":"CNY","duration":"1","category":"Other"
+                    "amount":"0","currency":"CNY","duration":"1","category":"Other","serviceId":"fixture-Other"
                 })),
                 admin,
             )
@@ -442,7 +444,7 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
         );
         self_route["stages"][1]["selfApproval"] = json!("Reject");
         policy(service, admin, "general", self_route);
-        let own_draft = call(service,tokens[2],CREATE_GENERAL_REQUEST,0,Some(json!({"requestKey":nonce().unwrap(),"departmentId":b,"title":"负责人自动分流","reason":"负责人本人直达公司领导","category":"Other"}))).unwrap();
+        let own_draft = call(service,tokens[2],CREATE_GENERAL_REQUEST,0,Some(json!({"requestKey":nonce().unwrap(),"departmentId":b,"title":"负责人自动分流","reason":"负责人本人直达公司领导","category":"Other","serviceId":"fixture-Other"}))).unwrap();
         let preview = get(
             service,
             tokens[2],
@@ -543,7 +545,7 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
                 json!([{"source":"Named","approverUserIds":[users[2]["id"],users[3]["id"]]}]),
             ),
         );
-        let self_draft = call(service,tokens[2],CREATE_GENERAL_REQUEST,0,Some(json!({"requestKey":nonce().unwrap(),"departmentId":b,"title":"负责人本人申请","reason":"回避验证","category":"Other"}))).unwrap();
+        let self_draft = call(service,tokens[2],CREATE_GENERAL_REQUEST,0,Some(json!({"requestKey":nonce().unwrap(),"departmentId":b,"title":"负责人本人申请","reason":"回避验证","category":"Other","serviceId":"fixture-Other"}))).unwrap();
         let own = act(service, tokens[2], "general", "submit", &self_draft);
         assert_eq!(own["approvalPlan"]["steps"].as_array().unwrap().len(), 1);
         assert_eq!(
@@ -797,7 +799,7 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
         json!([users[3]["id"], users[5]["id"]]),
     );
     budget["conditions"] = json!([{"field":"Currency","operator":"Equal","value":"CNY"},{"field":"Amount","operator":"GreaterOrEqual","value":"100"},{"field":"Amount","operator":"Less","value":"200"}]);
-    policy(
+    policy_with_samples(
         service,
         admin,
         "purchase",
@@ -808,6 +810,9 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
                 budget,
                 workflow::node("final", &["budget"], "CompanyExecutive", json!([]))
             ]),
+        ),
+        Some(
+            json!([{"employeeId":people[1]["employee"]["id"],"appointmentId":people[1]["organization"]["primaryAssignmentId"],"amount":"100","currency":"CNY","duration":"1"}]),
         ),
     );
     for (amount, currency, matched) in [
@@ -1034,7 +1039,7 @@ fn membership_scope(
     )
     .unwrap();
     let applicant = login(service, &worker_account["username"]);
-    let body = json!({"requestKey":nonce().unwrap(),"departmentId":a,"title":"主职之外的部门数据","reason":"任职权限撤销合同","category":"Other"});
+    let body = json!({"requestKey":nonce().unwrap(),"departmentId":a,"title":"主职之外的部门数据","reason":"任职权限撤销合同","category":"Other","serviceId":"fixture-Other"});
     let row = call(
         service,
         applicant["accessToken"].as_str().unwrap(),

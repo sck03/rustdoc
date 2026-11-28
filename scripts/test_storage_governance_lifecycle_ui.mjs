@@ -45,7 +45,7 @@ function App({owner,token}){
  window.planRevision=plan.data?.revision;
  const t=c.tracking;
  return <>{t.uncertain&&<JobTrackingRecovery jobId={t.jobId} pending={t.job.isFetching} retry={t.retry} dismiss={t.dismiss}/>}
- <RetentionReview key={token} plan={{token,count:1,bytes:15,requestedBy:1,expiresAt:'2026-12-31T00:00:00Z',reason:'保留期已满，依据结案记录',items:[{id:'retained',fileName:'签署凭证.pdf',company:'DEFAULT',archiveClass:'Signed',basisDate:'2020-01-01',expiresOn:'2020-01-02',size:15}]}} disabled={false} approve={()=>window.approved=true}/></>;
+ <RetentionReview key={token} plan={{token,count:1,bytes:15,requestedBy:1,canApprove:token!=='requester',approvalBlocker:token==='requester'?'申请人不能自行批准':'',expiresAt:'2026-12-31T00:00:00Z',reason:'保留期已满，依据结案记录',items:[{id:'retained',fileName:'签署凭证.pdf',company:'DEFAULT',archiveClass:'Signed',basisDate:'2020-01-01',expiresOn:'2020-01-02',size:15}]}} disabled={false} approve={()=>window.approved=true}/></>;
 }
 const root=createRoot(document.getElementById('root'));
 window.render=(owner=0,shown=true,token='one')=>root.render(<React.StrictMode><MemoryRouter><QueryClientProvider client={window.cache}>{shown&&<App owner={owner} token={token}/>}</QueryClientProvider></MemoryRouter></React.StrictMode>);
@@ -80,6 +80,10 @@ try {
   await page.evaluate(() => window.render(0,true,'replaced-plan'));
   await page.waitForFunction(() => !document.querySelector('input[type=checkbox]').checked);
   assert(await approve.isDisabled(), 'replacement token requires a fresh review');
+  await page.evaluate(() => window.render(0,true,'requester'));
+  await page.getByText('申请人不能自行批准', { exact: true }).waitFor();
+  assert(await page.getByLabel('已核对处置理由及全部文件明细').isDisabled());
+  assert(await approve.isDisabled(), 'requester cannot approve their own plan');
   const samples = await page.evaluate(() => {
     const sample={employeeId:1,appointmentId:'a',amount:'1',currency:'CNY'};
     let list=[]; for(let i=0;i<3;i++)list=window.addSample(list,sample,'员工',5);

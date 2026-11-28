@@ -138,7 +138,7 @@ try {
     await page.evaluate(() => window.remoteSettings({ autoRefreshEnabled: true }));
     await page.waitForFunction(() => window.requests.at(-1).configuration.autoRefreshEnabled);
     await page.evaluate(() => window.requests.at(-1).reject(new TypeError('initial source error')));
-    await page.getByText(/initial source error/).waitFor();
+    await page.getByText(/无法连接服务，请检查网络和服务状态/).waitFor();
     const failed = await page.evaluate(() => window.requests.length);
     await page.clock.fastForward(30_000);
     assert.equal(await page.evaluate(() => window.requests.length), failed, 'Network failures wait for backoff');

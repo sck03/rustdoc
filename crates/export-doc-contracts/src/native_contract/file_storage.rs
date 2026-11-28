@@ -40,6 +40,21 @@ pub(super) fn schemas() -> Vec<(&'static str, Schema)> {
             ]),
         ),
         (
+            "ApiFileStoragePolicyReceipt",
+            o(vec![
+                ("versionNumber", bytes()),
+                ("policy", r("ApiFileStoragePolicy")),
+            ])
+            .required(vec!["versionNumber", "policy"])
+            .additional(Additional::Allowed(false)),
+        ),
+        (
+            "ApiFileStorageCredentialsReceipt",
+            o(vec![("credentialVersion", bytes()), ("accessKeyId", s())])
+                .required(vec!["credentialVersion", "accessKeyId"])
+                .additional(Additional::Allowed(false)),
+        ),
+        (
             "ApiFileStoragePolicyRequest",
             o(vec![
                 ("expectedVersion", bytes()),
@@ -81,7 +96,7 @@ pub(super) fn endpoints() -> Vec<Endpoint> {
             "put",
             "/api/file-storage/credentials",
             "UpdateFileStorageCredentials",
-            "ApiFileStorageStatus",
+            "ApiFileStorageCredentialsReceipt",
             Some("ApiFileStorageCredentialsRequest"),
         ),
         (
@@ -95,7 +110,7 @@ pub(super) fn endpoints() -> Vec<Endpoint> {
             "put",
             "/api/file-storage/policy",
             "UpdateFileStoragePolicy",
-            "ApiFileStorageStatus",
+            "ApiFileStoragePolicyReceipt",
             Some("ApiFileStoragePolicyRequest"),
         ),
         (

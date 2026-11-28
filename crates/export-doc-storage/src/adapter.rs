@@ -41,6 +41,7 @@ pub(crate) trait Adapter: Send {
         file_page(record:i64,prefix:&str,after:&str,limit:i64)->(i64,Vec<FileInfo>) => file_catalog::page;
         delete_files(record:i64,kind:Option<&str>)->() => file_catalog::remove;
         file_objects(after:&str,limit:i64,unused:bool)->Vec<FileObject> => file_catalog::objects;
+        invoice_worklist_count(scopes:&[DataScope<'_>],actor:i64)->u64 => worklist_query::invoice_count;
         file_statistics()->Value => file_catalog::statistics;
         retained_files(after:&str,limit:i64)->Value => retention::page;
         retained_file(id:&str)->Option<Value> => retention::get;
@@ -64,6 +65,8 @@ pub(crate) trait Adapter: Send {
         file_owner_company(record:i64)->String => file_catalog::owner_company;
         pending_file_copies(identity:&str)->Vec<FileObject> => file_catalog::pending_copies;
         locate_file(identity:&str,digest:&str)->() => file_catalog::locate;
+        publish_online_file(identity:&str,digest:&str)->() => file_catalog::publish_online;
+        file_object_states(digests:&[String])->Vec<FileObjectState> => file_catalog::states;
         archive_file(identity:&str,digest:&str)->() => file_archive::activate;
         query_resources(query:&ResourceQuery<'_>)->(i64,Vec<Value>) => resource_index::catalogue;
         append_attachment_history(record:i64,kind:&str,body:&Value)->() => attachment_history::append;

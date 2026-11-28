@@ -117,12 +117,14 @@ pub fn exercise(service: &NativeService, root: &str) {
                 .contains("集成人员3")
         );
     }
+    let (handler, _) = workflow::reviewer(service, admin);
+    workflow::configure_handling_services(service, admin, handler, &["Other"]);
     let sessions: Vec<_> = (1..5).map(login).collect();
     let applicant = sessions[0]["accessToken"].as_str().unwrap();
     let first = sessions[1]["accessToken"].as_str().unwrap();
     let second = sessions[2]["accessToken"].as_str().unwrap();
     let create = |department: &str| {
-        call(service, applicant, operation("general","create"), 0, Some(json!({"requestKey":nonce().unwrap(),"departmentId":department,"title":"集成审批","reason":"通用回归","category":"Other"}))).unwrap()
+        call(service, applicant, operation("general","create"), 0, Some(json!({"requestKey":nonce().unwrap(),"departmentId":department,"title":"集成审批","reason":"通用回归","category":"Other","serviceId":"fixture-Other"}))).unwrap()
     };
     policy(
         service,

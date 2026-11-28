@@ -6,6 +6,22 @@ use crate::engine::{
 };
 use serde_json::{Value, json};
 impl FileStore {
+    /// The receipt survives rollback as well as commit. Collection verifies the
+    /// authoritative route before removing a copy, so an offline archive never
+    /// prevents publication of newly verified bytes in the online library.
+    pub(in crate::engine) fn journal_reactivation(
+        &self,
+        previous: &FileObject,
+        online: &str,
+    ) -> Result<Option<UploadLease>> {
+        if !previous.archive_identity.is_empty() {
+            let source = self.object_configuration(previous)?;
+            if source.identity != online {
+                return Ok(Some(self.begin_archive_cleanup(&source, previous)?));
+            }
+        }
+        Ok(None)
+    }
     pub(super) fn restore_archived(
         &self,
         object: &FileObject,
@@ -165,13 +181,8 @@ pub(super) fn run(store: &Store, actor: &Actor, body: &Value) -> Result<(u64, u6
             let row = store
                 .read(|tx| tx.retained_file(id).map_err(Into::into))?
                 .ok_or_else(|| conflict("档案引用已变化，请刷新。"))?;
-            if row["activeReferences"].as_u64().unwrap_or(0) != 0 {
-                return Err(invalid(
-                    "该文件仍被业务记录使用，请保留在线位置；结束业务引用后再迁移档案。",
-                ));
-            }
-            if row["basisDate"].as_str().unwrap_or("").is_empty() {
-                return Err(invalid("请先确认所选资料的档案类别和归档日期。"));
+            if let Some(reason) = super::retention::archive_blocker(&row) {
+                return Err(invalid(reason));
             }
             let object = FileObject {
                 digest: row["digest"].as_str().unwrap_or("").into(),
@@ -182,17 +193,28 @@ pub(super) fn run(store: &Store, actor: &Actor, body: &Value) -> Result<(u64, u6
                 continue;
             }
             let source = store.files.object_configuration(&object)?;
+            let destination = FileObject {
+                archive_identity: identity.clone(),
+                ..object.clone()
+            };
+            // Both receipts precede physical publication, including cancellation
+            // or a conflict before the route transaction commits.
+            let target_cleanup = if source.identity != target.identity {
+                Some(store.files.begin_archive_cleanup(&target, &destination)?)
+            } else {
+                None
+            };
+            let cleanup = if source.identity != target.identity {
+                Some(store.files.begin_archive_cleanup(&source, &object)?)
+            } else {
+                None
+            };
             store.files.copy_object(&target, &object)?;
             store.files.check_identity(&target)?;
             let _archive_write = store
                 .files
                 .archive_access
                 .write(std::time::Duration::from_secs(30))?;
-            let cleanup = if source.identity != target.identity {
-                Some(store.files.begin_archive_cleanup(&source, &object)?)
-            } else {
-                None
-            };
             store.transaction_as(actor, |tx, actor| {
                 if !actor.admin {
                     return Err(crate::engine::error::error(403, "管理员权限已撤销。"));
@@ -217,6 +239,9 @@ pub(super) fn run(store: &Store, actor: &Actor, body: &Value) -> Result<(u64, u6
             })?;
             count += 1;
             bytes += object.size;
+            if let Some(target_cleanup) = target_cleanup {
+                journal::remove_intent(&target_cleanup.path)?;
+            }
             // The journal predates the SQL switch and survives failed/unknown commits.
             if let Some(cleanup) = cleanup {
                 store.files.finish_archive_cleanup(

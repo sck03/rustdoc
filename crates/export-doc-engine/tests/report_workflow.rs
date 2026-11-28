@@ -258,7 +258,7 @@ impl Drop for Fixture {
 #[test]
 fn builtins_images_pdf_jobs_and_backup_restore_share_the_business_store() {
     let _scenario = report_scenario();
-    let fixture = Fixture::new();
+    let mut fixture = Fixture::new();
     let exporter = fixture.create(
         CREATE_EXPORTER,
         json!({"exporterNameEN":"REPORT TEST EXPORTER","exporterNameCN":"报表验证出口单位"}),
@@ -365,11 +365,13 @@ fn builtins_images_pdf_jobs_and_backup_restore_share_the_business_store() {
     for number in ["REPORT-JOB-001", "REPORT-JOB-002"] {
         assert_eq!(names.iter().filter(|name| name.contains(number)).count(), 3);
     }
-    fixture.request(CREATE_DATABASE_BACKUP, &[], &[], None);
+    let backup = fixture.request(CREATE_DATABASE_BACKUP, &[], &[], None);
+    let backup = serde_json::from_value(backup).unwrap();
+    jobs::wait_for_completion(fixture.client(), backup, &AtomicBool::new(false)).unwrap();
     let backups = fixture.request(LIST_DATABASE_BACKUPS, &[], &[], None);
     let name = backups["backups"][0]["fileName"].as_str().unwrap();
     fixture.request(DELETE_JOB, &parameters, &[], None);
-    fixture.request(
+    let restore = fixture.request(
         RESTORE_DATABASE_BACKUP,
         &[],
         &[],
@@ -378,6 +380,9 @@ fn builtins_images_pdf_jobs_and_backup_restore_share_the_business_store() {
             &json!({"backupFileName":name,"confirmationText":"RESTORE"}),
         )),
     );
+    let restore = serde_json::from_value(restore).unwrap();
+    jobs::wait_for_completion(fixture.client(), restore, &AtomicBool::new(false)).unwrap();
+    fixture.client = Some(fixture.client.take().unwrap().restart("Full").unwrap());
     let restored = fixture.client().login("admin".into(), "".into()).unwrap().0;
     assert_eq!(
         restored

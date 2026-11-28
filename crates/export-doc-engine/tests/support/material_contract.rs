@@ -44,7 +44,8 @@ pub fn exercise(service: &NativeService, admin: &str) {
     let token = login["accessToken"].as_str().unwrap();
     let applicant = person("申请材料所有者");
     // Fulfillment requires an actual business handler as well as the restricted reviewer.
-    workflow::reviewer(service, admin);
+    let (handler, _) = workflow::reviewer(service, admin);
+    workflow::configure_handling_services(service, admin, handler, &["Other"]);
     let mut settings = workflow::request(service, admin, GET_OA_APPROVAL_SETTINGS, None);
     let mut node = workflow::node("material-review", &[], "Named", json!([user["id"]]));
     node["materialPolicy"] = json!({"hiddenFields":["title","reason"]});
@@ -67,7 +68,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
         admin,
         CREATE_GENERAL_REQUEST,
         Some(json!({
-            "requestKey":nonce().unwrap(),"employeeId":applicant["employee"]["id"],"title":secret,"reason":secret,"category":"Other"
+            "requestKey":nonce().unwrap(),"employeeId":applicant["employee"]["id"],"title":secret,"reason":secret,"category":"Other","serviceId":"fixture-Other"
         })),
     );
     let id = request["id"].as_i64().unwrap();
@@ -250,7 +251,7 @@ fn activated_materials(
             admin,
             CREATE_GENERAL_REQUEST,
             Some(
-                json!({"requestKey":nonce().unwrap(),"employeeId":applicant["employee"]["id"],"title":"按激活节点检查材料","reason":secret,"category":"Other"}),
+                json!({"requestKey":nonce().unwrap(),"employeeId":applicant["employee"]["id"],"title":"按激活节点检查材料","reason":secret,"category":"Other","serviceId":"fixture-Other"}),
             ),
         );
         let id = draft["id"].as_i64().unwrap();

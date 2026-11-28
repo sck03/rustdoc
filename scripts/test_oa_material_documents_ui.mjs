@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
-import { approvalStage, approveTask, publishDefinitions } from './lib/approval-fixtures.mjs';
+import { configureWorkflowHandling, approvalStage, approveTask, publishDefinitions } from './lib/approval-fixtures.mjs';
 
 await withOfficeUi('oa-material-documents-ui', async ({ output, url, invoke, operations, openPage }) => {
   const admin = (await invoke('Login', { username: 'oa-review', password: 'Review-2026-Test' })).accessToken;
@@ -13,10 +13,12 @@ await withOfficeUi('oa-material-documents-ui', async ({ output, url, invoke, ope
   const applicant = (await invoke('ListPersonnel', undefined, {}, admin)).items.find(row => row.id !== person.employee.id);
   assert(applicant);
   const settings = await invoke('GetOaApprovalSettings', undefined, {}, admin);
-  await publishDefinitions(invoke, admin, { ...settings, rules: settings.rules.map(rule => rule.key === 'general' ? { ...rule, stages: [{ ...approvalStage('limited-review', [user.id]), materialPolicy: { hiddenFields: ['reason', 'attachments'] } }] } : rule) }, ['general']);
+  settings.rules = settings.rules.map(rule => rule.key === 'general' ? { ...rule, stages: [{ ...approvalStage('limited-review', [user.id]), materialPolicy: { hiddenFields: ['reason', 'attachments'] } }] } : rule);
+  await configureWorkflowHandling(invoke, admin, settings, ['general']);
+  await publishDefinitions(invoke, admin, settings, ['general']);
   const secret = 'PRIVATE-MATERIAL-20261031';
   const reason = [secret, ...Array.from({ length: 70 }, (_, index) => `第 ${index + 1} 行：核对长正文分页及独立审批材料。`)].join('\n');
-  let row = await invoke('CreateGeneralRequest', { requestKey: 'material-doc-request', employeeId: applicant.id, title: '公开事项与受限材料分页验收', category: 'Other', reason }, {}, admin);
+  let row = await invoke('CreateGeneralRequest', { requestKey: 'material-doc-request', employeeId: applicant.id, title: '公开事项与受限材料分页验收', category: 'Other', serviceId: 'fixture-Other', reason }, {}, admin);
   const original = Buffer.from('<?xml version="1.0"?><Private>PRIVATE-ORIGINAL-20261031</Private>');
   const form = new FormData(); form.set('expectedVersion', String(row.versionNumber)); form.set('purpose', 'Supporting'); form.set('file', new Blob([original], { type: 'application/xml' }), `${secret}.xml`);
   const route = (name, submissionId) => operations.get(name).route.replace('{id}', row.id).replace('{submissionId}', submissionId);

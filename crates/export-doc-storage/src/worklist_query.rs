@@ -74,3 +74,31 @@ pub(crate) fn build(
     }
     Ok((statement, projection))
 }
+
+/// The invoice queue has only indexed scope/owner/state predicates and no live
+/// workflow authority or deadline. Keep its total separate from page projection.
+pub(crate) fn invoice_count(
+    db: &(impl crate::Adapter + ?Sized),
+    scopes: &[DataScope<'_>],
+    actor: i64,
+) -> Result<u64> {
+    let (statement, _) = build(
+        &ScopedQuery {
+            kind: "invoices",
+            scopes,
+            company: None,
+            fields: &[],
+            limit: 1,
+        },
+        actor,
+        &DataScope::default(),
+        &WorklistScan::default(),
+        db.provider() == "PostgreSQL",
+    )?;
+    db.query_json(
+        &crate::query_source::aggregate(&statement, "CAST(COUNT(*) AS TEXT)"),
+        &statement.values,
+    )?
+    .as_u64()
+    .ok_or_else(|| crate::Error::unavailable("单据待办汇总无效。"))
+}

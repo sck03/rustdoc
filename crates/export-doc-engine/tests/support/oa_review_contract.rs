@@ -64,6 +64,8 @@ fn read(service: &NativeService, token: &str, op: Operation, query: &[(&str, Str
     serde_json::from_slice(&service.dispatch(op, &[], query, None, token).unwrap()).unwrap()
 }
 pub fn exercise(service: &NativeService, admin: &str) {
+    let (handler, _) = fixture::reviewer(service, admin);
+    fixture::configure_handling_services(service, admin, handler, &["Other"]);
     participation_limits(service, admin);
     same_department_appointments(service, admin);
 }
@@ -95,7 +97,7 @@ fn participation_limits(service: &NativeService, admin: &str) {
             admin,
             CREATE_GENERAL_REQUEST,
             Some(
-                json!({"requestKey":nonce().unwrap(),"employeeId":applicant["employee"]["id"],"title":format!("范围-{}",nonce().unwrap()),"reason":"显式限制优先于分派","category":"Other"}),
+                json!({"requestKey":nonce().unwrap(),"employeeId":applicant["employee"]["id"],"title":format!("范围-{}",nonce().unwrap()),"reason":"显式限制优先于分派","category":"Other","serviceId":"fixture-Other"}),
             ),
         );
         if applicant["employee"]["id"] == applicants[1]["employee"]["id"] {
@@ -323,7 +325,7 @@ fn same_department_appointments(service: &NativeService, admin: &str) {
         token,
         CREATE_GENERAL_REQUEST,
         Some(
-            json!({"requestKey":nonce().unwrap(),"title":"第二岗位申请","reason":"使用明确任职对应的上级","category":"Other"}),
+            json!({"requestKey":nonce().unwrap(),"title":"第二岗位申请","reason":"使用明确任职对应的上级","category":"Other","serviceId":"fixture-Other"}),
         ),
     );
     assert_eq!(draft["applicantAppointmentId"], appointment);
@@ -366,7 +368,7 @@ fn same_department_appointments(service: &NativeService, admin: &str) {
         admin,
         SIMULATE_OA_DEFINITION,
         Some(
-            json!({"definition":definition,"employeeId":linked["employee"]["id"],"appointmentId":appointment,"amount":"0","currency":"CNY","duration":"1","category":"Other"}),
+            json!({"definition":definition,"employeeId":linked["employee"]["id"],"appointmentId":appointment,"amount":"0","currency":"CNY","duration":"1","category":"Other","serviceId":"fixture-Other"}),
         ),
     );
     assert_eq!(
@@ -387,7 +389,7 @@ fn same_department_appointments(service: &NativeService, admin: &str) {
         token,
         CREATE_GENERAL_REQUEST,
         Some(
-            json!({"requestKey":nonce().unwrap(),"title":"主任职申请","reason":"主任职上级保持独立","category":"Other"}),
+            json!({"requestKey":nonce().unwrap(),"title":"主任职申请","reason":"主任职上级保持独立","category":"Other","serviceId":"fixture-Other"}),
         ),
     );
     let pending = submit(service, token, &draft);

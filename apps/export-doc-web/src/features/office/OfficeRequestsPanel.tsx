@@ -3,7 +3,7 @@ import { useState, type FormEvent } from "react";
 import { RefreshCw } from "lucide-react";
 import type { ApiUserDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { formatBusinessDateTime } from "../../ui/businessTime.ts";
-import { isMeetingBooking, officeActionLabels, officeRequestActions, officeRequestStatuses, officeStatus, officeStatusLabels,
+import { isMeetingBooking, officeActionLabels, officeHandlingTask, officeRequestActions, officeRequestStatuses, officeStatus, officeStatusLabels,
   type OfficeAction, type OfficeKind, type OfficeRequestRow } from "./officeModel.ts";
 import { applyOfficeAction, useOfficeResourceOperation, useOfficeRequests } from "./useOfficeData.ts";
 import { OfficeDialog, OfficeField, OfficePager, OfficeQueryState, OfficeSubmit } from "./OfficeUi.tsx";
@@ -64,7 +64,8 @@ function OfficeActionDialog({ client, kind, row, action, label, onClose }: {
 }) {
   const operation = useOfficeResourceOperation(kind, client, row.id);
   const [taskKey, setTaskKey] = useState(action==="approve"||action==="reject"?row.reviewTaskKeys?.[0]??"":"");
-  const handlingNode=row.approvalPlan?.nodes.find(node=>node.kind==="Handling"&&node.handlingAction===(action==="issue"?"Issue":"Return")&&!node.skipped);
+  const handlingTask = officeHandlingTask(row, action);
+  const handlingNode = row.approvalPlan?.nodes.find(node => node.key === handlingTask?.nodeKey);
   const [verificationValues, setVerificationValues] = useState<Record<string, string | boolean>>({});
   const [confirmedReviewPoints, setConfirmedReviewPoints] = useState<number[]>([]);
   const remaining = !isMeetingBooking(row) && row.quantity !== undefined && row.returnedQuantity !== undefined ? row.quantity - row.returnedQuantity : undefined;

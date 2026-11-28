@@ -26,6 +26,7 @@ fn call(
     let body = workflow::decision_body(service, token, op, id, body);
     workflow::dispatch(service, token, op, &parameters, query, body)
 }
+#[track_caller]
 fn action(service: &NativeService, token: &str, op: Operation, row: &Value) -> Value {
     call(
         service,
@@ -411,7 +412,6 @@ pub fn exercise(service: &NativeService, admin: &str) -> i64 {
     );
     call(service,admin,LINK_PERSONNEL_ACCOUNT,employee["employee"]["id"].as_i64().unwrap(),&[],Some(json!({"expectedVersion":employee["versionNumber"],"userId":users[0]["id"],"expectedAccountVersion":users[0]["versionNumber"]}))).unwrap();
     let reader = login(users[0]["username"].as_str().unwrap());
-    let request=call(service,&reader,CREATE_GENERAL_REQUEST,0,&[],Some(json!({"requestKey":nonce().unwrap(),"title":"通知事务验收","reason":"设备维修","category":"IT"}))).unwrap();
     let reviewer_person = create(
         CREATE_PERSONNEL,
         json!({"requestKey":nonce().unwrap(),"employeeNumber":format!("COMMS-REVIEW-{suffix}"),"departmentId":"GENERAL","jobTitle":"审批员","employmentType":"FullTime","hireDate":"2026-09-01","profile":{"fullName":"manager"}}),
@@ -421,6 +421,10 @@ pub fn exercise(service: &NativeService, admin: &str) -> i64 {
     let manager = manager.as_str();
     let reviewer = call(service, manager, GET_CURRENT_USER, 0, &[], None).unwrap();
     let mut settings = workflow::request(service, admin, GET_OA_APPROVAL_SETTINGS, None);
+    settings["handlingServices"] = json!([workflow::handling_service(
+        "Other",
+        reviewer["id"].as_i64().unwrap()
+    )]);
     let general = settings["rules"]
         .as_array_mut()
         .unwrap()
@@ -441,6 +445,18 @@ pub fn exercise(service: &NativeService, admin: &str) -> i64 {
         PUBLISH_OA_DEFINITION,
         Some(json!({"expectedVersion":saved["versionNumber"],"definitionKey":"general"})),
     );
+    let request = call(
+        service,
+        &reader,
+        CREATE_GENERAL_REQUEST,
+        0,
+        &[],
+        Some(json!({
+            "requestKey": nonce().unwrap(), "title": "通知事务验收",
+            "reason": "事项通知", "category": "Other", "serviceId": "fixture-Other"
+        })),
+    )
+    .unwrap();
     let request = action(service, &reader, SUBMIT_GENERAL_REQUEST, &request);
     assert_eq!(count(service, manager), 1);
     assert_eq!(count(service, &reader), 0);

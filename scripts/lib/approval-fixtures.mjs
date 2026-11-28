@@ -125,6 +125,43 @@ export async function saveApprovalSettings(invoke, token, settings) {
   }
   return saved;
 }
+// Explicit business-handler setup for positive integration scenarios. Tests that
+// exercise missing responsibilities do not call this helper.
+export async function configureWorkflowHandling(invoke, token, settings, keys, categories = ['Other']) {
+  const password = 'Workflow-Handler-2026';
+  const resources = [...new Set(keys.map(key => 'office.' + ({ expense: 'expenses', room: 'rooms', supply: 'supplies' }[key] ?? key)))];
+  const user = (await invoke('createUserAccount', {
+    username: 'handler-' + randomUUID(), fullName: '验收业务办理员', role: 'OfficeEmployee',
+    companyScope: 'DEFAULT', departmentId: 'GENERAL', isActive: true, resetPassword: password,
+    permissionGrants: resources.flatMap(resourceKey => (['office.rooms', 'office.supplies'].includes(resourceKey)
+      ? ['view', 'issue', 'return'] : ['view', 'complete']).map(action => ({ resourceKey, action, dataScope: 'company' }))),
+  }, {}, token)).user;
+  await linkBusinessPerson(invoke, token, user);
+  const original = await invoke('GetOaApprovalSettings', undefined, {}, token);
+  settings.rules = settings.rules.map(rule => {
+    if (!keys.includes(rule.key)) return rule;
+    const nodes = original.rules.find(item => item.key === rule.key).stages.filter(node => node.phase === 'Fulfillment');
+    const approval = rule.stages.filter(node => node.phase !== 'Fulfillment');
+    const fulfillmentKeys = new Set(nodes.map(node => node.key));
+    return { ...rule, stages: [...approval, ...nodes.map(node => ({
+      ...node, dependsOn: [...new Set(node.dependsOn.flatMap(key => fulfillmentKeys.has(key) ? [key] : approval.map(stage => stage.key)))],
+      ...(node.kind === 'Handling' ? { source: 'Named', approverUserIds: [user.id] } : {}),
+    }))] };
+  });
+  const services = keys.includes('general') ? await createHandlingServices(invoke, token, user.id, categories) : {};
+  return { user, password, services };
+}
+
+export async function createHandlingServices(invoke, token, handlerId, categories = ['Other']) {
+  const services = {};
+  for (const category of categories) {
+    const service = { key: 'fixture-' + category, category, name: category + '验收事项', handlerUserIds: [handlerId], isActive: true, revision: 0 };
+    await invoke('SaveHandlingService', { service, commandKey: randomUUID() }, {}, token);
+    services[category] = service.key;
+  }
+  return services;
+}
+
 export async function publishDefinitions(invoke, token, settings, keys, samplesByDefinition = {}) {
   let saved = await saveApprovalSettings(invoke, token, settings);
   let candidates;

@@ -51,7 +51,7 @@ await withOfficeUi('frontend-filter-typography-ui', async ({ repo, output, url, 
       await page.goto(url + '/' + route);
       await page.locator('.workspace-header h1').waitFor();
       await page.getByText('正在加载页面', { exact: true }).waitFor({ state: 'hidden' });
-      await page.waitForFunction(() => ![...document.querySelectorAll('.page-state[data-tone="loading"]')].some(node => node.getClientRects().length));
+      await page.waitForFunction(() => ![...document.querySelectorAll('.page-state[data-tone="loading"]')].some(node => node.getClientRects().length && !node.closest('details:not([open])')));
       await page.locator('[aria-busy="true"], .oa-hub-count[aria-label="正在读取"]').first().waitFor({ state: 'hidden' });
       await page.evaluate(() => document.fonts.ready);
       await checkInputFrames(page);
@@ -112,8 +112,10 @@ await withOfficeUi('frontend-filter-typography-ui', async ({ repo, output, url, 
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(url + '/#/master-data/hs-knowledge/examples');
   await page.getByRole('button', { name: '新增实例', exact: true }).click();
-  assert.deepEqual(await page.locator('main .command-button:not(.secondary)').allTextContents(), ['保存实例'], 'Editing makes save the primary action');
-  await page.getByRole('button', { name: '取消', exact: true }).click();
+  const editor = page.locator('form.knowledge-editor');
+  await editor.getByRole('button', { name: '保存实例', exact: true }).waitFor();
+  assert.deepEqual(await editor.locator('.command-button:not(.secondary)').allTextContents(), ['保存实例'], 'Editing makes save the primary action');
+  await editor.getByRole('button', { name: '关闭', exact: true }).click();
   await page.goto(url + '/#/master-data/hs-knowledge/transfer');
   const exportRoute = '**/api/master-data/hs-knowledge/export';
   await page.route(exportRoute, route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: '知识库导出服务暂不可用' }) }));

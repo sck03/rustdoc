@@ -16,6 +16,7 @@ mod credentials;
 mod flights;
 pub(super) mod incremental;
 mod journal;
+pub(in crate::engine) use journal::UploadLease;
 mod migration;
 pub(super) mod policy;
 mod remote;

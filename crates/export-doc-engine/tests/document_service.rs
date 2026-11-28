@@ -15,8 +15,6 @@ use serde_json::{Value, json};
 fn office_documents_round_trip_with_type_and_state_validation() {
     let mut fixture = native_fixture::Fixture::new();
     let person = fixture.employee();
-    let mut row=fixture.create(CREATE_GENERAL_REQUEST,json!({"requestKey":"office-files","title":"办公文档附件","reason":"按原始字节交接","category":"IT","employeeId":person["employee"]["id"]}));
-    let path = [("id", row["id"].to_string())];
     fixture.client.take();
     let service = export_doc_engine::engine::NativeService::open(fixture.paths.clone()).unwrap();
     let login: Value = serde_json::from_slice(
@@ -34,6 +32,16 @@ fn office_documents_round_trip_with_type_and_state_validation() {
     let token = login["accessToken"].as_str().unwrap();
     let (reviewer_id, _) = workflow::reviewer(&service, token);
     workflow::configure(&service, token, reviewer_id);
+    let mut row = workflow::request(
+        &service,
+        token,
+        CREATE_GENERAL_REQUEST,
+        Some(json!({
+            "requestKey":"office-files","title":"办公文档附件","reason":"按原始字节交接",
+            "category":"IT","serviceId":"fixture-IT","employeeId":person["employee"]["id"]
+        })),
+    );
+    let path = [("id", row["id"].to_string())];
     for (extension, bytes) in document_samples::office_files() {
         row = service
             .upload(

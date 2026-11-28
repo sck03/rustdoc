@@ -92,7 +92,7 @@ await withOfficeUi('oa-handling-ui', async ({ output, require, url, invoke, open
     await form.getByLabel('登记人员',{exact:true}).fill('OA-001'); await form.getByRole('option',{name:/OA-001/u}).click();
     await form.getByLabel('申请标题').fill(`${name}闭环验收`); await form.getByLabel('申请说明').fill('先经部门领导及总经理批准，再交专岗办理。');
     await form.getByLabel('申请类别').selectOption(category);
-    await form.getByLabel('具体印章／办理事项').selectOption(keys[name]);
+    await form.getByLabel('办理事项',{exact:true}).selectOption(keys[name]);
     await form.locator('input[type=file]').setInputFiles(proof);
     await form.getByRole('button',{name:'保存草稿',exact:true}).click(); await form.waitFor({state:'hidden'});
     const requestUrl=admin.url();

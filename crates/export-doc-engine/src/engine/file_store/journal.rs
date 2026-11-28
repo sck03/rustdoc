@@ -2,6 +2,7 @@
 //! An interrupted upload remains observable until the administrator reconciles it.
 use super::*;
 mod archive_cleanup;
+mod discovery;
 #[cfg(test)]
 #[path = "tests/journal.rs"]
 mod tests;
@@ -14,6 +15,7 @@ pub(super) type Uploads = Arc<Mutex<Activity>>;
 pub(super) struct Activity {
     uploads: BTreeMap<String, (String, String)>,
     collecting: BTreeSet<(String, String)>,
+    scan: Option<fs::ReadDir>,
 }
 struct CollectionLease {
     key: (String, String),
@@ -26,7 +28,7 @@ impl Drop for CollectionLease {
         }
     }
 }
-pub(super) struct UploadLease {
+pub(in crate::engine) struct UploadLease {
     pub(super) path: PathBuf,
     token: String,
     active: Uploads,
@@ -43,7 +45,7 @@ impl Drop for UploadLease {
 struct Intent {
     identity: String,
     object: FileObject,
-    archive_source: bool,
+    copy_cleanup: bool,
 }
 impl FileStore {
     fn journal_root(&self) -> PathBuf {
@@ -70,7 +72,7 @@ impl FileStore {
         &self,
         config: &Configuration,
         object: &FileObject,
-        archive_source: bool,
+        copy_cleanup: bool,
     ) -> Result<UploadLease> {
         let token = paths::nonce().map_err(unavailable)?;
         let lease = UploadLease {
@@ -100,7 +102,7 @@ impl FileStore {
             &serde_json::to_vec(&Intent {
                 identity: config.identity.clone(),
                 object: object.clone(),
-                archive_source,
+                copy_cleanup,
             })?,
         )
         .map_err(unavailable)?;
@@ -116,103 +118,24 @@ impl FileStore {
         }
         Ok(lease)
     }
-    /// Bounded discovery of abandoned uploads, including objects without a SQL row.
-    pub(super) fn orphan_intents(
-        &self,
-        store: &super::super::store::Store,
-        config: &Configuration,
-    ) -> Result<Vec<FileObject>> {
-        let root = self.journal_root();
-        paths::ensure_safe_absolute(&root).map_err(unavailable)?;
-        crate::secrets::private_directory(&root).map_err(unavailable)?;
-        let mut objects = BTreeMap::new();
-        for entry in fs::read_dir(root)?.take(1000) {
-            crate::operation::check()?;
-            let path = entry?.path();
-            paths::ensure_safe_absolute(&path).map_err(unavailable)?;
-            if path.extension().is_none_or(|e| e != "json") {
-                continue;
-            }
-            let file = match fs::File::open(&path) {
-                Ok(file) => file,
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
-                Err(e) => return Err(e.into()),
-            };
-            let intent: Intent = serde_json::from_reader(file.take(4096))
-                .map_err(|_| invalid("文件上传回收记录损坏，请核对文件存储维护记录。"))?;
-            validate(&intent.object)?;
-            if intent.archive_source {
-                continue;
-            }
-
-            let token = path.file_stem().and_then(|v| v.to_str()).unwrap_or("");
-            let active = self
-                .uploads
-                .lock()
-                .map_err(|_| unavailable("文件上传状态异常。"))?;
-            if active.uploads.contains_key(token) {
-                continue;
-            }
-            drop(active);
-            if intent.identity != config.identity {
-                fs::remove_file(&path)?;
-                continue;
-            }
-            if store
-                .connection()?
-                .file_is_referenced(&intent.object.digest)?
-            {
-                match fs::remove_file(&path) {
-                    Ok(()) => {}
-                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-                    Err(e) => return Err(e.into()),
-                }
-            } else {
-                objects.insert(intent.object.digest.clone(), intent.object);
-                if objects.len() == 500 {
-                    break;
-                }
-            }
-        }
-        Ok(objects.into_values().collect())
-    }
     pub(super) fn finish_collection(
         &self,
         config: &Configuration,
         removed: &BTreeSet<String>,
+        intents: &[(String, String)],
     ) -> Result<()> {
-        let root = self.journal_root();
-        paths::ensure_safe_absolute(&root).map_err(unavailable)?;
-        if root.try_exists()? {
-            for entry in fs::read_dir(root)?.take(1000) {
-                crate::operation::check()?;
-                let path = entry?.path();
-                paths::ensure_safe_absolute(&path).map_err(unavailable)?;
-                if path.extension().is_none_or(|e| e != "json") {
-                    continue;
-                }
-                let file = match fs::File::open(&path) {
-                    Ok(f) => f,
-                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
-                    Err(e) => return Err(e.into()),
-                };
-                let intent: Intent = serde_json::from_reader(file.take(4096))?;
+        #[cfg(not(feature = "s3-storage"))]
+        let _ = config;
+        for (token, digest) in intents {
+            crate::operation::check()?;
+            if removed.contains(digest) {
+                let path = self.intent_path(token)?;
                 let active = self
                     .uploads
                     .lock()
                     .map_err(|_| unavailable("文件上传状态异常。"))?;
-                if !intent.archive_source
-                    && intent.identity == config.identity
-                    && removed.contains(&intent.object.digest)
-                    && !active
-                        .uploads
-                        .contains_key(path.file_stem().and_then(|v| v.to_str()).unwrap_or(""))
-                {
-                    match fs::remove_file(&path) {
-                        Ok(()) => {}
-                        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-                        Err(e) => return Err(e.into()),
-                    }
+                if !active.uploads.contains_key(token) {
+                    remove_intent(&path)?;
                 }
             }
         }
@@ -236,7 +159,8 @@ impl FileStore {
     #[cfg(test)]
     pub(super) fn reconcile(&self, store: &super::super::store::Store) -> Result<u64> {
         let config = self.configuration()?;
-        let mut objects = self.orphan_intents(store, &config)?;
+        let discovered = self.discover_intents(store, &config)?;
+        let mut objects = discovered.orphans;
         objects.extend(store.connection()?.file_objects("", 1000, true)?);
         let mut removed = BTreeSet::new();
         let mut progress = super::CollectionProgress::default();
@@ -248,7 +172,7 @@ impl FileStore {
                     removed.insert(object.digest);
                 }
             }
-            self.finish_collection(&config, &removed)?;
+            self.finish_collection(&config, &removed, &discovered.uploads)?;
             Ok(progress.bytes)
         })();
         result.map_err(|cause| progress.failure(cause))
@@ -319,5 +243,14 @@ impl FileStore {
                     })
             }
         }
+    }
+}
+
+/// A concurrent successful transaction may already have retired this receipt.
+pub(super) fn remove_intent(path: &Path) -> Result<()> {
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(cause) => Err(cause.into()),
     }
 }

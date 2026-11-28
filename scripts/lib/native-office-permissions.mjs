@@ -30,7 +30,10 @@ export async function verifyDesktopOfficePermissions({ run, request, token, cdp,
     assert(!await run("!!document.querySelector('input[autocomplete=username]')"), 'Employee React login succeeded');
     await delay(500);
   };
-  await run("document.querySelector('.workspace-logout-button').click(); true");
+  await run("document.querySelector('button.account-menu-trigger[aria-haspopup=menu]').click(); true");
+  const menuDeadline = Date.now() + 10000;
+  while (Date.now() < menuDeadline && !await run("[...document.querySelectorAll('[role=menuitem]')].some(item=>item.textContent.trim()==='退出登录')")) await delay(100);
+  await run("[...document.querySelectorAll('[role=menuitem]')].find(item=>item.textContent.trim()==='退出登录').click(); true");
   await signIn();
   assert.equal(await run('location.hash'), '#/office/approvals', 'Employee opens the office workspace');
   const text = await run('document.body.innerText');

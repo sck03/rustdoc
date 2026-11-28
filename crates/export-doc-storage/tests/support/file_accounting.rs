@@ -25,6 +25,28 @@ pub fn exercise(c: &Connection) {
         })
         .unwrap();
     }
+    c.locate_file("online", &object.digest).unwrap();
+    c.archive_file("archive", &object.digest).unwrap();
+    let states = c
+        .file_object_states(&[object.digest.clone(), "f".repeat(64)])
+        .unwrap();
+    assert_eq!(states.len(), 1);
+    assert_eq!(states[0].references, 2);
+    assert_eq!(states[0].object.archive_identity, "archive");
+    c.publish_online_file("online", &object.digest).unwrap();
+    assert!(
+        c.file_info(record, "first")
+            .unwrap()
+            .unwrap()
+            .object
+            .archive_identity
+            .is_empty()
+    );
+    assert!(c.file_object_states(&[]).unwrap().is_empty());
+    assert!(
+        c.file_object_states(&vec![object.digest.clone(); 1001])
+            .is_err()
+    );
     assert_eq!(c.file_usage("FILE-QUOTA-A").unwrap(), 14);
     c.verify_file_accounting().unwrap();
     body["companyScope"] = json!("FILE-QUOTA-B");

@@ -28,7 +28,13 @@ export async function verifyDesktopBackupSave({run,request,token,cdp,output,data
     await wait(()=>run("[...document.querySelectorAll('button')].some(button=>button.textContent.trim()==='下载'&&!button.disabled)"));
     await run("[...document.querySelectorAll('button')].find(button=>button.textContent.trim()==='下载'&&!button.disabled).click();true");
     await wait(()=>fs.existsSync(destination));
-    await wait(()=>run("document.body.innerText.includes('便携恢复点已导出')"));
+    await run("[...document.querySelectorAll('button')].find(button=>button.textContent.trim()==='查看任务').click();true");
+    await wait(()=>run("new URLSearchParams(location.hash.split('?')[1]).has('jobId')"));
+    const jobId=await run("new URLSearchParams(location.hash.split('?')[1]).get('jobId')");
+    await wait(async()=>{const current=await call('GetJob',undefined,{jobId});assert(!['Failed','Canceled'].includes(current.status),JSON.stringify(current));return current.status==='Succeeded';});
+    const completed=await call('GetJob',undefined,{jobId});
+    assert.equal(path.resolve(completed.outputPath),path.resolve(destination));
+    await wait(()=>run("[...document.querySelectorAll('tr.job-row-focused')].some(row=>row.innerText.includes('已完成')&&row.innerText.includes("+JSON.stringify(jobId)+"))"));
     const bytes=fs.readFileSync(destination);
     const magic=Buffer.from('EDM-RECOVERY-POINT-1\n');
     assert.deepEqual(bytes.subarray(0,magic.length),magic);
@@ -38,7 +44,7 @@ export async function verifyDesktopBackupSave({run,request,token,cdp,output,data
       const name=bytes.subarray(offset,offset+length).toString();offset+=length;
       assert.match(name,/^(repository\.json|(?:blob|manifest|point)-[a-zA-Z0-9.-]+)$/u);
       const size=bytes.readUInt32LE(offset);offset+=4;
-      assert.deepEqual(bytes.subarray(offset,offset+size),fs.readFileSync(path.join(repository,name)),name);
+      assert.deepEqual(bytes.subarray(offset,offset+size),fs.readFileSync(path.join(repository,/^(blob|manifest)-/u.test(name)?'objects':'',name)),name);
       offset+=size;lastName=name;frames++;
     }
     assert.equal(offset,bytes.length,'portable export has no truncation or trailing bytes');

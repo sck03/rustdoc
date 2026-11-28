@@ -161,7 +161,7 @@ fn jobs(c: &Connection) {
         insert(
             c,
             "background-jobs",
-            json!({"jobId":format!("job-{n}"),"versionNumber":1,"ownerUserId":owner,"requestedByUserId":owner,"companyScope":"A","departmentId":"D","status":"Succeeded","createdAt":time,"completedAt":time,"title":"中文文件任务","_retry":{"operation":"Export","body":"large input".repeat(2048)}}),
+            json!({"jobId":format!("job-{n}"),"outputPath":format!("result-{n}.pdf"),"versionNumber":1,"ownerUserId":owner,"requestedByUserId":owner,"companyScope":"A","departmentId":"D","status":"Succeeded","createdAt":time,"completedAt":time,"title":"中文文件任务","_retry":{"operation":"Export","body":"large input".repeat(2048)}}),
         );
     }
     for (owner, cancel) in [(1, false), (2, true)] {
@@ -199,6 +199,17 @@ fn jobs(c: &Connection) {
     assert_eq!(total, 230);
     assert_eq!(rows.len(), 200);
     assert!(!rows[0].to_string().contains("large input"));
+    for keyword in ["JOB-229", "RESULT-229.PDF"] {
+        q.keyword = keyword;
+        assert_eq!(c.query_jobs(&q).unwrap().0, 1);
+        q.owner = Some(3);
+        assert_eq!(
+            c.query_jobs(&q).unwrap().0,
+            0,
+            "search must preserve ownership"
+        );
+        q.owner = None;
+    }
     q.status = "";
     q.keyword = "";
     q.active = Some(false);

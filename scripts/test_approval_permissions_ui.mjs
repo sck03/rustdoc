@@ -80,12 +80,13 @@ await withOfficeUi('approval-permissions-ui', async ({ output, url, invoke, open
     permissionGrants:['view','complete'].map(action=>({resourceKey:'office.general',action,dataScope:'company'})) }, {}, adminToken)).user;
   await linkBusinessPerson(invoke, adminToken, handler);
   // Approval authority does not imply handling authority; provide an actual business handler.
+  await invoke('SaveHandlingService', { service: { key:'fixture-Other', category:'Other', name:'通用事项办理验收', handlerUserIds:[handler.id], isActive:true, revision:0 }, commandKey:crypto.randomUUID() }, {}, adminToken);
   await publishDefinitions(invoke, adminToken, { ...policy,
     rules: policy.rules.map(rule => ['general', 'personnel:Confirm'].includes(rule.key) ? { ...rule, stages: [approvalStage('review', [account.id]),
       ...(rule.key==='general'?rule.stages.filter(stage=>stage.phase==='Fulfillment').map(stage=>({...stage,dependsOn:['review'],
         ...(stage.kind==='Handling'?{source:'Named',approverUserIds:[handler.id]}:{})})):[])] } : rule) }, ['general', 'personnel:Confirm']);
   for (const [kind, op, extra, button] of [
-    ['general', 'General', { category: 'Other' }, '批准'],
+    ['general', 'General', { category: 'Other', serviceId: 'fixture-Other' }, '批准'],
     ['personnel', 'PersonnelChange', { personnelChange: { action: 'Confirm', expectedPersonnelVersion: employee.versionNumber, effectiveDate: login.user.businessDate } }, '批准人员变动'],
   ]) {
     const draft = await invoke(`Create${op}Request`, { requestKey: `approval-${kind}`, employeeId: employee.employee.id,

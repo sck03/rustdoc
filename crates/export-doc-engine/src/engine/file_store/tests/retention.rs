@@ -43,10 +43,13 @@ fn archive_routes_are_verified_and_retention_requires_an_independent_reviewer() 
     )
     .unwrap();
     assert_eq!(plan["reason"], "到期复核");
+    assert_eq!(plan["canApprove"], false);
+    assert!(plan["approvalBlocker"].as_str().unwrap().contains("申请人"));
     assert_eq!(plan["items"][0]["id"], id);
     assert_eq!(plan["items"][0]["fileName"], "signed.pdf");
     let listed = call(QUERY_FILE_RETENTION, json!({})).unwrap();
     assert_eq!(listed["plan"], plan);
+    assert_eq!(listed["items"][0]["canArchive"], true);
     assert_eq!(
         call(APPROVE_RETENTION_DELETION, json!({"token":plan["token"]}))
             .unwrap_err()
@@ -199,7 +202,10 @@ fn archive_routes_are_verified_and_retention_requires_an_independent_reviewer() 
     let review =
         super::super::retention::handle(&service, &reviewer, QUERY_FILE_RETENTION, &json!({}))
             .unwrap();
-    assert_eq!(review["plan"], plan);
+    assert_eq!(review["plan"]["canApprove"], true);
+    assert_eq!(review["plan"]["approvalBlocker"], "");
+    assert_eq!(review["plan"]["token"], plan["token"]);
+    assert_eq!(review["plan"]["items"], plan["items"]);
     // Archive location change invalidates the old deletion preflight.
     assert_eq!(
         super::super::retention::handle(

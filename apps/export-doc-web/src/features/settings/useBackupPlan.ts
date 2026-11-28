@@ -81,7 +81,7 @@ export function useBackupPlan(client: ExportDocManagerApiClient, canManage: bool
     },
     onSuccess: (job) => {
       if (!job) return;
-      trackJob(job.jobId); setMessage(null); setSuccess("便携导出任务已启动，完成后可在任务结果中下载。");
+      trackJob(job.jobId); setMessage(null); setSuccess("便携导出任务已启动。");
     },
     refreshKeys: () => [queryKeys.jobsRoot()],
     onError: fail,

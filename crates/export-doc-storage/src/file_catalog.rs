@@ -30,6 +30,12 @@ pub struct FileInfo {
     pub media_type: String,
     pub object: FileObject,
 }
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileObjectState {
+    pub object: FileObject,
+    pub references: u64,
+}
 pub struct FileWrite<'a> {
     pub kind: &'a str,
     pub record_id: i64,
@@ -220,6 +226,54 @@ pub(crate) fn locate(db: &(impl Adapter + ?Sized), identity: &str, digest: &str)
         &values,
     )?;
     Ok(())
+}
+/// Publishing newly verified online bytes also retires the previous archive route.
+/// The application journals obsolete physical copies before this transaction.
+pub(crate) fn publish_online(
+    db: &(impl Adapter + ?Sized),
+    identity: &str,
+    digest: &str,
+) -> Result<()> {
+    locate(db, identity, digest)?;
+    let mut values = vec![];
+    let digest = sql::bind(&mut values, digest, db.provider() == "PostgreSQL");
+    db.execute_statement(
+        &format!("UPDATE file_locations SET archived=0 WHERE digest={digest} AND archived=1"),
+        &values,
+    )?;
+    Ok(())
+}
+
+/// Bounded, set-based projection for journal discovery; no connection per intent.
+pub(crate) fn states(
+    db: &(impl Adapter + ?Sized),
+    digests: &[String],
+) -> Result<Vec<FileObjectState>> {
+    if digests.len() > 1000 {
+        return Err(Error::unavailable("文件状态查询超过 1000 个对象的预算。"));
+    }
+    let pg = db.provider() == "PostgreSQL";
+    let json = if pg {
+        "jsonb_build_object"
+    } else {
+        "json_object"
+    };
+    let mut result = Vec::new();
+    for chunk in digests.chunks(500) {
+        let mut values = vec![];
+        let selected = chunk
+            .iter()
+            .map(|digest| sql::bind(&mut values, digest, pg))
+            .collect::<Vec<_>>()
+            .join(",");
+        let query = format!(
+            "SELECT {json}('object',{json}('digest',o.digest,'size',o.size_bytes,'archiveIdentity',COALESCE(l.storage_identity,'')),'references',o.reference_count) AS body FROM file_objects o LEFT JOIN file_locations l ON l.digest=o.digest AND l.archived=1 WHERE o.digest IN ({selected})"
+        );
+        for value in rows(db, &query, &values)? {
+            result.push(serde_json::from_value(value)?);
+        }
+    }
+    Ok(result)
 }
 pub(crate) fn begin_migration(db: &(impl Adapter + ?Sized), identity: &str) -> Result<()> {
     let mut values = vec![];

@@ -6556,6 +6556,24 @@
           "rowVersion"
         ]
       },
+      "ApiFileStorageCredentialsReceipt": {
+        "type": "object",
+        "properties": {
+          "accessKeyId": {
+            "type": "string"
+          },
+          "credentialVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "credentialVersion",
+          "accessKeyId"
+        ],
+        "additionalProperties": false
+      },
       "ApiFileStorageCredentialsRequest": {
         "type": "object",
         "properties": {
@@ -6646,6 +6664,24 @@
           "requestBytes",
           "requestFiles",
           "quotaBytes"
+        ],
+        "additionalProperties": false
+      },
+      "ApiFileStoragePolicyReceipt": {
+        "type": "object",
+        "properties": {
+          "policy": {
+            "$ref": "#/components/schemas/ApiFileStoragePolicy"
+          },
+          "versionNumber": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "versionNumber",
+          "policy"
         ],
         "additionalProperties": false
       },
@@ -14516,10 +14552,16 @@
       "ApiRetentionPlan": {
         "type": "object",
         "properties": {
+          "approvalBlocker": {
+            "type": "string"
+          },
           "bytes": {
             "type": "integer",
             "format": "int64",
             "minimum": 0
+          },
+          "canApprove": {
+            "type": "boolean"
           },
           "count": {
             "type": "integer"
@@ -14551,6 +14593,8 @@
           "bytes",
           "expiresAt",
           "requestedBy",
+          "canApprove",
+          "approvalBlocker",
           "reason",
           "items"
         ],
@@ -14628,6 +14672,9 @@
           "activeReferences": {
             "type": "integer"
           },
+          "archiveBlocker": {
+            "type": "string"
+          },
           "archiveClass": {
             "type": "string"
           },
@@ -14636,6 +14683,9 @@
           },
           "basisDate": {
             "type": "string"
+          },
+          "canArchive": {
+            "type": "boolean"
           },
           "company": {
             "type": "string"
@@ -14704,7 +14754,9 @@
           "holdRevision",
           "activeReferences",
           "expiresOn",
-          "eligible"
+          "eligible",
+          "canArchive",
+          "archiveBlocker"
         ],
         "additionalProperties": false
       },
@@ -50280,7 +50332,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiFileStorageStatus"
+                  "$ref": "#/components/schemas/ApiFileStorageCredentialsReceipt"
                 }
               }
             }
@@ -50607,7 +50659,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiFileStorageStatus"
+                  "$ref": "#/components/schemas/ApiFileStoragePolicyReceipt"
                 }
               }
             }

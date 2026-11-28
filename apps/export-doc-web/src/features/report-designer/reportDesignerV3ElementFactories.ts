@@ -2,6 +2,7 @@ import type { ReportBlock } from "./reportDesignerSchema.ts";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
 import { isShippingMarksField } from "./reportDesignerFieldRendering.ts";
 import {
+  REPORT_DESIGNER_V3_MIN_ELEMENT_SIZE_HUNDREDTH_MM,
   type ReportDesignerV3Element,
   type ReportDesignerV3ElementBase,
 } from "./reportDesignerV3Schema.ts";
@@ -26,11 +27,11 @@ export function createV3RectangleElement(x = 1500, y = 1500): ReportDesignerV3El
   return createBase("Rectangle", x, y, 9000, 5000, { borderColor: "#334155", borderWidthPx: 1, borderStyle: "Solid" }, {});
 }
 export function createV3ProductSpacerElement(x = 1500, y = 1500, width = 18000): ReportDesignerV3Element {
-  return createBase("ProductSpacer", x, y, width, 400, { borderStyle: "None", borderWidthPx: 0 }, {});
+  return createBase("ProductSpacer", x, y, width, REPORT_DESIGNER_V3_MIN_ELEMENT_SIZE_HUNDREDTH_MM, { borderStyle: "None", borderWidthPx: 0 }, {});
 }
 
 export function createV3LineElement(x = 1500, y = 1500): ReportDesignerV3Element {
-  return createBase("Line", x, y, 9000, 300, { borderColor: "#334155", borderWidthPx: 1, borderStyle: "Solid" }, { direction: "Horizontal" });
+  return createBase("Line", x, y, 9000, REPORT_DESIGNER_V3_MIN_ELEMENT_SIZE_HUNDREDTH_MM, { borderColor: "#334155", borderWidthPx: 1, borderStyle: "Solid" }, { direction: "Horizontal" });
 }
 
 export function createV3ImageElement(x = 1500, y = 1500): ReportDesignerV3Element {

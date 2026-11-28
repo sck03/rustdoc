@@ -84,6 +84,12 @@ for (const [name, reference] of defaultReportDesigns()) {
   fs.writeFileSync(path.join(directory, path.basename(name, '.dtpl') + '.json'), JSON.stringify(rebuilt));
 }
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
+for (const factory of [api.createV3TextElement, api.createV3RectangleElement, api.createV3LineElement, api.createV3PageNumberElement, api.createV3ProductSpacerElement]) {
+  const schema = api.parseReportDesignerV3Source("", "ExportDocument").schema;
+  schema.layers.forEach(layer => { layer.elements = []; });
+  schema.layers.find(layer => layer.role === "Body").elements.push(factory(1500, 1500));
+  assert(api.hasValidReportDesignerV3Schema(JSON.stringify(schema)), "palette constructor must obey saved-template limits: " + factory.name + JSON.stringify(api.validateReportDesignerV3Draft(schema).issues));
+}
 for (const invalid of ["12garbage", "12", "", true, null, Infinity, -1]) {
   const schema = api.parseReportDesignerV3Source("", "ExportDocument").schema;
   schema.page.fontSizePt = invalid;

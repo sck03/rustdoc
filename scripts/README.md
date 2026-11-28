@@ -1,5 +1,7 @@
 # 脚本使用说明
 
+2026-11-28 文件发布一致性：`test:storage-governance-lifecycle` 新增 `test_storage_receipts_ui.mjs`，验证保存成功但刷新失败后的版本续用、状态保留和凭据清空；原存储合同增加两库正式位置切换/批量状态、单据待办计数。归档重传、回滚、重启清理和千条日志推进由 Engine 文件存储回归覆盖。本批按用户追加要求执行全量验证，见[实施记录](../docs/archive/2026-11/2026-11-28文件发布一致性与全量验证.md)。
+
 2026-11-28：`test:storage-governance-lifecycle` 增加 `test_backup_selection_download_ui.mjs`，覆盖恢复列表按需读取、延迟/跨页选择、草稿、回执丢失及 API origin 下载。组织引用专项复用 `test-native-postgres.ps1 -Scope Organization`，不需为本批执行完整测试；结果和定向清理见[实施记录](../docs/archive/2026-11/2026-11-28提交回执与查询一致性修复.md)。
 
 2026-11-28 恢复契约专项：`node scripts/test_recovery_pagination_ui.mjs` 使用真实 React 和模拟 HTTP 验证准确翻页、返回首页、空页刷新导航、选择/预检失效及唯一凭证入口，已登记到 `test:storage-governance-lifecycle`。`test_async_draft_ui.mjs` 按容量保存的独立版本回执验证续编；Rust 仅执行恢复、容量、维护执行器、审批图和契约定向测试。结果、仓库格式 2 边界与空间清理见[本批记录](../docs/archive/2026-11/2026-11-28恢复契约与资源优化.md)。

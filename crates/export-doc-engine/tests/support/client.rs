@@ -52,6 +52,15 @@ impl ApiClient {
             access_token: String::new(),
         })
     }
+    /// Close the host, apply pending recovery on startup, and retain the old token for revocation checks.
+    pub fn restart(self, edition: &str) -> Result<Self, ApiError> {
+        let paths = self.native.paths.clone();
+        let token = self.access_token.clone();
+        drop(self);
+        let mut client = Self::native_edition(paths, Default::default(), edition)?;
+        client.access_token = token;
+        Ok(client)
+    }
     pub fn supports(&self, operation: Operation) -> bool {
         NativeService::supports(operation)
     }

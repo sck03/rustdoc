@@ -189,7 +189,15 @@ pub(super) fn exercise(
     }
     for token in [first, second] {
         assert_eq!(queue(token, true)["totalCount"], 1);
-        assert_eq!(queue(token, true)["items"][0]["canHandle"], true);
+        let projected = queue(token, true);
+        assert_eq!(projected["items"][0]["canHandle"], true);
+        assert!(
+            projected["items"][0]["workflowTasks"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|task| task["action"] == "issue" && task["canExecute"] == true)
+        );
         assert!(notice(token).iter().any(|n| n["action"] == "approve"));
         let work = list(
             service,
@@ -236,6 +244,15 @@ pub(super) fn exercise(
         .unwrap_err()
         .status,
         Some(409)
+    );
+    let unassigned = queue(leader, false);
+    assert!(
+        unassigned["items"][0]["workflowTasks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|task| task["canExecute"] != true),
+        "broad permissions do not expose a handover command"
     );
     let issue = json!({"expectedVersion":booking["versionNumber"],"note":"第一位办理人交付钥匙"});
     assert_eq!(

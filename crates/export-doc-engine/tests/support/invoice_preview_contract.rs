@@ -1,4 +1,5 @@
 use super::*;
+use export_doc_domain::designer::Kind;
 
 #[test]
 fn unlinked_invoice_seals_persist_render_and_reject_foreign_references() {
@@ -186,8 +187,19 @@ fn every_default_previews_samples_and_saved_documents_through_the_current_design
     for template in export_doc_report::BUILTINS {
         let mut design = template.design().unwrap();
         let original = serde_json::to_string(&design).unwrap();
-        let title = design.element_mut("title").unwrap();
-        title.kind = export_doc_domain::designer::Kind::Text {
+        let editable = design
+            .layers
+            .iter_mut()
+            .filter(|layer| layer.visible)
+            .flat_map(|layer| &mut layer.elements)
+            .find(|element| {
+                element.visible
+                    && element.output_enabled
+                    && element.width_hundredth_mm >= 5000
+                    && matches!(&element.kind, Kind::Text { .. } | Kind::Field { .. })
+            })
+            .expect("built-in template has printable editable text");
+        editable.kind = Kind::Text {
             text: "DRAFT TITLE".into(),
         };
         let content = serde_json::to_string(&design).unwrap();

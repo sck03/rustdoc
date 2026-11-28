@@ -349,7 +349,7 @@ pub fn exercise(service: &Arc<NativeService>, admin: &str, applicant: &str, empl
             "purchase" => {
                 json!({"currency":"CNY","purchaseLines":[{"name":"办公纸","quantity":"2","unit":"包","unitPrice":"18.25"}]})
             }
-            _ => json!({"category":"IT"}),
+            _ => json!({"category":"IT","serviceId":"fixture-IT"}),
         };
         let mut body = json!({"requestKey":nonce().unwrap(),"title":format!("{kind}流程验收"),"reason":"测试内部审批与附件闭环","employeeId":employee});
         body.as_object_mut()

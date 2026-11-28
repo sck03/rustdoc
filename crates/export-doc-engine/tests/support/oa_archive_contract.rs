@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 pub fn exercise(service: &NativeService, admin: &str, applicant: &str, employee: Option<i64>) {
     let (reviewer_id, reviewer_token) = super::oa_contract::workflow::reviewer(service, admin);
     super::oa_contract::workflow::configure(service, admin, reviewer_id);
-    let mut body = json!({"requestKey":nonce().unwrap(),"title":"冻结版本验证","reason":"第一版正文","category":"IT","employeeId":employee});
+    let mut body = json!({"requestKey":nonce().unwrap(),"title":"冻结版本验证","reason":"第一版正文","category":"IT","serviceId":"fixture-IT","employeeId":employee});
     let mut row = call(
         service,
         applicant,

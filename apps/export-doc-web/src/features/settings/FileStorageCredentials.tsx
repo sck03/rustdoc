@@ -28,10 +28,14 @@ export function FileStorageCredentials({ client, status, disabled }: {
   const save = useScopedMutation("file-storage-credentials", client, {
     mutationFn: (_: void, signal) => client.updateFileStorageCredentials({ body: { ...draft, expectedVersion: version } }, { signal }),
     onSuccess: response => {
-      cache.setQueryData(queryKeys.fileStorage(), response);
-      setVersion(response.credentialVersion!);
+      cache.setQueryData<ApiFileStorageStatus>(queryKeys.fileStorage(), current => current ? {
+        ...current, credentialVersion: response.credentialVersion, s3: { ...current.s3!, accessKeyId: response.accessKeyId },
+      } : current);
+      setVersion(response.credentialVersion);
       setDraft(current => ({ ...current, secret: "", token: "" })); setMessage(""); setSaved(true);
     },
+    refreshKeys: () => [queryKeys.fileStorage()],
+    onRefreshError: error => setMessage("凭据已更新，状态刷新失败：" + readApiError(error)),
     onError: error => { setMessage(readApiError(error)); setSaved(false); },
   });
   return <CollapsibleSection title="更新存储凭据" error={Boolean(message)}>

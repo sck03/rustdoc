@@ -82,7 +82,7 @@ fn publish(
         admin,
         PUBLISH_OA_DEFINITION,
         Some(
-            json!({"expectedVersion":saved["versionNumber"],"definitionKey":kind,"commandKey":nonce().unwrap(),"samples":[{"employeeId":applicant.person,"appointmentId":applicant.appointment,"amount":"0","currency":"CNY","duration":"1","category":"Other","isReturnable":true,"projectId":project_id}]}),
+            json!({"expectedVersion":saved["versionNumber"],"definitionKey":kind,"commandKey":nonce().unwrap(),"samples":[{"employeeId":applicant.person,"appointmentId":applicant.appointment,"amount":"0","currency":"CNY","duration":"1","category":"Other","serviceId":"fixture-Other","isReturnable":true,"projectId":project_id}]}),
         ),
     )
 }
@@ -120,6 +120,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
     let reviewer = actor(service, admin, "职责审批人");
     let handler = actor(service, admin, "实际办理人");
     let verifier = actor(service, admin, "独立验收人");
+    fixture::configure_handling_services(service, admin, handler.user, &["Other"]);
     let directory = fixture::request(service, admin, GET_ORGANIZATION_DIRECTORY, None);
     let unit = directory["companies"]
         .as_array()
@@ -213,7 +214,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
         &handler.token,
         CREATE_GENERAL_REQUEST,
         Some(
-            json!({"requestKey":nonce().unwrap(),"title":"不能借用项目身份","reason":"成员范围合同","category":"Other","projectId":project["id"]}),
+            json!({"requestKey":nonce().unwrap(),"title":"不能借用项目身份","reason":"成员范围合同","category":"Other","serviceId":"fixture-Other","projectId":project["id"]}),
         ),
     );
     assert_eq!(
@@ -235,7 +236,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
         &applicant.token,
         CREATE_GENERAL_REQUEST,
         Some(
-            json!({"requestKey":nonce().unwrap(),"employeeId":applicant.person,"appointmentId":applicant.appointment,"title":"职责合同","reason":"验证三个稳定来源","category":"Other","projectId":project["id"]}),
+            json!({"requestKey":nonce().unwrap(),"employeeId":applicant.person,"appointmentId":applicant.appointment,"title":"职责合同","reason":"验证三个稳定来源","category":"Other","serviceId":"fixture-Other","projectId":project["id"]}),
         ),
     );
     let mut row = command(
@@ -362,7 +363,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
         &applicant.token,
         CREATE_GENERAL_REQUEST,
         Some(
-            json!({"requestKey":nonce().unwrap(),"employeeId":applicant.person,"appointmentId":applicant.appointment,"title":"子流程与实际办理","reason":"输入输出及独立验收","category":"Other"}),
+            json!({"requestKey":nonce().unwrap(),"employeeId":applicant.person,"appointmentId":applicant.appointment,"title":"子流程与实际办理","reason":"输入输出及独立验收","category":"Other","serviceId":"fixture-Other"}),
         ),
     );
     let mut row = command(

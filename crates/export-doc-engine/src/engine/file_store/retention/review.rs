@@ -41,7 +41,7 @@ pub(super) fn preview(
         "expiresAt":(chrono::Utc::now()+chrono::Duration::minutes(15)).to_rfc3339(),"requestedBy":actor.id});
     let plan = json!({"state":"Ready","summary":summary,"rows":rows,"reason":reason});
     tx.set_settings(PLAN, 1, &plan)?;
-    Ok(public_plan(&plan))
+    public_plan(&plan, actor)
 }
 
 pub(super) fn approve(

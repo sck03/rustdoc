@@ -49,7 +49,7 @@ export function ExampleLibrary({ businessYear, client, canOperate, canManage, ca
       <label>当前有效编码<input disabled={fieldsLocked} maxLength={20} value={draft.resolvedCurrentHsCode} onChange={event => workspace.change({ ...draft, resolvedCurrentHsCode: event.target.value })}/></label>
       <label>来源年份<input disabled={fieldsLocked} type="number" min={2000} max={2100} value={draft.sourceYear ?? ""} onChange={event => workspace.change({ ...draft, sourceYear: event.target.value ? Number(event.target.value) : null })}/></label>
       <label className="wide">规格与申报要素<textarea disabled={fieldsLocked} maxLength={1500} value={draft.specification} onChange={event => workspace.change({ ...draft, specification: event.target.value })}/></label>
-      <div className="wide form-actions"><Button type="submit" disabled={busy || !canOperate}>保存实例</Button><Button variant="secondary" disabled={busy} onClick={() => workspace.edit(null)}>关闭</Button></div>
+      <div className="wide form-actions"><Button variant="primary" type="submit" disabled={busy || !canOperate}>保存实例</Button><Button variant="secondary" disabled={busy} onClick={() => workspace.edit(null)}>关闭</Button></div>
     </form> : null}
     {data.isLoading ? <PageState tone="loading" title="正在读取申报实例"/> : null}
     {data.isError ? <PageState tone="error" title="申报实例读取失败" description={readApiError(data.error)}/> : null}

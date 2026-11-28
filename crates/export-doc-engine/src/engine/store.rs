@@ -36,6 +36,7 @@ pub struct Connection<'a> {
     pub(crate) clock: &'a crate::clock::BusinessClock,
     files: Option<&'a super::file_store::FileStore>,
     file_intents: std::cell::RefCell<Vec<std::path::PathBuf>>,
+    file_copies: std::cell::RefCell<Vec<super::file_store::UploadLease>>,
 }
 impl<'a> std::ops::Deref for Connection<'a> {
     type Target = export_doc_storage::Connection;
@@ -50,6 +51,7 @@ impl<'a> Connection<'a> {
             clock,
             files: None,
             file_intents: Default::default(),
+            file_copies: Default::default(),
         }
     }
     pub(crate) fn publish_file(
@@ -62,6 +64,11 @@ impl<'a> Connection<'a> {
     ) -> Result<()> {
         let files = self.files.ok_or_else(|| unavailable("文件存储未配置。"))?;
         files.check_prepared(prepared)?;
+        if let Some(previous) = self.inner.file_object(&prepared.object.digest)? {
+            if let Some(lease) = files.journal_reactivation(&previous, &prepared.identity)? {
+                self.file_copies.borrow_mut().push(lease);
+            }
+        }
         self.inner.insert_file(&export_doc_storage::FileWrite {
             kind,
             record_id,
@@ -71,7 +78,7 @@ impl<'a> Connection<'a> {
             created_at: &timestamp(),
         })?;
         self.inner
-            .locate_file(&prepared.identity, &prepared.object.digest)?;
+            .publish_online_file(&prepared.identity, &prepared.object.digest)?;
         let quota = files.configuration()?.policy.quota_bytes;
         if quota > 0 {
             let company = self.inner.file_owner_company(record_id)?;

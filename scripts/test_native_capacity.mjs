@@ -8,7 +8,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { spawnProcessTree, stopProcessTree } from './lib/child-process-tree.mjs';
 import { cargoArtifactDirectory } from './lib/cargo-paths.mjs';
-import { approvalStage, publishDefinitions } from './lib/approval-fixtures.mjs';
+import { approvalStage, linkBusinessPerson, publishDefinitions } from './lib/approval-fixtures.mjs';
 
 // Invoked only by the isolated PostgreSQL test runner. No production endpoint
 // or caller-selected database is accepted by this workload.
@@ -105,7 +105,6 @@ async function phase(size,key) {
       const draft={...createEmptyInvoice(date),invoiceNo:number,exporterNameEN:'CAPACITY SAMPLE EXPORTER',customerNameEN:'Capacity sample customer',currency:'USD'};
       draft.items=[{...createEmptyInvoiceItem(),styleNo:'CAP-ITEM',styleName:'Sample product',quantity:"10",cartons:"1",unitEN:'PCS',ctnUnitEN:'CTNS',unitPrice:"1.25",totalPrice:"12.5"}];return draft;
     };
-    for(let n=0;n<historyRows;n++)await api('CreateInvoice',token,invoice(`CAP-SEED-${n}`));
     const users=[];
     for(let n=0;n<20;n++) {
       const account=(await api('createUserAccount',token,{username:`capacity-${n}`,fullName:`Capacity ${n}`,role:'Admin',departmentId:'GENERAL',companyScope:'DEFAULT',isActive:true,resetPassword:password})).user;
@@ -129,8 +128,12 @@ async function phase(size,key) {
       const entries=Object.entries(parameters);
       return api(id,identity,body,Object.fromEntries(entries.filter(([key])=>route.includes(`{${key}}`))),Object.fromEntries(entries.filter(([key])=>!route.includes(`{${key}}`))));
     };
+    const finance=(await api('createUserAccount',token,{username:'capacity-finance',fullName:'Capacity finance',role:'Finance',departmentId:'GENERAL',companyScope:'DEFAULT',isActive:true,resetPassword:password})).user;
+    await linkBusinessPerson(invoke,token,finance);
     const settings=await api('GetOaApprovalSettings',token);
-    const activePolicy=await publishDefinitions(invoke,token,{...settings,rules:settings.rules.map(rule=>rule.key==='expense'?{...rule,stages:[{...approvalStage('capacity-review',reviewers.map(reviewer=>reviewer.id)),decision:'Any'}]}:rule)},['expense']);
+    const definition=settings.rules.find(rule=>rule.key==='expense');
+    definition.stages=[{...approvalStage('capacity-review',reviewers.map(reviewer=>reviewer.id)),decision:'Any'},...definition.stages.filter(node=>node.phase==='Fulfillment').map(node=>({...node,dependsOn:['capacity-review'],...(node.kind==='Handling'?{source:'Named',approverUserIds:[finance.id]}:{})}))];
+    const activePolicy=await publishDefinitions(invoke,token,settings,['expense']);
     const scheduled=await api('ScheduleOaDefinition',token,{expectedVersion:activePolicy.versionNumber,expectedRevision:activePolicy.revisions['rule:expense']??0,definitionKey:'expense',commandKey:randomUUID(),activateAt:new Date(Date.now()+10000).toISOString(),samples:[{employeeId:person.employee.id,appointmentId:person.organization.primaryAssignmentId,amount:'12.34',currency:'CNY',duration:'1',category:'Other',isReturnable:true}]});
     const activation=scheduled.activations.find(row=>row.definitionKey==='expense'&&row.state==='Pending');
     assert(activation,'Scheduled publication must persist a pending activation');
@@ -147,6 +150,10 @@ async function phase(size,key) {
     }
     assert(activated,'The real PostgreSQL HTTP scheduler must enable the fixed version; completed activations leave the pending list');
     const scheduledActivationMs=performance.now()-activationStarted;
+    for(let n=0;n<historyRows;n++) {
+      await api('CreateInvoice',token,invoice(`CAP-SEED-${n}`));
+      if((n+1)%1000===0)process.stderr.write(`Pool ${size}: seeded ${n+1}/${historyRows} invoices\n`);
+    }
     const approvals=[];
     for(let n=0;n<5;n++) {
       let row=await api('CreateExpenseRequest',requesterToken,{requestKey:randomUUID(),title:`Capacity expense ${n}`,reason:'Isolated concurrency verification',currency:'CNY',lines:[{category:'Travel',spentOn:date,description:'Sample receipt',amount:'12.34'}]});

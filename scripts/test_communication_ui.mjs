@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
-import { approvalStage, approveTask, fulfillNodeInUi, linkBusinessPerson, publishDefinitions } from './lib/approval-fixtures.mjs';
+import { configureWorkflowHandling, approvalStage, approveTask, fulfillNodeInUi, linkBusinessPerson, publishDefinitions } from './lib/approval-fixtures.mjs';
 
 await withOfficeUi('communication-ui', async ({ output, require, url, operations, invoke, openPage }) => {
   const page = await openPage('oa-review', 'Review-2026-Test');
@@ -84,8 +84,9 @@ await withOfficeUi('communication-ui', async ({ output, require, url, operations
   const definitions=settings.rules.filter(rule=>['general','expense'].includes(rule.kind)&&!rule.companyScope);
   assert.equal(definitions.length,2);
   settings.rules=settings.rules.map(rule=>definitions.includes(rule)?{...rule,stages:[approvalStage(`${rule.kind}-review`,[reviewer.id])]}:rule);
+  await configureWorkflowHandling(invoke,token,settings,definitions.map(rule=>rule.key),['IT']);
   await publishDefinitions(invoke,token,settings,definitions.map(rule=>rule.key));
-  let request = await invoke('CreateGeneralRequest', { requestKey: `notification-ui-${Date.now()}`, employeeId: person.id, title: '站内通知关联申请', reason: '检验审批结果通知', category: 'IT' }, {}, token);
+  let request = await invoke('CreateGeneralRequest', { requestKey: `notification-ui-${Date.now()}`, employeeId: person.id, title: '站内通知关联申请', reason: '检验审批结果通知', category: 'IT', serviceId: 'fixture-IT' }, {}, token);
   request=await invoke('SubmitGeneralRequest',{expectedVersion:request.versionNumber},{id:request.id},token);
   request=await approveTask(invoke,reviewerToken,'General',request.id);
   await navigate('/office/notifications');
@@ -111,6 +112,10 @@ await withOfficeUi('communication-ui', async ({ output, require, url, operations
   const financeName = `finance-ui-${Date.now()}`;
   const finance = (await invoke('createUserAccount', { username: financeName, fullName: '财务接收验收', role: 'Finance', companyScope: 'DEFAULT', departmentId: 'GENERAL', isActive: true, resetPassword: 'Finance-Review-2026' }, {}, token)).user;
   await linkBusinessPerson(invoke, token, finance);
+  const financeSettings = await invoke('GetOaApprovalSettings', undefined, {}, token);
+  const expenseRule = financeSettings.rules.find(rule => rule.key === 'expense');
+  expenseRule.stages = expenseRule.stages.map(node => node.kind === 'Handling' ? { ...node, source: 'Named', approverUserIds: [finance.id] } : node);
+  await publishDefinitions(invoke, token, financeSettings, ['expense']);
   const businessUser = await invoke('getCurrentUser', undefined, {}, token);
   const expenseBody = { requestKey: `expense-ui-${Date.now()}`, employeeId: person.id, title: '已批准报销财务接收', reason: '核对凭证并移交独立财务软件', currency: 'CNY', lines: [{ category: 'Travel', spentOn: businessUser.businessDate, description: '市内交通', amount: '12.35' }] };
   let expense = await invoke('CreateExpenseRequest', expenseBody, {}, token);
@@ -126,7 +131,7 @@ await withOfficeUi('communication-ui', async ({ output, require, url, operations
   await financePage.getByRole('button', { name: '标记已读', exact: true }).click();
   await financePage.getByRole('heading', { name: '站内通知 · 0 条未读', exact: true }).waitFor();
   await financePage.getByRole('link', { name: '查看关联申请', exact: true }).click();
-  await financePage.getByRole('heading', { name: '报销凭证', exact: true }).waitFor();
+  await financePage.getByRole('heading', { name: '付款报销凭证', exact: true }).waitFor();
   await financePage.goto(`${url}/#/office/approvals?view=handling`);
   await financePage.locator('.oa-hub-count[aria-label="待财务接收 1 项"]').waitFor();
   await financePage.screenshot({ path: path.join(output, 'finance-hub.png'), fullPage: true });
@@ -136,7 +141,7 @@ await withOfficeUi('communication-ui', async ({ output, require, url, operations
   assert.equal(await financePage.getByRole('button', { name: privateDraft.title, exact: true }).count(), 0);
   await financePage.screenshot({ path: path.join(output, 'finance-queue.png'), fullPage: true });
   await financePage.getByRole('button', { name: expenseBody.title, exact: true }).click();
-  await financePage.getByRole('heading', { name: '报销凭证', exact: true }).waitFor();
+  await financePage.getByRole('heading', { name: '付款报销凭证', exact: true }).waitFor();
   assert.equal(await financePage.getByRole('button', { name: '编辑草稿', exact: true }).count(), 0);
   assert.equal(await financePage.getByRole('button', { name: '批准', exact: true }).count(), 0);
   const expenseDownload = financePage.waitForEvent('download');

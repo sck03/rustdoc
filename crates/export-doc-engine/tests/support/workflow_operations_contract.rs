@@ -52,6 +52,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
     let (parallel_id, parallel) = fixture::reviewer(service, admin);
     let (last_id, last) = fixture::reviewer(service, admin);
     let (added_id, added) = fixture::reviewer(service, admin);
+    fixture::configure_handling_services(service, admin, last_id, &["Other"]);
     let person = fixture::request(
         service,
         admin,
@@ -92,7 +93,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
             admin,
             CREATE_GENERAL_REQUEST,
             Some(json!({
-                "requestKey":nonce().unwrap(),"employeeId":person["employee"]["id"],"title":"并行审批与异常操作","reason":"真实签署、幂等和历史验收","category":"Other"
+                "requestKey":nonce().unwrap(),"employeeId":person["employee"]["id"],"title":"并行审批与异常操作","reason":"真实签署、幂等和历史验收","category":"Other","serviceId":"fixture-Other"
             })),
         );
         fixture::call(service, admin, SUBMIT_GENERAL_REQUEST, draft["id"].as_i64().unwrap(), Some(json!({
@@ -561,7 +562,7 @@ fn subflow_versions(
             admin,
             CREATE_GENERAL_REQUEST,
             Some(
-                json!({"requestKey":nonce().unwrap(),"employeeId":person["employee"]["id"],"title":"固定版本子流程","reason":"版本变化不能改写在途实例","category":"Other"}),
+                json!({"requestKey":nonce().unwrap(),"employeeId":person["employee"]["id"],"title":"固定版本子流程","reason":"版本变化不能改写在途实例","category":"Other","serviceId":"fixture-Other"}),
             ),
         );
         fixture::call(service,admin,SUBMIT_GENERAL_REQUEST,draft["id"].as_i64().unwrap(),Some(json!({"commandKey":nonce().unwrap(),"expectedVersion":draft["versionNumber"],"note":"提交固定版本流程"}))).unwrap()

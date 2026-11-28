@@ -26,7 +26,7 @@ mod file_catalog;
 mod generic_query;
 mod retention;
 pub use business_query::{BusinessList, BusinessQuery};
-pub use file_catalog::{FileInfo, FileObject, FileWrite};
+pub use file_catalog::{FileInfo, FileObject, FileObjectState, FileWrite};
 mod hs_query;
 mod import_preview_query;
 mod import_preview_rows;
@@ -393,6 +393,7 @@ delegate! {
     file_page(record:i64,prefix:&str,after:&str,limit:i64)->(i64,Vec<FileInfo>);
     delete_files(record:i64,kind:Option<&str>)->();
     file_objects(after:&str,limit:i64,unused:bool)->Vec<FileObject>;
+    invoice_worklist_count(scopes:&[DataScope<'_>],actor:i64)->u64;
     file_statistics()->Value;
     retained_files(after:&str,limit:i64)->Value;
     retained_file(id:&str)->Option<Value>;
@@ -416,6 +417,8 @@ delegate! {
     file_owner_company(record:i64)->String;
     pending_file_copies(identity:&str)->Vec<FileObject>;
     locate_file(identity:&str,digest:&str)->();
+    publish_online_file(identity:&str,digest:&str)->();
+    file_object_states(digests:&[String])->Vec<FileObjectState>;
     archive_file(identity:&str,digest:&str)->();
     query_resources(query:&ResourceQuery<'_>)->(i64,Vec<Value>);
     append_attachment_history(record:i64,kind:&str,body:&Value)->();

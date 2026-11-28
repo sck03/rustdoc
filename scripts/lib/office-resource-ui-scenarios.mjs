@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 
 // Runs against the same real React/HTTP host as the six OA request workflows.
-export async function exerciseOfficeResources({ url, page, output, run, wait, click, fill, navigate, captureScreenshot, approveResource }) {
+export async function exerciseOfficeResources({ url, page, output, run, wait, click, fill, navigate, captureScreenshot, approveResource, useHandler, useAdmin }) {
   const finish = async label => {
     await wait("document.querySelector('[role=dialog] button[type=submit]')", `${label} form not ready`);
     await run("document.querySelector('[role=dialog] button[type=submit]').click()");
@@ -24,10 +24,13 @@ export async function exerciseOfficeResources({ url, page, output, run, wait, cl
   await wait("document.querySelector('.office-request-card')?.textContent.includes('资源流程验收会议')", 'Full admin lost new booking');
   assert.equal(await run("document.querySelector('select[aria-label=申请状态]').value"), 'Approved');
   await fill('申请状态', '');
+  await useHandler();
+  await navigate(`${url}/#/office/meeting-rooms?view=requests`);
   await action('发放钥匙'); await wait("document.querySelector('.office-badge')?.textContent==='使用中'", 'Room not in use');
   await action('归还钥匙'); await wait("document.querySelector('.office-badge')?.textContent==='已完成'", 'Room not completed');
   await captureScreenshot(page, path.join(output, 'resource-meeting-completed.png'));
 
+  await useAdmin();
   await navigate(`${url}/#/office/supplies`);
   await wait("document.querySelector('[aria-label=物品领用工作区]')", 'Supplies missing');
   await click('添加物品'); await fill('物品名称', '资源流程验收设备');
@@ -44,6 +47,8 @@ export async function exerciseOfficeResources({ url, page, output, run, wait, cl
   await wait("document.querySelector('select[aria-label=申请状态]')?.value==='Approved'", 'Same-route status navigation did not update the filter');
   await wait("document.querySelector('.office-request-card')", 'Approved supply request missing');
   await fill('申请状态', '');
+  await useHandler();
+  await navigate(`${url}/#/office/supplies?view=requests`);
   await action('确认发放'); await click('登记归还');
   await run("(() => {const n=document.querySelector('input[name=quantity]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(n,'1');n.dispatchEvent(new Event('input',{bubbles:true}));})()");
   await finish('Partial return'); await wait("document.querySelector('.office-badge')?.textContent==='部分归还'", 'Partial return missing');
@@ -54,4 +59,5 @@ export async function exerciseOfficeResources({ url, page, output, run, wait, cl
   await wait("document.querySelector('.office-stock-number') && document.querySelector('[aria-label=刷新办公物品]')?.disabled===false", 'Stock refresh did not finish');
   assert.equal(await run("document.querySelector('.office-stock-number strong').textContent"), '5');
   assert.deepEqual(await run('window.__oaErrors'), []);
+  await useAdmin();
 }

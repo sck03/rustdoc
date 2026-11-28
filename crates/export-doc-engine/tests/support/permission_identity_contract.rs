@@ -124,6 +124,7 @@ pub fn exercise(service: &NativeService, root: &str) {
     assert!(ids.contains(&visible["id"]));
     assert!(!ids.contains(&audience_hidden["id"]) && !ids.contains(&unit_hidden["id"]));
     let (reviewer, reviewer_token) = workflow::reviewer(service, admin);
+    workflow::configure_handling_services(service, admin, reviewer, &["IT"]);
     policy(
         service,
         admin,
@@ -134,7 +135,7 @@ pub fn exercise(service: &NativeService, root: &str) {
             json!([workflow::node("review", &[], "Named", json!([reviewer]))]),
         ),
     );
-    let request = call(service, token(&worker), operation("general", "create"), 0, Some(json!({"requestKey":nonce().unwrap(),"employeeId":person["employee"]["id"],"title":"单位身份通知验收","reason":"仅向实际收件人发送审批动态","category":"IT"}))).unwrap();
+    let request = call(service, token(&worker), operation("general", "create"), 0, Some(json!({"requestKey":nonce().unwrap(),"employeeId":person["employee"]["id"],"title":"单位身份通知验收","reason":"仅向实际收件人发送审批动态","category":"IT","serviceId":"fixture-IT"}))).unwrap();
     let request = call(
         service,
         token(&worker),

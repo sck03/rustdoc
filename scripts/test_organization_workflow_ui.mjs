@@ -1,4 +1,4 @@
-import { approveTask, approvalStage, publishDefinitionInUi, publishDefinitions, openDefinitionInUi, saveApprovalPartInUi } from './lib/approval-fixtures.mjs';
+import { configureWorkflowHandling, approveTask, approvalStage, publishDefinitionInUi, publishDefinitions, openDefinitionInUi, saveApprovalPartInUi } from './lib/approval-fixtures.mjs';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
@@ -22,6 +22,7 @@ await withOfficeUi('organization-workflow-ui', async ({ output, url, operations,
     users.push(user);
   }
   const initialSettings = await invoke('GetOaApprovalSettings', undefined, {}, token);
+  await configureWorkflowHandling(invoke, token, initialSettings, ['general']);
   await publishDefinitions(invoke, token, {...initialSettings,rules:initialSettings.rules.map(rule=>rule.key==='personnel:Transfer'?{...rule,stages:[approvalStage('personnel-review',[users[4].id])]}:rule)}, ['personnel:Transfer']);
   await admin.goto(`${url}/#/office/people/${people[0].employee.id}`);
   await admin.getByRole('link', { name: '申请调岗', exact: true }).click();
@@ -97,7 +98,7 @@ await withOfficeUi('organization-workflow-ui', async ({ output, url, operations,
   assert.equal(hireDetails.organization.additionalAssignments[0].departmentId, 'ORGFIN');
   await admin.goto(`${url}/#/office/people/${hired.id}`);
   const facts = admin.getByRole('region', { name: '任职与汇报关系', exact: true });
-  await facts.getByText(/DEFAULT · 测试财务部/u).waitFor();
+  await facts.getByText(directory.companies.find(company => company.code === 'DEFAULT').name + ' · 测试财务部', { exact: false }).waitFor();
   await admin.getByRole('button', { name: '编辑档案', exact: true }).click();
   const edit = admin.getByRole('dialog', { name: /编辑档案/u });
   await edit.getByRole('checkbox', { name: '纠正登记信息（须说明原因）', exact: true }).check();
@@ -143,8 +144,8 @@ await withOfficeUi('organization-workflow-ui', async ({ output, url, operations,
   await admin.goto(`${url}/#/office/approval-settings`);
   const general = await openDefinitionInUi(admin, 'general');
   await general.getByLabel('责任人来源').first().selectOption('Named');
-  await general.getByLabel('责任账号（可多选）').selectOption([String(users[1].id), String(users[2].id)]);
-  await publishDefinitionInUi(admin, general, '兼职员工', operations, dialog => dialog.getByLabel('类别代码', { exact: true }).fill('Other'), '测试财务部');
+  await general.getByLabel('责任账号（可多选）').first().selectOption([String(users[1].id), String(users[2].id)]);
+  await publishDefinitionInUi(admin, general, '兼职员工', operations, dialog => dialog.getByLabel('申请类别', { exact: true }).selectOption('Other'), '测试财务部');
   await general.getByRole('tab', { name: '基本信息', exact: true }).click();
   await general.getByText(/当前发布版本.*已启用/u).waitFor();
   const purchase = await openDefinitionInUi(admin, 'purchase');
@@ -167,7 +168,7 @@ await withOfficeUi('organization-workflow-ui', async ({ output, url, operations,
   const stoppedPolicy = await invoke('GetOaApprovalSettings', undefined, {}, token);
   assert.deepEqual(stoppedPolicy.rules.find(r => r.key === 'purchase').stages[1].conditions, [], 'Disabling another flow preserves unsaved conditions without silently saving them');
   await openDefinitionInUi(admin, 'general');
-  await publishDefinitionInUi(admin, general, '兼职员工', operations, dialog => dialog.getByLabel('类别代码', { exact: true }).fill('Other'), '测试财务部');
+  await publishDefinitionInUi(admin, general, '兼职员工', operations, dialog => dialog.getByLabel('申请类别', { exact: true }).selectOption('Other'), '测试财务部');
   await general.getByRole('tab', { name: '基本信息', exact: true }).click();
   await general.getByText(/当前发布版本.*已启用/u).waitFor();
   assert.equal(await admin.getByText('审批设置已被其他管理员修改。', { exact: false }).count(), 0, 'Own successful publication is not a concurrent edit');
@@ -183,7 +184,7 @@ await withOfficeUi('organization-workflow-ui', async ({ output, url, operations,
   await admin.screenshot({ path: path.join(output, 'workflow-conditions.png'), fullPage: true });
   const workerLogin = await invoke('Login', { username: 'org-ui-0', password: 'Org-Workflow-2026' });
   assert.equal(workerLogin.user.employee.organization.additionalAssignments[0].departmentId, 'ORGFIN');
-  const draft = await invoke('CreateGeneralRequest', { requestKey: 'org-ui-approval', employeeId: people[0].employee.id, departmentId: 'ORGFIN', title: '兼职部门会签申请', reason: '真实界面闭环测试', category: 'Other' }, {}, token);
+  const draft = await invoke('CreateGeneralRequest', { requestKey: 'org-ui-approval', employeeId: people[0].employee.id, departmentId: 'ORGFIN', title: '兼职部门会签申请', reason: '真实界面闭环测试', category: 'Other', serviceId: 'fixture-Other' }, {}, token);
   let row = await invoke('SubmitGeneralRequest', { expectedVersion: draft.versionNumber, note: '发起会签' }, { id: draft.id }, token);
   const first = await openPage('org-ui-1', 'Org-Workflow-2026');
   const hubReads = [];

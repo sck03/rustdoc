@@ -157,7 +157,7 @@ pub fn exercise(admin: &Request<'_>, applicant: &Request<'_>, reviewer: &Request
         0
     );
     let issued = save(
-        admin,
+        reviewer,
         ISSUE_MEETING_ROOM_KEY,
         id,
         json!({"expectedVersion":booking["versionNumber"],"note":"当面交付钥匙"}),
@@ -181,7 +181,7 @@ pub fn exercise(admin: &Request<'_>, applicant: &Request<'_>, reviewer: &Request
         Some(409)
     );
     let completed = save(
-        admin,
+        reviewer,
         RETURN_MEETING_ROOM_KEY,
         id,
         json!({"expectedVersion":issued["versionNumber"],"note":"钥匙已收回"}),
@@ -219,7 +219,7 @@ pub fn exercise(admin: &Request<'_>, applicant: &Request<'_>, reviewer: &Request
         json!({"expectedVersion":future["versionNumber"],"note":"同意"}),
     );
     assert_eq!(
-        admin(
+        reviewer(
             ISSUE_MEETING_ROOM_KEY,
             future["id"].as_i64(),
             &[],
@@ -357,13 +357,13 @@ pub fn exercise(admin: &Request<'_>, applicant: &Request<'_>, reviewer: &Request
     assert_eq!(supply["availableQuantity"], 7);
     assert_eq!(admin(STOCKTAKE_OFFICE_SUPPLY,supply_id,&[],Some(json!({"operationId":nonce().unwrap(),"quantity":2,"expectedVersion":supply["versionNumber"],"note":"不能低于预留"}))).unwrap_err().status,Some(409));
     let mut issued = save(
-        admin,
+        reviewer,
         ISSUE_OFFICE_SUPPLY,
         application["id"].as_i64(),
         json!({"expectedVersion":application["versionNumber"],"note":"当面发放"}),
     );
     issued = save(
-        admin,
+        reviewer,
         RETURN_OFFICE_SUPPLY,
         issued["id"].as_i64(),
         json!({"expectedVersion":issued["versionNumber"],"quantity":1,"note":"先归还一台"}),
@@ -371,7 +371,7 @@ pub fn exercise(admin: &Request<'_>, applicant: &Request<'_>, reviewer: &Request
     assert_eq!(issued["status"], "Issued");
     assert_eq!(issued["returnedQuantity"], 1);
     issued = save(
-        admin,
+        reviewer,
         RETURN_OFFICE_SUPPLY,
         issued["id"].as_i64(),
         json!({"expectedVersion":issued["versionNumber"],"quantity":2,"note":"余下设备归还"}),

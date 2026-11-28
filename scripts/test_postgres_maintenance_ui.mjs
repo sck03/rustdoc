@@ -180,7 +180,9 @@ try {
   const archivePage = await (await operation("ListRecoveryArchives")).json();
   assert.equal(archivePage.totalCount, 1);
   const archive = archivePage.items[0];
-  const issued = await operation('CreateRecoveryArchiveDownloadTicket', { parameters: { id: archive.id } });
+  const exportJob = await (await operation('StartRecoveryArchiveSaveToPathJob', { parameters: { id: archive.id }, body: {} })).json();
+  await waitForJob(operation, exportJob.jobId);
+  const issued = await operation('CreateJobDownloadTicket', { parameters: { jobId: exportJob.jobId } });
   const archiveCookie = issued.headers.get('set-cookie')?.split(';')[0];
   const archiveTicket = await issued.json();
   assert.equal((await fetch(new URL(archiveTicket.downloadUrl, origin))).status, 404);

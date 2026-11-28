@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
-import { approvalStage, linkBusinessPerson, openDefinitionInUi } from './lib/approval-fixtures.mjs';
+import { createHandlingServices, approvalStage, linkBusinessPerson, openDefinitionInUi } from './lib/approval-fixtures.mjs';
 
 await withOfficeUi('oa-responsibility-ui', async ({ invoke, output, openPage, url }) => {
   const admin = (await invoke('Login', { username:'oa-review', password:'Review-2026-Test' })).accessToken;
@@ -30,7 +30,7 @@ await withOfficeUi('oa-responsibility-ui', async ({ invoke, output, openPage, ur
       await invoke('SimulateOaDefinition', { definition, ...sample }, {}, admin);
     } else {
       await assert.rejects(() => invoke('SimulateOaDefinition', { definition, ...sample }, {}, admin), cause => {
-        assert.match(cause.message, /409.*节点“.*查看及 .*未找到启用且关联有效人员任职/u);
+        assert.match(cause.message, definition.kind === 'general' ? /400.*OA_HANDLING_SERVICE_UNCONFIGURED/u : /409.*节点“.*查看及 .*未找到启用且关联有效人员任职/u);
         report.missingHandlers[definition.key] = cause.message;
         return true;
       });
@@ -55,6 +55,8 @@ await withOfficeUi('oa-responsibility-ui', async ({ invoke, output, openPage, ur
   await simulation.getByText(/节点“.*销假登记.*未找到启用/u).waitFor();
   await page.screenshot({ path:path.join(output, 'missing-handler.png') });
   await linkBusinessPerson(invoke, admin, handler);
+  await createHandlingServices(invoke, admin, handler.id);
+  sample.serviceId = 'fixture-Other';
   for (const definition of definitions) {
     const result = await invoke('SimulateOaDefinition', { definition, ...sample }, {}, admin);
     for (const node of result.approvalPlan.nodes.filter(node => node.kind === 'Handling')) {

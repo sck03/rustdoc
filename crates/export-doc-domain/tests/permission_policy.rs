@@ -35,6 +35,12 @@ fn prior_policy(id: &str) -> &'static Value {
         ))
         .unwrap();
         policies.extend(additions.as_object().unwrap().clone());
+        // Reviewed storage/OA additions and the separate maintenance authentication context.
+        let additions: Value = serde_json::from_str(include_str!(
+            "fixtures/permission-annotations-2026-11-28.json"
+        ))
+        .unwrap();
+        policies.extend(additions.as_object().unwrap().clone());
         // Reviewed self-service endpoint authorizes the authenticated account without a resource grant.
         policies.insert(
             CHANGE_OWN_PASSWORD.id.into(),

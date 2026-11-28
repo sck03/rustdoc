@@ -5,6 +5,7 @@ use serde_json::{Value, json};
 
 pub fn exercise(service: &NativeService, admin: &str) {
     let (reviewer_id, reviewer) = w::reviewer(service, admin);
+    w::configure_handling_services(service, admin, reviewer_id, &["Other"]);
     let person = w::request(
         service,
         admin,
@@ -100,7 +101,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
         "deleted keys cannot reset optimistic concurrency"
     );
     let values = json!({"customer":"匿名外贸客户","freight":"125.50","samples":[{"name":"样品 A","quantity":"2"}]});
-    let sample = json!({"employeeId":person["employee"]["id"],"appointmentId":person["organization"]["primaryAssignmentId"],"formValues":values,"category":"Other"});
+    let sample = json!({"employeeId":person["employee"]["id"],"appointmentId":person["organization"]["primaryAssignmentId"],"formValues":values,"category":"Other","serviceId":"fixture-Other"});
     let mut simulation = sample.clone();
     simulation["definition"] = rule.clone();
     w::request(service, admin, SIMULATE_OA_DEFINITION, Some(simulation));
@@ -116,7 +117,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
         .find(|i| i["key"] == key)
         .unwrap();
     assert_eq!(application["name"], "样品寄送");
-    let create = |values: Value| json!({"requestKey":nonce().unwrap(),"employeeId":person["employee"]["id"],"title":"展会样品寄送","reason":"客户确认样品","category":"Other","definitionKey":key,"definitionVersion":application["version"],"formValues":values});
+    let create = |values: Value| json!({"requestKey":nonce().unwrap(),"employeeId":person["employee"]["id"],"title":"展会样品寄送","reason":"客户确认样品","category":"Other","serviceId":"fixture-Other","definitionKey":key,"definitionVersion":application["version"],"formValues":values});
     let incomplete = call(
         service,
         admin,

@@ -71,6 +71,12 @@ pub fn exercise(db: &Connection) {
     }
     ids.reverse();
     assert_eq!(found, ids);
+    assert_eq!(
+        db.invoice_worklist_count(&scopes, 1).unwrap(),
+        ids.len() as u64
+    );
+    let denied = [DataScope::default()];
+    assert_eq!(db.invoice_worklist_count(&denied, 1).unwrap(), 0);
     let scan = export_doc_storage::WorklistScan {
         source: "invoice-review",
         ascending: true,

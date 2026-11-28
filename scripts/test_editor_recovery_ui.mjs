@@ -99,7 +99,7 @@ try {
     await page.waitForFunction(() => window.backup.job?.status === "Succeeded");
     assert.equal(await page.evaluate(() => window.backup.jobError), null);
     await page.evaluate(() => window.backup.dismissJob());
-    await page.waitForFunction(() => window.backup.jobId === null);
+    await page.waitForFunction(() => window.backup.jobId === "");
   });
   console.log(`Editor recovery UI: ${passed} passed`);
 } finally { await context.close(); }

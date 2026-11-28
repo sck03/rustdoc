@@ -67,8 +67,10 @@ pub(in crate::engine) fn handle(
         return super::cleanup::preview(service, &actor);
     }
     if operation == UPDATE_FILE_STORAGE_CREDENTIALS {
-        super::credentials::rotate(&service.store, &actor, body)?;
-        return status(&service.store);
+        let version = super::credentials::rotate(&service.store, &actor, body)?;
+        return Ok(
+            json!({"credentialVersion":version,"accessKeyId":crate::engine::records::text(body, "accessKeyId")}),
+        );
     }
     if operation == UPDATE_FILE_STORAGE_POLICY {
         let _maintenance = maintenance_lock(&service.store.files)?;
@@ -84,7 +86,7 @@ pub(in crate::engine) fn handle(
         let policy: Policy = serde_json::from_value(body["policy"].clone())
             .map_err(|_| invalid("文件策略无效。"))?;
         policy.validate()?;
-        service.store.with_writes_paused(|| {
+        return service.store.with_writes_paused(|| {
             let current = service
                 .store
                 .read(|tx| auth::refresh_actor_in(tx, &actor))?;
@@ -97,9 +99,10 @@ pub(in crate::engine) fn handle(
             }
             config.policy = policy;
             config.revision += 1;
-            service.store.files.activate(config)
-        })?;
-        return status(&service.store);
+            let receipt = json!({"versionNumber":config.revision,"policy":config.policy});
+            service.store.files.activate(config)?;
+            Ok(receipt)
+        });
     }
     let store = service.store.clone();
     let body = body.clone();

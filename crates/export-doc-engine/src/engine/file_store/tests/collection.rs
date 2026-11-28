@@ -22,7 +22,7 @@ fn collection_failure_keeps_deleted_counts_and_retryable_journal() {
                     "token":"test-plan", "owner":administrator().id,
                     "expiresAt":(chrono::Utc::now()+chrono::Duration::minutes(15)).to_rfc3339(),
                     "identity":config.identity, "revision":config.revision,
-                    "objects":[first,second],"archiveCleanup":[],
+                    "objects":[first,second],"archiveCleanup":[],"uploadIntents":[],
                 }),
             )?;
             Ok(())

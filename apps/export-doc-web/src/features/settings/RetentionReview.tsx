@@ -12,10 +12,21 @@ export function RetentionReview({ plan, disabled, approve }: { plan: ApiRetentio
     <p>处置理由：{plan.reason}</p>
     <ResponsiveTableFrame label="待处置档案" className="summary-table-frame">
       <table className="data-table" aria-label="待处置档案"><thead><tr><th>文件</th><th>单位</th><th>类别</th><th>归档日期</th><th>到期日期</th><th>容量</th></tr></thead>
-        <tbody>{plan.items.map(row => <tr key={row.id}><td>{row.fileName}</td><td>{row.company}</td><td>{row.archiveClass}</td><td>{row.basisDate}</td><td>{row.expiresOn}</td><td>{formatBytes(row.size)}</td></tr>)}</tbody>
+        <tbody>{plan.items.map(row => <tr key={row.id}>
+          <td>{row.fileName}</td>
+          <td>{row.company}</td>
+          <td>{row.archiveClass}</td>
+          <td>{row.basisDate}</td>
+          <td>{row.expiresOn}</td>
+          <td>{formatBytes(row.size)}</td>
+          </tr>)}</tbody>
       </table>
     </ResponsiveTableFrame>
-    <label className="checkbox-field"><input type="checkbox" checked={reviewed} onChange={event => setReviewed(event.target.checked)} /><span>已核对处置理由及全部文件明细</span></label>
-    <Button disabled={disabled || !reviewed} onClick={approve}>独立复核并批准</Button>
+    {plan.approvalBlocker && <InlineNotice tone="warning">{plan.approvalBlocker}</InlineNotice>}
+    <label className="checkbox-field">
+      <input type="checkbox" disabled={disabled || !plan.canApprove} checked={reviewed} onChange={event => setReviewed(event.target.checked)} />
+      <span>已核对处置理由及全部文件明细</span>
+      </label>
+    <Button disabled={disabled || !plan.canApprove || !reviewed} onClick={approve}>独立复核并批准</Button>
   </section>;
 }

@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     fs,
     path::{Path, PathBuf},
+    time::{Duration, Instant},
 };
 
 pub(super) const KEY: &str = "Security/native-master-key.bin";
@@ -24,13 +25,25 @@ pub(in crate::engine) fn lock(paths: &RuntimePaths) -> Result<fs::File> {
         .read(true)
         .write(true)
         .open(path)?;
-    file.try_lock_exclusive().map_err(|e| {
-        if e.raw_os_error() == fs2::lock_contended_error().raw_os_error() {
-            error(429, "备份或恢复正在进行，请稍后重试。")
-        } else {
-            unavailable(e.to_string())
+    // Listing recovery points briefly holds the same gate. Wait before any work
+    // begins so a concurrent read cannot turn an accepted backup into a failure.
+    let started = Instant::now();
+    loop {
+        crate::operation::check()?;
+        match file.try_lock_exclusive() {
+            Ok(()) => break,
+            Err(cause) if cause.raw_os_error() == fs2::lock_contended_error().raw_os_error() => {
+                if started.elapsed() >= Duration::from_secs(5) {
+                    return Err(error(
+                        429,
+                        "备份或恢复正在进行，请等待当前任务结束后再操作。",
+                    ));
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Err(cause) => return Err(unavailable(cause.to_string())),
         }
-    })?;
+    }
     super::scratch::recover(paths)?;
     Ok(file)
 }
@@ -257,6 +270,24 @@ pub(super) fn verify_inventory(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn backup_gate_waits_for_short_readers_and_obeys_cancellation() {
+        let root = crate::engine::test_support::ScratchDirectory::new();
+        let paths = root.paths();
+        let holder = lock(&paths).unwrap();
+        let scope = crate::operation::OperationScope::new(Duration::from_millis(30));
+        assert_eq!(scope.run(|| lock(&paths)).unwrap_err().status, Some(504));
+        let started = Instant::now();
+        std::thread::scope(|threads| {
+            let waiter = threads.spawn(|| lock(&paths));
+            std::thread::sleep(Duration::from_millis(50));
+            drop(holder);
+            assert!(waiter.join().unwrap().is_ok());
+        });
+        assert!(started.elapsed() < Duration::from_secs(5));
+        assert!(lock(&paths).is_ok());
+    }
 
     #[test]
     fn restore_publication_obeys_cancellation_and_final_authorization() {

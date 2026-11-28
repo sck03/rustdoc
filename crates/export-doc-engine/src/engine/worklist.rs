@@ -36,7 +36,12 @@ fn groups(tx: &Connection, actor: &Actor, selection: &Selection<'_>) -> Result<V
     let mut groups = vec![];
     if allowed(actor, "document.invoices", &["view", "operate"]) {
         let mut group = Group::new("invoice-review", "单据待核对");
-        if selection.needs(&[group.key], &groups) {
+        let details = Selection {
+            include_summary: false,
+            ..*selection
+        };
+        let undated = matches!(selection.due, "All" | "Undated");
+        if undated && details.needs(&[group.key], &groups) {
             visit(
                 tx,
                 actor,
@@ -44,7 +49,7 @@ fn groups(tx: &Connection, actor: &Actor, selection: &Selection<'_>) -> Result<V
                 "document.invoices",
                 &["view", "operate"],
                 false,
-                selection,
+                &details,
                 |r| {
                     group.push(
                         item(
@@ -55,10 +60,17 @@ fn groups(tx: &Connection, actor: &Actor, selection: &Selection<'_>) -> Result<V
                             Value::Null,
                             Value::Null,
                         ),
-                        selection,
+                        &details,
                     )
                 },
             )?;
+        }
+        if selection.include_summary && undated {
+            let scopes = [
+                auth::data_scope(actor, "document.invoices", "view"),
+                auth::data_scope(actor, "document.invoices", "operate"),
+            ];
+            group.count = tx.invoice_worklist_count(&scopes, actor.id)? as usize;
         }
         groups.push(group);
     }

@@ -7,7 +7,7 @@ use crate::engine::{
 };
 use serde_json::Value;
 
-pub(super) fn rotate(store: &Store, actor: &Actor, body: &Value) -> Result<()> {
+pub(super) fn rotate(store: &Store, actor: &Actor, body: &Value) -> Result<u64> {
     let _maintenance = super::admin::maintenance_lock(&store.files)?;
     let source = store.files.configuration()?;
     if body["expectedVersion"] != source.credential_revision {
@@ -46,6 +46,8 @@ pub(super) fn rotate(store: &Store, actor: &Actor, body: &Value) -> Result<()> {
         {
             return Err(conflict("存储配置已变化，请刷新。"));
         }
-        store.files.activate(target)
+        let revision = target.credential_revision;
+        store.files.activate(target)?;
+        Ok(revision)
     })
 }

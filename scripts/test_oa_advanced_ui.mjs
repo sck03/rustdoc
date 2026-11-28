@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { approvalStage, fulfillNodeInUi, linkBusinessPerson, openDefinitionInUi } from './lib/approval-fixtures.mjs';
+import { createHandlingServices, approvalStage, fulfillNodeInUi, linkBusinessPerson, openDefinitionInUi } from './lib/approval-fixtures.mjs';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
 
 await withOfficeUi('oa-advanced-ui', async ({ output, url, operations, invoke, openPage }) => {
@@ -21,6 +21,7 @@ await withOfficeUi('oa-advanced-ui', async ({ output, url, operations, invoke, o
   const reviewer = await employee('职责审批人', ['view', 'approve'], 'company');
   const projectReviewer = await employee('项目复核人', ['view', 'approve'], 'company');
   const handler = await employee('实际办理人', ['view', 'complete'], 'company');
+  await createHandlingServices(invoke, token, handler.user.id, ['IT']);
   const directory = await invoke('GetOrganizationDirectory', undefined, {}, token);
   const unitId = String(directory.companies.find(unit => unit.code === 'DEFAULT').id);
   const responsibility = await invoke('SaveResponsibility', {
@@ -112,7 +113,7 @@ await withOfficeUi('oa-advanced-ui', async ({ output, url, operations, invoke, o
 
   const applicantToken = (await invoke('Login', { username: applicant.user.username, password })).accessToken;
   let request = await invoke('CreateGeneralRequest', {
-    requestKey: randomUUID(), title: '高级职责与项目实际审批', reason: '按发布图办理', category: 'IT', projectId: project.id,
+    requestKey: randomUUID(), title: '高级职责与项目实际审批', reason: '按发布图办理', category: 'IT', serviceId: 'fixture-IT', projectId: project.id,
   }, {}, applicantToken);
   request = await invoke('SubmitGeneralRequest', { expectedVersion: request.versionNumber, note: '实际提交' }, { id: request.id }, applicantToken);
   const requestUrl = `${url}/#/office/requests/general?requestId=${request.id}`;

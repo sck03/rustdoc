@@ -14,6 +14,15 @@ const PLAN: &str = "file-retention-review";
 fn text<'a>(body: &'a Value, key: &str) -> &'a str {
     body[key].as_str().unwrap_or("")
 }
+pub(super) fn archive_blocker(row: &Value) -> Option<&'static str> {
+    if row["activeReferences"].as_u64().unwrap_or(0) != 0 {
+        Some("该文件仍被业务记录使用，请结束业务引用后再迁移档案。")
+    } else if row["basisDate"].as_str().unwrap_or("").is_empty() {
+        Some("请先确认所选资料的档案类别和归档日期。")
+    } else {
+        None
+    }
+}
 fn project(today: chrono::NaiveDate, mut row: Value) -> Result<Value> {
     let expiry = export_doc_domain::retention::expires_on(
         row["basisDate"].as_str(),
@@ -23,6 +32,9 @@ fn project(today: chrono::NaiveDate, mut row: Value) -> Result<Value> {
     row["basisDate"] = json!(row["basisDate"].as_str().unwrap_or(""));
     row["held"] = json!(row["held"] == 1);
     row["expiresOn"] = json!(expiry.map(|v| v.to_string()).unwrap_or_default());
+    let blocker = archive_blocker(&row);
+    row["canArchive"] = json!(blocker.is_none());
+    row["archiveBlocker"] = json!(blocker.unwrap_or(""));
     row["eligible"] = json!(
         expiry.is_some_and(|date| date <= today)
             && row["held"] == false
@@ -40,7 +52,7 @@ pub(in crate::engine) fn handle(
         return service.store.read(|tx| {
             let actor = auth::refresh_actor_in(tx, actor)?;
             authorize(&actor, operation)?;
-            query(tx, body)
+            query(tx, &actor, body)
         });
     }
     service.store.transaction_as(actor, |tx, actor| {
@@ -85,14 +97,25 @@ fn authorize(actor: &Actor, operation: Operation) -> Result<()> {
     auth::authorize_operation(actor, operation, &[])
 }
 
-fn public_plan(plan: &Value) -> Value {
+fn public_plan(plan: &Value, actor: &Actor) -> Result<Value> {
     let mut result = plan["summary"].clone();
     result["reason"] = plan["reason"].clone();
     result["items"] = plan["rows"].clone();
-    result
+    let expires = chrono::DateTime::parse_from_rfc3339(text(&result, "expiresAt"))
+        .map_err(|_| invalid("处置计划期限无效，请重新预检。"))?;
+    let blocker = if result["requestedBy"] == actor.id {
+        "申请人不能自行批准，请由另一名系统管理员复核。"
+    } else if expires < chrono::Utc::now() {
+        "处置预检已过期，请重新预检。"
+    } else {
+        ""
+    };
+    result["canApprove"] = json!(blocker.is_empty());
+    result["approvalBlocker"] = json!(blocker);
+    Ok(result)
 }
 
-fn query(tx: &Connection, body: &Value) -> Result<Value> {
+fn query(tx: &Connection, actor: &Actor, body: &Value) -> Result<Value> {
     let today = crate::engine::units::today(tx)?;
     let mut rows = tx
         .retained_files(text(body, "after"), 101)?
@@ -117,7 +140,7 @@ fn query(tx: &Connection, body: &Value) -> Result<Value> {
     if let Some(plan) = tx.settings(PLAN)?
         && plan["state"] == "Ready"
     {
-        result["plan"] = public_plan(&plan);
+        result["plan"] = public_plan(&plan, actor)?;
     }
     Ok(result)
 }

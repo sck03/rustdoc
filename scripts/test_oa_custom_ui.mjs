@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { approvalStage, linkBusinessPerson, publishDefinitionInUi, fulfillNodeInUi } from './lib/approval-fixtures.mjs';
+import { createHandlingServices, approvalStage, linkBusinessPerson, publishDefinitionInUi, fulfillNodeInUi } from './lib/approval-fixtures.mjs';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
 
 await withOfficeUi('oa-custom-ui', async ({ output, url, operations, invoke, openPage, require }) => {
@@ -38,6 +38,7 @@ await withOfficeUi('oa-custom-ui', async ({ output, url, operations, invoke, ope
   const applicant = await employee('样品申请人', ['view', 'create', 'edit']);
   const reviewer = await employee('样品审核人', ['view', 'approve']);
   const handler = await employee('样品办理人', ['view', 'complete']);
+  await createHandlingServices(invoke, token, handler.user.id);
   const settings = await invoke('GetOaApprovalSettings', undefined, {}, token);
   const template = settings.rules.find(rule => rule.key === 'general');
   template.stages = [approvalStage('review', [reviewer.user.id])];
@@ -90,6 +91,7 @@ await withOfficeUi('oa-custom-ui', async ({ output, url, operations, invoke, ope
   const dialog = staff.getByRole('dialog', { name: '新建样品寄送', exact: true });
   await dialog.getByLabel('申请标题', { exact: true }).fill('展会样品寄送');
   await dialog.getByLabel('申请说明', { exact: true }).fill('客户确认后寄送样品');
+  await dialog.getByLabel('办理事项', { exact: true }).selectOption('fixture-Other');
   await dialog.getByLabel('客户名称', { exact: true }).fill('中文客户甲');
   await dialog.getByLabel('运费（CNY）', { exact: true }).fill('25.50');
   await sampleLine(dialog);
@@ -165,10 +167,10 @@ await withOfficeUi('oa-custom-ui', async ({ output, url, operations, invoke, ope
   const departmentKey = limitedRule.form.fields.find(field => field.kind === 'Department').key;
   limitedRule.stages[0].materialPolicy = { hiddenFields: [`formValues.${departmentKey}`] };
   latest = await invoke('SaveOaApprovalSettings', { section: 'rules', definitionKey: key, rule: limitedRule, expectedRevision: latest.revisions[`rule:${key}`] }, {}, token);
-  const samples = [{ employeeId: applicant.person.employee.id, appointmentId: applicant.person.organization.primaryAssignmentId, category: 'Other', formValues: complete.formValues }];
+  const samples = [{ employeeId: applicant.person.employee.id, appointmentId: applicant.person.organization.primaryAssignmentId, category: 'Other', serviceId: 'fixture-Other', formValues: complete.formValues }];
   await invoke('PublishOaDefinition', { definitionKey: key, expectedVersion: latest.versionNumber, expectedRevision: latest.revisions[`rule:${key}`], samples }, {}, token);
   const active = (await invoke('ListOaApplications', undefined, {}, token)).items.find(item => item.key === key);
-  let limited = await invoke('CreateGeneralRequest', { requestKey: randomUUID(), employeeId: applicant.person.employee.id, title: '受限自定义材料', reason: '核验显示值过滤', category: 'Other', definitionKey: key, definitionVersion: active.version, formValues: complete.formValues }, {}, token);
+  let limited = await invoke('CreateGeneralRequest', { requestKey: randomUUID(), employeeId: applicant.person.employee.id, title: '受限自定义材料', reason: '核验显示值过滤', category: 'Other', serviceId: 'fixture-Other', definitionKey: key, definitionVersion: active.version, formValues: complete.formValues }, {}, token);
   limited = await invoke('SubmitGeneralRequest', { expectedVersion: limited.versionNumber }, { id: limited.id }, token);
   const reviewerToken = (await invoke('Login', { username: reviewer.user.username, password })).accessToken;
   limited = await invoke('GetGeneralRequest', undefined, { id: limited.id }, reviewerToken);

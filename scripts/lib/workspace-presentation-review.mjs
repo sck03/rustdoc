@@ -46,13 +46,15 @@ export async function verifyWorkspacePresentation({ page, url, output }) {
   const schemes = page.getByRole('region', { name: '权限方案', exact: true });
   await schemes.locator('.permission-template-card').first().waitFor();
   const category = schemes.getByRole('combobox', { name: '模块分类', exact: true });
-  assert.notEqual(await category.inputValue(), '', 'asynchronously loaded resources start with one category');
+  assert.equal(await category.inputValue(), '', 'the permission editor initially exposes all resource categories');
+  const firstCategory = await category.locator('option').nth(1).getAttribute('value');
+  await category.selectOption(firstCategory);
   const categoryCount = await schemes.locator('.permission-resource-card').count();
   assert(categoryCount > 0 && categoryCount < 20, 'default editor avoids showing the entire permission catalog');
   await category.selectOption('');
   assert(await schemes.locator('.permission-resource-card').count() > categoryCount);
   await schemes.getByRole('searchbox', { name: '搜索功能模块' }).fill('发票');
   await schemes.getByRole('searchbox', { name: '搜索功能模块' }).fill('');
-  assert.notEqual(await category.inputValue(), '', 'clearing cross-category search restores a compact category');
+  assert.equal(await category.inputValue(), '', 'clearing cross-category search preserves the full catalog');
   await page.screenshot({ path: path.join(output, 'permission-categories.png'), fullPage: true });
 }

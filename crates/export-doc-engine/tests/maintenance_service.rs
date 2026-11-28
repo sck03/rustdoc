@@ -1,3 +1,6 @@
+#[path = "support/jobs.rs"]
+#[allow(dead_code)]
+mod jobs;
 #[path = "support/native_fixture.rs"]
 mod native_fixture;
 use export_doc_engine::generated_api::*;
@@ -5,6 +8,7 @@ use native_fixture::ApiClient;
 use serde_json::{Value, json};
 use std::{
     fs,
+    sync::atomic::AtomicBool,
     time::{Duration, SystemTime},
 };
 
@@ -12,7 +16,11 @@ use std::{
 fn backup_retention_restore_confirmation_and_session_revocation_use_the_original_workflow() {
     let mut fixture = native_fixture::Fixture::new();
     fixture.create(CREATE_CUSTOMER, json!({"customerNameEN":"BEFORE-BACKUP"}));
-    fixture.request(CREATE_DATABASE_BACKUP, None, None);
+    let backup = fixture
+        .client()
+        .json(CREATE_DATABASE_BACKUP, &[], &[], None)
+        .unwrap();
+    jobs::wait_for_completion(fixture.client(), backup, &AtomicBool::new(false)).unwrap();
     let list = fixture.request(LIST_DATABASE_BACKUPS, None, None);
     export_doc_contracts::validation::response(LIST_DATABASE_BACKUPS.id, &list).unwrap();
     let backup = list["backups"][0].clone();
@@ -27,7 +35,11 @@ fn backup_retention_restore_confirmation_and_session_revocation_use_the_original
             fs::FileTimes::new().set_modified(SystemTime::now() - Duration::from_secs(60 * 86400)),
         )
         .unwrap();
-    fixture.request(CREATE_DATABASE_BACKUP, None, None);
+    let backup = fixture
+        .client()
+        .json(CREATE_DATABASE_BACKUP, &[], &[], None)
+        .unwrap();
+    jobs::wait_for_completion(fixture.client(), backup, &AtomicBool::new(false)).unwrap();
     let list = fixture.request(LIST_DATABASE_BACKUPS, None, None);
     let newest = list["backups"][0]["fileName"].as_str().unwrap().to_owned();
     let newest_path = fixture.root.join("Backups").join(&newest);
@@ -65,11 +77,17 @@ fn backup_retention_restore_confirmation_and_session_revocation_use_the_original
             .json::<Value>(GET_CURRENT_USER, &[], &[], None)
             .is_ok()
     );
-    fixture.request(
-        RESTORE_DATABASE_BACKUP,
-        None,
-        Some(json!({"backupFileName":newest,"confirmationText":"RESTORE"})),
-    );
+    let restore = fixture
+        .client()
+        .json(
+            RESTORE_DATABASE_BACKUP,
+            &[],
+            &[],
+            Some(json!({"backupFileName":newest,"confirmationText":"RESTORE"})),
+        )
+        .unwrap();
+    jobs::wait_for_completion(fixture.client(), restore, &AtomicBool::new(false)).unwrap();
+    fixture.client = Some(fixture.client.take().unwrap().restart("Full").unwrap());
     assert_eq!(
         fixture
             .client()

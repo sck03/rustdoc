@@ -197,11 +197,14 @@ pub(super) fn list_with(
             if !directory && !fields.is_empty() {
                 row["kind"] = json!(if kind == "bookings" { "room" } else { "supply" });
             }
-            let row = if fields.is_empty() {
+            let mut row = if fields.is_empty() {
                 super::handling::project_resource(tx, actor, resource, row)?
             } else {
                 row
             };
+            if !directory && fields.is_empty() {
+                row["workflowTasks"] = super::oa::fulfillment::tasks(tx, actor, &row)?;
+            }
             let row = if directory {
                 row
             } else {

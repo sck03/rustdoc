@@ -202,10 +202,7 @@ fn postgres_migration_and_physical_restore_preserve_roles_and_reject_live_instan
         let deadline = Instant::now() + Duration::from_secs(120);
         loop {
             let state = recovery.status().unwrap();
-            if !matches!(
-                state["state"].as_str(),
-                Some("Preparing" | "Preflight" | "ApplyingFiles" | "Committing")
-            ) {
+            if state["busy"] == false {
                 assert_ne!(state["state"], "Failed", "{state}");
                 return state;
             }

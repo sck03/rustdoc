@@ -138,6 +138,8 @@ pub(crate) fn build(q: &JobQuery<'_>, pg: bool) -> Result<(QuerySql, String)> {
         clauses.push(format!(
             "({})",
             [
+                "jobId",
+                "outputPath",
                 "title",
                 "kind",
                 "statusText",

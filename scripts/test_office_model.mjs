@@ -88,6 +88,17 @@ const manager = { ...user, capabilities: { ...user.capabilities, permissions: gr
 assert.deepEqual(office.officeRequestActions({ ...row, canReview: true }, manager, "rooms").map(entry => entry.action), ["approve", "reject", "cancel"]);
 assert(!office.officeRequestActions({ ...row, ownerUserId: 1 }, manager, "rooms").some(entry => entry.action === "approve"), "self approval must not be offered");
 assert(!office.officeAccess({ ...user, capabilities: { permissions: grants("unknown") } }, "rooms").allows("approve"));
+for (const kind of ['rooms', 'supplies']) {
+  for (const [action, status] of [['issue', 'Approved'], ['return', kind === 'rooms' ? 'InUse' : 'Issued']]) {
+    const assigned = { ...row, status, isReturnable: true, workflowTasks: [{ kind: 'Handling', action, nodeKey: 'active', canExecute: true }] };
+    if (kind === 'supplies') delete assigned.meetingRoomId;
+    assert(office.officeRequestActions(assigned, manager, kind).some(entry => entry.action === action));
+    for (const workflowTasks of [[], [{ ...assigned.workflowTasks[0], canExecute: false }]]) {
+      assert(!office.officeRequestActions({ ...assigned, workflowTasks }, manager, kind).some(entry => entry.action === action), 'broad permissions cannot bypass current node assignment');
+    }
+    assert.equal(office.officeHandlingTask({ ...assigned, workflowTasks: [{ ...assigned.workflowTasks[0], nodeKey: 'completed', canExecute: false }, ...assigned.workflowTasks] }, action).nodeKey, 'active');
+  }
+}
 const oaUser = { ...user, capabilities: { permissions: ["view","edit","approve"].map(action => ({ resourceKey:"office.leave", action, dataScope:action==="view"?"company":"own" })) } };
 assert.deepEqual(oa.oaActions({ ...row, kind:"leave" }, oaUser), [], "broad read access must not expose out-of-scope approval actions");
 const oaManager = { ...oaUser, capabilities: { permissions: oaUser.capabilities.permissions.map(grant => ({ ...grant, dataScope:"company" })) } };
@@ -197,15 +208,16 @@ assert(!isRouteAccessAllowed({pathname:"/invoices",user:fullDesktopUser,canManag
 assert.equal(office.officeRequestActions({...row,status:"Approved"},fullDesktopUser,"rooms").find(item=>item.action==='cancel').label,"取消申请");
 const supplyRow = {companyScope:"C1",id:8,officeSupplyId:2,ownerUserId:2,status:"Approved",serviceId:"daily",canHandle:false,isReturnable:false};
 assert(!office.officeRequestActions(supplyRow,manager,"supplies").some(entry=>entry.action==="issue"),"company permission cannot bypass an explicit custodian");
-assert(office.officeRequestActions({...supplyRow,canHandle:true},user,"supplies").some(entry=>entry.action==="issue"),"a designated custodian can issue outside ordinary own scope");
+const handlingTasks = action => [{ kind: "Handling", action, nodeKey: action, canExecute: true }];
+assert(office.officeRequestActions({...supplyRow,canHandle:true,workflowTasks:handlingTasks("issue")},user,"supplies").some(entry=>entry.action==="issue"),"a designated custodian can issue outside ordinary own scope");
 assert(!office.officeRequestActions({...supplyRow,status:"Issued",canHandle:true},manager,"supplies").some(entry=>entry.action==="return"),"consumable issue is terminal and offers no return action");
-const assignedRoom = { ...row, status: "Approved", serviceId: "meeting", canHandle: true };
+const assignedRoom = { ...row, status: "Approved", serviceId: "meeting", canHandle: true, workflowTasks:handlingTasks("issue") };
 assert.equal(communication.notificationLink({ requestKind: "bookings", requestId: 7 }), "/office/meeting-rooms?view=requests&requestId=7");
 assert(office.officeRequestActions(assignedRoom, user, "rooms").some(entry => entry.action === "issue"));
-assert(!office.officeRequestActions({ ...assignedRoom, canHandle: false }, manager, "rooms").some(entry => entry.action === "issue"));
-assert(office.officeRequestActions({ ...assignedRoom, status: "InUse" }, user, "rooms").some(entry => entry.action === "return"));
+assert(!office.officeRequestActions({ ...assignedRoom, canHandle: false, workflowTasks: [] }, manager, "rooms").some(entry => entry.action === "issue"));
+assert(office.officeRequestActions({ ...assignedRoom, status: "InUse", workflowTasks:handlingTasks("return") }, user, "rooms").some(entry => entry.action === "return"));
 const issueOnly = { ...user, capabilities: { ...user.capabilities, permissions: grants("own").filter(grant => grant.action !== "return") } };
-assert(!office.officeRequestActions({ ...assignedRoom, status: "InUse" }, issueOnly, "rooms").some(entry => entry.action === "return"), "being assigned does not grant unconfigured actions");
+assert(!office.officeRequestActions({ ...assignedRoom, status: "InUse", workflowTasks:handlingTasks("return") }, issueOnly, "rooms").some(entry => entry.action === "return"), "being assigned does not grant unconfigured actions");
 const crypto = globalThis.crypto;
 try {
   Object.defineProperty(globalThis, "crypto", { configurable: true, value: { getRandomValues: crypto.getRandomValues.bind(crypto) } });

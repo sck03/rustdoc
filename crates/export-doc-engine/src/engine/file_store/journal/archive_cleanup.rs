@@ -12,10 +12,9 @@ impl FileStore {
     ) -> Result<()> {
         progress.stage = "归档旧副本核验与删除";
         paths::ensure_safe_absolute(path).map_err(unavailable)?;
-        let intent: Intent = serde_json::from_reader(fs::File::open(path)?.take(4096))?;
-        if !intent.archive_source {
-            return Err(invalid("此记录不是归档副本清理任务。"));
-        }
+        let Some(intent) = discovery::read_intent(path)? else {
+            return Ok(());
+        };
         validate(&intent.object)?;
         let token = path
             .file_stem()
@@ -65,11 +64,11 @@ impl FileStore {
             progress.removed(intent.object.size);
         }; // SQL did not switch: the source stays authoritative.
         progress.stage = "归档旧副本记录清理";
-        fs::remove_file(path)?;
+        remove_intent(path)?;
         Ok(())
     }
 
-    pub(in crate::engine::file_store) fn reconcile_archive_sources(
+    pub(in crate::engine::file_store) fn reconcile_copies(
         &self,
         store: &Store,
         tokens: &[String],
@@ -81,67 +80,21 @@ impl FileStore {
         let _access = self
             .archive_access
             .write(std::time::Duration::from_secs(30))?;
+        let mut completed = BTreeSet::new();
         for token in tokens {
             crate::operation::check()?;
-            if token.len() != 32 || !token.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-                return Err(invalid("归档副本清理编号无效。"));
-            }
-            let path = self.journal_root().join(format!("{token}.json"));
-            paths::ensure_safe_absolute(&path).map_err(unavailable)?;
-            if path.try_exists()? {
+            let path = self.intent_path(token)?;
+            let Some(intent) = discovery::read_intent(&path)? else {
+                continue;
+            };
+            let key = (intent.identity, intent.object.digest);
+            if completed.contains(&key) {
+                remove_intent(&path)?;
+            } else {
                 self.finish_archive_cleanup(store, &path, progress)?;
+                completed.insert(key);
             }
         }
         Ok(())
-    }
-
-    pub(in crate::engine::file_store) fn archive_cleanup_candidates(
-        &self,
-        store: &Store,
-    ) -> Result<Vec<(String, u64)>> {
-        let root = self.journal_root();
-        paths::ensure_safe_absolute(&root).map_err(unavailable)?;
-        if !root.try_exists()? {
-            return Ok(Vec::new());
-        }
-        let mut candidates = Vec::new();
-        for entry in fs::read_dir(root)?.take(1000) {
-            crate::operation::check()?;
-            let path = entry?.path();
-            paths::ensure_safe_absolute(&path).map_err(unavailable)?;
-            if path.extension().is_none_or(|extension| extension != "json") {
-                continue;
-            }
-            let intent: Intent = serde_json::from_reader(fs::File::open(&path)?.take(4096))?;
-            if !intent.archive_source {
-                continue;
-            }
-            let token = path
-                .file_stem()
-                .and_then(|value| value.to_str())
-                .unwrap_or("");
-            if self
-                .uploads
-                .lock()
-                .map_err(|_| unavailable("文件操作状态异常。"))?
-                .uploads
-                .contains_key(token)
-            {
-                continue;
-            }
-            validate(&intent.object)?;
-            let current = store.connection()?.file_object(&intent.object.digest)?;
-            let target = current
-                .as_ref()
-                .map(|object| self.object_configuration(object))
-                .transpose()?;
-            let bytes = if target.is_some_and(|target| target.identity != intent.identity) {
-                intent.object.size
-            } else {
-                0
-            };
-            candidates.push((token.to_owned(), bytes));
-        }
-        Ok(candidates)
     }
 }

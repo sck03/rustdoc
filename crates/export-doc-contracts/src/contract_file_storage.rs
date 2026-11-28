@@ -25,6 +25,13 @@ pub(super) fn apply_oa_recovery(baseline: &mut Value) {
     );
 }
 
+pub(super) fn apply_publication(baseline: &mut Value) {
+    changes(
+        baseline,
+        include_str!("../tests/fixtures/storage-publication-changes.jsonl").lines(),
+    );
+}
+
 fn changes<'a>(baseline: &mut Value, lines: impl Iterator<Item = &'a str>) {
     for line in lines {
         let change: Value = serde_json::from_str(line).unwrap();

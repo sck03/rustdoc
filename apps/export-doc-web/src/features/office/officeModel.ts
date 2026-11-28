@@ -41,7 +41,7 @@ export function officeAccess(user: ApiUserDto, kind: OfficeKind) {
       return grants.some(grant => {
         if (grant.action !== action || !["own", "department", "company", "all"].includes(grant.dataScope)) return false;
         if (!row) return true;
-        if (row.serviceId && ["issue", "return"].includes(action)) return row.canHandle === true;
+        if (action === "issue" || action === "return") return Boolean(officeHandlingTask(row, action));
         if (grant.dataScope === "own") return row.ownerUserId === user.id;
         if (grant.dataScope === "department") return hasDepartment(user, row.departmentId);
         return true;
@@ -62,6 +62,10 @@ export function readMeetingBookingUpdate(form: FormData, version: number, timeZo
 export function readSupplyRequestUpdate(form: FormData, version: number): SupplyRequestUpdateRequest {
   return { expectedVersion: version, quantity: Number(form.get("quantity")), purpose: String(form.get("purpose") ?? "").trim(),
     returnDueDate: String(form.get("returnDueDate") ?? "") || null };
+}
+
+export function officeHandlingTask(row: OfficeRequestRow, action: string) {
+  return row.workflowTasks?.find(task => task.kind === "Handling" && task.action === action && task.canExecute);
 }
 
 export function officeRequestActions(row: OfficeRequestRow, user: ApiUserDto, kind: OfficeKind) {

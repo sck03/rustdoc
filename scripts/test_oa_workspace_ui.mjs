@@ -1,4 +1,4 @@
-import { approvalStage, publishDefinitions, approveTask } from './lib/approval-fixtures.mjs';
+import { configureWorkflowHandling, approvalStage, publishDefinitions, approveTask } from './lib/approval-fixtures.mjs';
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
@@ -66,6 +66,8 @@ try {
   const reviewerToken = (await invoke('Login', { username: 'workflow-auditor', password: 'Workflow-Auditor-2026' })).accessToken;
   const settings = await invoke('GetOaApprovalSettings', undefined, {}, token);
   settings.rules = settings.rules.map(rule => rule.kind === 'personnel' ? rule : ({ ...rule, stages: [approvalStage('review', [reviewer.id])] }));
+  const definitionKeys = settings.rules.filter(rule => rule.kind !== 'personnel').map(rule => rule.key);
+  const handler = await configureWorkflowHandling(invoke, token, settings, definitionKeys);
   await publishDefinitions(invoke, token, settings, settings.rules.filter(rule => rule.kind !== 'personnel').map(rule => rule.key));
   const approveResource = async kind => {
     const route = kind === 'rooms' ? '/api/office/bookings' : '/api/office/supply-requests';
@@ -84,12 +86,25 @@ try {
       if(method==='GET' && url.includes('/commands/'))window.__receiptReads=(window.__receiptReads||0)+1;
       const response=await originalFetch(...args);if(upload && counts?.upload===2)throw new TypeError('Simulated lost upload response');
       if(response.ok && method==='POST' && /\\/(submit|approve)$/.test(url) && !window.__lostCommand){window.__lostCommand=true;throw new TypeError('Simulated lost command response');}return response;};` });
+  async function login(username, password) {
+    if (await run("Boolean(document.querySelector('.account-menu-trigger'))")) {
+      await run("document.querySelector('.account-menu-trigger').click()");
+      await click('退出登录');
+    }
+    await wait("document.querySelector('input[autocomplete=username]')", "Login not displayed");
+    await run('(' + ((values) => {
+      for (const [selector, value] of values) {
+        const input = document.querySelector(selector);
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, value);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }).toString() + ')(' + JSON.stringify([['input[autocomplete=username]', username], ['input[autocomplete=current-password]', password]]) + ')');
+    await click('登录');
+    await wait("!document.querySelector('.login-submit-button')", "Login failed");
+  }
   await navigate(url);
-  await wait("document.querySelector('input[autocomplete=username]')", "Login not displayed");
-  await run(`(() => {for(const [selector,value] of [['input[autocomplete=username]','oa-review'],['input[autocomplete=current-password]','Review-2026-Test']]){const input=document.querySelector(selector);Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));}})()`);
-  await click("登录");
-  await wait("!document.querySelector('.login-submit-button')", "Login failed");
-  await exerciseOfficeResources({ url, page, output, run, wait, click, fill, navigate, captureScreenshot, approveResource });
+  await login('oa-review', 'Review-2026-Test');
+  await exerciseOfficeResources({ url, page, output, run, wait, click, fill, navigate, captureScreenshot, approveResource, useHandler: () => login(handler.user.username, handler.password), useAdmin: () => login("oa-review", "Review-2026-Test") });
   assert.deepEqual(await run("[window.__lostCommand,window.__receiptReads]"), [true,1], "A committed command with a lost HTTP response is confirmed by its receipt");
   await navigate(`${url}/#/office/approvals`);
   await wait("document.querySelector('[aria-label=\"申请与审批中心\"]')", "Approval hub missing");
@@ -181,6 +196,7 @@ try {
     if (kind === "overtime") { await fill("开始时间", `${yesterday}T18:00`); await fill("结束时间", `${yesterday}T20:00`); await fill("加班地点", "总部办公室"); }
     if (kind === "travel") { await fill("出差地点", "上海"); await fill("出发日期", travelDay); await fill("返程日期", travelDay); }
     if (kind === "expense") { await fill("费用说明", "市内交通凭证"); await fill("金额", "12.35"); }
+    if (kind === "general") await fill("办理事项", "fixture-Other");
     if (kind === "purchase") { await fill("物品名称", "办公纸"); await fill("预算单价", "18.25"); }
     await chooseFiles('[role=dialog] input[type=file]', kind === "expense" ? [receipt, supporting] : [receipt]);
     if (kind === "expense") await run("window.__saveCounts={create:0,upload:0}");
@@ -234,6 +250,7 @@ try {
     await act("提交审批", "申请提交");
     await wait("document.querySelector('.oa-detail .office-badge')?.textContent==='待审批'", "Submission state missing");
     await approveTask(invoke, reviewerToken, {leave:'Leave',overtime:'Overtime',expense:'Expense',travel:'Travel',purchase:'Purchase',general:'General'}[kind], savedId);
+    await login(handler.user.username, handler.password);
     await navigate(`${url}/#/office/requests/${kind}?requestId=${savedId}`);
     await wait("document.querySelector('.oa-detail .office-badge')?.textContent==='已批准'", "Approval state missing");
     await click("办理此节点");
@@ -251,6 +268,7 @@ try {
     await captureScreenshot(page, path.join(output, `${kind}-mobile.png`));
     assert(await run("document.documentElement.scrollWidth<=document.documentElement.clientWidth+1"), `${kind}: no page overflow on phone`);
     await page.send("Emulation.clearDeviceMetricsOverride");
+    await login("oa-review", "Review-2026-Test");
     console.log(`${name}: real React/Rust HTTP save, approval, completion, history and mobile layout passed.`);
   }
   console.log(`Office UI evidence: ${output}`);

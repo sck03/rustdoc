@@ -351,6 +351,7 @@ fn attachment_versions_require_confirmation_and_keep_auditable_reasons() {
 #[test]
 fn implemented_parameterless_reads_match_the_generated_response_structure() {
     let fixture = Fixture::new();
+    let _reviewer = fixture.client().business_reviewer();
     assert!(fixture.client().supports(CLONE_USER_REPORT_TEMPLATE));
     if fixture.client().supports(GET_DISASTER_RECOVERY_STATUS) {
         assert!(fixture.client().supports(CREATE_DISASTER_RECOVERY_PACKAGE));
@@ -690,24 +691,22 @@ fn stock_reservation_issue_partial_return_and_cancellation_are_atomic() {
     let supplies = fixture.request(LIST_OFFICE_SUPPLIES, None, None);
     assert_eq!(supplies["items"][0]["availableQuantity"], 7);
     assert_eq!(supplies["items"][0]["stockQuantity"], 10);
-    let issued = fixture.request(
-        ISSUE_OFFICE_SUPPLY,
-        request["id"].as_i64(),
-        Some(json!({"expectedVersion":request["versionNumber"],"quantity":3})),
-    );
+    let handle = |op, row: &Value, quantity| -> Value {
+        reviewer
+            .json(
+                op,
+                &[("id", row["id"].to_string())],
+                &[],
+                Some(json!({"expectedVersion":row["versionNumber"],"quantity":quantity})),
+            )
+            .unwrap()
+    };
+    let issued = handle(ISSUE_OFFICE_SUPPLY, &request, 3);
     assert_eq!(issued["status"], "Issued");
-    let returned = fixture.request(
-        RETURN_OFFICE_SUPPLY,
-        request["id"].as_i64(),
-        Some(json!({"expectedVersion":issued["versionNumber"],"quantity":1})),
-    );
+    let returned = handle(RETURN_OFFICE_SUPPLY, &issued, 1);
     assert_eq!(returned["status"], "Issued");
     assert_eq!(returned["returnedQuantity"], 1);
-    let returned = fixture.request(
-        RETURN_OFFICE_SUPPLY,
-        request["id"].as_i64(),
-        Some(json!({"expectedVersion":returned["versionNumber"],"quantity":2})),
-    );
+    let returned = handle(RETURN_OFFICE_SUPPLY, &returned, 2);
     assert_eq!(returned["status"], "Returned");
     let supplies = fixture.request(LIST_OFFICE_SUPPLIES, None, None);
     assert_eq!(supplies["items"][0]["stockQuantity"], 10);
@@ -727,8 +726,7 @@ fn stock_reservation_issue_partial_return_and_cancellation_are_atomic() {
     assert_eq!(insufficient["status"], "Approved");
     assert_eq!(insufficient["reservationState"], "Insufficient");
     assert_eq!(
-        fixture
-            .client()
+        reviewer
             .json::<Value>(
                 ISSUE_OFFICE_SUPPLY,
                 &[("id", insufficient["id"].to_string())],

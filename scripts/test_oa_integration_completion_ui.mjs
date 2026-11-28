@@ -3,7 +3,7 @@ import { switchUnitIdentity } from './lib/unit-context-ui.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
-import { approvalStage, publishDefinitions, personnelChange } from './lib/approval-fixtures.mjs';
+import { configureWorkflowHandling, approvalStage, publishDefinitions, personnelChange } from './lib/approval-fixtures.mjs';
 import { verifyWorkspacePresentation } from './lib/workspace-presentation-review.mjs';
 
 await withOfficeUi('oa-completion-ui', async ({output,url,invoke,openPage,require,operations}) => {
@@ -95,7 +95,9 @@ await withOfficeUi('oa-completion-ui', async ({output,url,invoke,openPage,requir
   await admin.goto(`${url}/#/system/access-control?userId=${users[1].id}`);
   await admin.locator('.user-management-section').getByText('任职与账号同步后的岗位',{exact:false}).waitFor();
   settings=await invoke('GetOaApprovalSettings',undefined,{},adminToken);
-  settings=await publishDefinitions(invoke,adminToken,{...settings,rules:settings.rules.map(rule=>['room','supply'].includes(rule.kind)?{...rule,stages:[{...approvalStage('resource-review',[users[0].id]),name:'资源审批',revisionPolicy:{allowAddSigners:true,allowRemoveSigners:true,minimumSigners:1,protectedUserIds:[users[0].id]}}]}:rule)},['room','supply']);
+  settings.rules = settings.rules.map(rule=>['room','supply'].includes(rule.kind)?{...rule,stages:[{...approvalStage('resource-review',[users[0].id]),name:'资源审批',revisionPolicy:{allowAddSigners:true,allowRemoveSigners:true,minimumSigners:1,protectedUserIds:[users[0].id]}}]}:rule);
+  await configureWorkflowHandling(invoke, adminToken, settings, ['room', 'supply']);
+  settings = await publishDefinitions(invoke, adminToken, settings, ['room', 'supply']);
   const room=await invoke('CreateMeetingRoom',{name:'完整资源验收会议室',capacity:10,maximumBookingHours:8,advanceBookingDays:90,requiresKey:true,isActive:true},{},adminToken);
   const supply=await invoke('CreateOfficeSupply',{name:'完整资源验收物品',unit:'件',minimumStock:0,isReturnable:false,isActive:true},{},adminToken);
   await invoke('RestockOfficeSupply',{operationId:'completion-stock',expectedVersion:supply.versionNumber,quantity:10,note:'测试库存'},{id:supply.id},adminToken);
@@ -120,7 +122,9 @@ await withOfficeUi('oa-completion-ui', async ({output,url,invoke,openPage,requir
   const supplyRequest=(await invoke('ListOfficeSupplyRequests',undefined,{approvalsOnly:true,mineOnly:false,status:'Pending'},reviewerToken)).items.find(row=>row.officeSupplyId===supply.id);assert(supplyRequest);
   const reviewer=await openPage('completion-ui-0','Completion-UI-2026');
   const reads=[];reviewer.on('request',request=>{const route=new URL(request.url()).pathname;if(['/api/office/approval-hub','/api/office/bookings','/api/office/supply-requests'].includes(route)) reads.push(route);});
-  await reviewer.goto(`${url}/#/office/approvals`);reads.length=0;await reviewer.reload();
+  await reviewer.goto(`${url}/#/office/approvals`);
+  await reviewer.getByRole('region',{name:'申请与审批中心',exact:true}).getByRole('link',{name:/附件随预约冻结/u}).waitFor();
+  reads.length=0;await reviewer.reload();
   await reviewer.getByRole('region',{name:'申请与审批中心',exact:true}).getByRole('link',{name:/附件随预约冻结/u}).waitFor();
   assert.deepEqual(reads,['/api/office/approval-hub'],'one hub request includes both resource queues');
   const hubReads=[...reads];
