@@ -33,7 +33,7 @@ export function validateBackupPlan(draft: ApiBackupPlanSaveRequest, status: ApiB
 }
 
 export function backupResultLabel(result: string) {
-  return ({ NotRun: "尚未执行", Running: "执行中", Succeeded: "已完成", Partial: "部分完成，需处理", Failed: "失败", Canceled: "已取消", Interrupted: "执行中断", Deferred: "系统繁忙，稍后重试", NeedsReview: "需要复核配置" } as Record<string, string>)[result] ?? result;
+  return ({ NotRun: "尚未执行", Running: "执行中", Succeeded: "已完成", Partial: "部分完成，需处理", Unknown: "提交结果待核对", Failed: "失败", Canceled: "已取消", Interrupted: "执行中断", Deferred: "系统繁忙，稍后重试", NeedsReview: "需要复核配置" } as Record<string, string>)[result] ?? result;
 }
 export function replicaResultLabel(result: string) {
   return ({ Committed: "已提交并核验", NotRequested: "仅本地", Pending: "传输中", Verified: "已回读校验", Uploaded: "已上传", Failed: "副本未完成" } as Record<string, string>)[result] ?? result;

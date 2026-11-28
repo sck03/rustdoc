@@ -109,7 +109,9 @@ pub(super) fn normalize(
 }
 
 pub(super) fn validate(tx: &Connection, proposed: &Value) -> Result<()> {
-    let people = store::matching(
+    let today = super::units::today(tx)?;
+    let mut available = HashMap::new();
+    store::visit_matching(
         tx,
         "people",
         &[],
@@ -122,25 +124,66 @@ pub(super) fn validate(tx: &Connection, proposed: &Value) -> Result<()> {
             ("hireDate", "hireDate"),
             ("organization", "organization"),
         ],
+        |person| {
+            if person["id"] != proposed["id"] {
+                add_appointments(&mut available, &person, today, false)?;
+            }
+            Ok(())
+        },
     )?;
-    let today = super::units::today(tx)?;
+    add_appointments(&mut available, proposed, today, true)?;
     let previous = proposed["id"]
         .as_i64()
         .filter(|id| *id > 0)
         .map(|id| store::get(tx, "people", id))
         .transpose()?
         .unwrap_or(Value::Null);
-    validate_graph(people, proposed, &previous, today)
+    validate_graph(available, proposed, &previous)
+}
+
+fn add_appointments(
+    available: &mut HashMap<String, (i64, Assignment)>,
+    person: &Value,
+    today: chrono::NaiveDate,
+    proposed: bool,
+) -> Result<()> {
+    if !matches!(person["status"].as_str(), Some("Active" | "Probation")) {
+        return Ok(());
+    }
+    for appointment in assignments(person)? {
+        if !appointment.active_on(today).map_err(invalid)? {
+            continue;
+        }
+        if appointment.id.is_empty()
+            || appointment.manager_employee_id.is_some()
+                != appointment.manager_assignment_id.is_some()
+            || appointment.functional_manager_employee_ids.len()
+                != appointment.functional_manager_assignment_ids.len()
+        {
+            return Err(unavailable("任职或汇报关系引用不完整。"));
+        }
+        let owner = if proposed && person["id"].is_null() {
+            0
+        } else {
+            person["id"]
+                .as_i64()
+                .ok_or_else(|| unavailable("任职人员编号损坏。"))?
+        };
+        if available
+            .insert(appointment.id.clone(), (owner, appointment))
+            .is_some()
+        {
+            return Err(unavailable("任职编号重复。"));
+        }
+    }
+    Ok(())
 }
 
 fn validate_graph(
-    mut people: Vec<Value>,
+    available: HashMap<String, (i64, Assignment)>,
     proposed: &Value,
     previous: &Value,
-    today: chrono::NaiveDate,
 ) -> Result<()> {
-    people.retain(|p| p["id"] != proposed["id"]);
-    people.push(proposed.clone());
     let old = if previous["status"] == "Departed" {
         vec![]
     } else {
@@ -157,38 +200,6 @@ fn validate_graph(
         .filter(|a| !old.contains(a) || !next.contains(a))
         .map(|a| a.id.as_str())
         .collect();
-    let mut available = HashMap::new();
-    for person in people
-        .iter()
-        .filter(|p| matches!(p["status"].as_str(), Some("Active" | "Probation")))
-    {
-        for appointment in assignments(person)? {
-            if !appointment.active_on(today).map_err(invalid)? {
-                continue;
-            }
-            if appointment.id.is_empty()
-                || appointment.manager_employee_id.is_some()
-                    != appointment.manager_assignment_id.is_some()
-                || appointment.functional_manager_employee_ids.len()
-                    != appointment.functional_manager_assignment_ids.len()
-            {
-                return Err(unavailable("任职或汇报关系引用不完整。"));
-            }
-            let owner = if person["id"].is_null() && proposed["id"].is_null() {
-                0
-            } else {
-                person["id"]
-                    .as_i64()
-                    .ok_or_else(|| unavailable("任职人员编号损坏。"))?
-            };
-            if available
-                .insert(appointment.id.clone(), (owner, appointment))
-                .is_some()
-            {
-                return Err(unavailable("任职编号重复。"));
-            }
-        }
-    }
     let mut graph = HashMap::new();
     for (id, (_, appointment)) in &available {
         let mut edges = vec![];
@@ -226,62 +237,5 @@ fn validate_graph(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-    #[test]
-    fn optional_expiry_does_not_block_unrelated_units_but_changes_and_cycles_remain_strict() {
-        let person = |id, unit, department| json!({"id":id,"status":"Active","companyScope":unit,"departmentId":department,"jobTitle":"普通员工","hireDate":"2026-01-01","organization":{"primaryAssignmentId":format!("primary-{id}"),"managerEmployeeId":null,"functionalManagerEmployeeIds":[],"additionalAssignments":[]}});
-        let mut manager = person(1, "A", "A1");
-        manager["organization"]["additionalAssignments"] = json!([{"id":"temporary-b","companyCode":"B","departmentId":"B1","jobTitle":"临时兼任","startsOn":"2026-01-01","endsOn":"2026-10-29","managerEmployeeId":null,"functionalManagerEmployeeIds":[]}]);
-        let mut reporter = person(2, "B", "B2");
-        reporter["organization"]["managerEmployeeId"] = json!(1);
-        reporter["organization"]["managerAssignmentId"] = json!("temporary-b");
-        let unrelated = person(3, "C", "C1");
-        let rows = vec![manager.clone(), reporter.clone(), unrelated.clone()];
-        let mut changed = unrelated.clone();
-        changed["jobTitle"] = json!("其他单位的岗位维护");
-        let today = "2026-10-30".parse().unwrap();
-        validate_graph(rows.clone(), &changed, &unrelated, today).unwrap();
-        let mut changed_reporter = reporter.clone();
-        changed_reporter["jobTitle"] = json!("调整汇报岗位");
-        assert_eq!(
-            validate_graph(rows.clone(), &changed_reporter, &reporter, today)
-                .unwrap_err()
-                .status,
-            Some(400)
-        );
-        validate_graph(
-            rows.clone(),
-            &changed_reporter,
-            &reporter,
-            "2026-10-29".parse().unwrap(),
-        )
-        .unwrap();
-        let mut previous_manager = manager.clone();
-        previous_manager["organization"]["additionalAssignments"][0]["endsOn"] = json!("");
-        assert_eq!(
-            validate_graph(rows.clone(), &manager, &previous_manager, today)
-                .unwrap_err()
-                .status,
-            Some(400)
-        );
-        let mut fixed = reporter.clone();
-        fixed["organization"]["managerEmployeeId"] = Value::Null;
-        fixed["organization"]["managerAssignmentId"] = Value::Null;
-        validate_graph(rows, &fixed, &reporter, today).unwrap();
-        let mut first = person(4, "A", "A2");
-        let second = person(5, "A", "A3");
-        first["organization"]["managerEmployeeId"] = json!(5);
-        first["organization"]["managerAssignmentId"] = json!("primary-5");
-        let mut looped = second.clone();
-        looped["organization"]["managerEmployeeId"] = json!(4);
-        looped["organization"]["managerAssignmentId"] = json!("primary-4");
-        assert_eq!(
-            validate_graph(vec![first, second.clone()], &looped, &second, today)
-                .unwrap_err()
-                .status,
-            Some(400)
-        );
-    }
-}
+#[path = "personnel_reporting/tests/graph.rs"]
+mod tests;

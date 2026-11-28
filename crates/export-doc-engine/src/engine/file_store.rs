@@ -10,6 +10,8 @@ mod archive;
 mod cache;
 pub(super) mod capacity;
 mod cleanup;
+mod collection;
+use collection::CollectionProgress;
 mod credentials;
 mod flights;
 pub(super) mod incremental;

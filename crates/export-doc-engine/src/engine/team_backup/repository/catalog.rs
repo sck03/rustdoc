@@ -45,18 +45,28 @@ impl Catalog {
                 }
             }
         }
-        let fresh = snapshot.as_ref().is_some_and(|s| {
-            s.identity == identity
-                && s.names == names
-                && s.loaded.elapsed() < Duration::from_secs(60)
-        });
-        if !fresh {
+        let reusable = snapshot
+            .as_ref()
+            .filter(|s| s.identity == identity && s.loaded.elapsed() < Duration::from_secs(60));
+        if reusable.is_none_or(|s| s.names != names) {
+            // Immutable display summaries may survive additions/removals until
+            // the original TTL expires. Never extend trust just by listing.
+            let loaded = reusable.map_or_else(Instant::now, |s| s.loaded);
+            let previous: std::collections::HashMap<_, _> = reusable
+                .into_iter()
+                .flat_map(|s| &s.rows)
+                .filter_map(|row| row.1["id"].as_str().map(|id| (id, row)))
+                .collect();
             let mut rows = Vec::with_capacity(names.len());
             for name in &names {
                 let id = name
                     .strip_prefix("point-")
                     .and_then(|s| s.strip_suffix(".commit"))
                     .ok_or_else(|| invalid("恢复点名称无效。"))?;
+                if let Some(row) = previous.get(id) {
+                    rows.push((*row).clone());
+                    continue;
+                }
                 let point = repo.commit(id)?;
                 let at = DateTime::parse_from_rfc3339(&point.created_at)
                     .map_err(|_| invalid("恢复点创建时间无效。"))?;
@@ -69,7 +79,7 @@ impl Catalog {
             *snapshot = Some(Snapshot {
                 identity,
                 names,
-                loaded: Instant::now(),
+                loaded,
                 rows,
             });
         }

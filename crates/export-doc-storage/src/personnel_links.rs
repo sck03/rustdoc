@@ -1,5 +1,33 @@
 //! Indexed public account links and appointment references shared by both adapters.
 use crate::{Adapter, QuerySql, Result, Value, sql};
+
+pub(crate) fn reporting_reference_count(
+    db: &(impl Adapter + ?Sized),
+    company: &str,
+    employee: i64,
+    active_on: Option<&str>,
+) -> Result<usize> {
+    let pg = db.provider() == "PostgreSQL";
+    let mut values = vec![];
+    let company = sql::bind(&mut values, company, pg);
+    let employee = sql::bind(&mut values, employee, pg);
+    // Ended primary appointments are history, not current assignments. Multiple
+    // reporting lines and appointments still count each reporting person once.
+    let mut filter = format!(
+        "manager.person_id=CAST({employee} AS BIGINT) AND member.company={company} AND (member.is_primary=0 OR member.ends_on='')"
+    );
+    if let Some(date) = active_on {
+        let date = sql::bind(&mut values, date, pg);
+        filter += &format!(
+            " AND person.status IN ('Active','Probation') AND (member.starts_on='' OR member.starts_on<={date}) AND (member.ends_on='' OR member.ends_on>={date})"
+        );
+    }
+    let value = db.query_json(&format!("SELECT CAST(COUNT(DISTINCT member.person_id) AS TEXT) FROM personnel_memberships manager JOIN reporting_relations relation ON relation.manager_appointment_id=manager.id JOIN personnel_memberships member ON member.id=relation.appointment_id JOIN persons person ON person.id=member.person_id WHERE {filter}"), &values)?;
+    value
+        .as_u64()
+        .and_then(|count| usize::try_from(count).ok())
+        .ok_or_else(|| crate::Error::unavailable("汇报关系计数无效。"))
+}
 pub(crate) fn unit_accounts(
     company: &str,
     date: &str,

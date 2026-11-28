@@ -4,6 +4,8 @@ use std::{fs, io::Write};
 mod catalog_tests;
 #[path = "tests/portable.rs"]
 mod portable_tests;
+#[path = "tests/publication.rs"]
+mod publication_tests;
 #[path = "tests/remote.rs"]
 mod remote_tests;
 struct CountReads {

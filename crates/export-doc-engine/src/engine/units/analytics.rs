@@ -33,8 +33,9 @@ pub(in crate::engine) fn summary(
                 .ok_or_else(|| error(403, "需要明确的统计授权身份。"))?;
             store::get(tx, KIND, id)?["includeDescendants"] == true
         };
-        let tree = tree(tx)?;
-        let companies: Vec<_> = store::all(tx, "companies")?
+        let units = store::all(tx, "companies")?;
+        let tree = tree_from(&units)?;
+        let companies: Vec<_> = units
             .iter()
             .filter(|u| u["isActive"] == true && u["unitKind"] != "Group")
             .map(|u| text(u, "code"))

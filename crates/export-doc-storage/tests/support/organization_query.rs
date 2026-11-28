@@ -10,6 +10,7 @@ fn insert(tx: &Connection, kind: &str, mut body: Value) -> i64 {
     id
 }
 pub fn exercise(tx: &Connection) {
+    reporting_counts(tx);
     reference_ownership(tx);
     tx.begin().unwrap();
     super::organization_fixture::unit(tx, "ORG-A", &["ORG-D", "PRIMARY", "SECONDARY"]);
@@ -139,6 +140,84 @@ pub fn exercise(tx: &Connection) {
         tx.personnel_private_profile(person).unwrap().is_none(),
         "private and public writes roll back together"
     );
+}
+
+fn reporting_counts(tx: &Connection) {
+    tx.begin().unwrap();
+    super::organization_fixture::unit(tx, "REPORT-A", &["D"]);
+    super::organization_fixture::unit(tx, "REPORT-B", &["D"]);
+    let person = |number: &str, status: &str, company: &str, organization: Value| {
+        json!({
+            "companyScope":company,"departmentId":"D","status":status,"employeeNumber":number,
+            "employmentType":"FullTime","hireDate":"2026-01-01","jobTitle":"职员",
+            "departedOn":if status=="Departed" {Some("2026-10-01")} else {None},
+            "organization":organization,"profile":{"fullName":number}
+        })
+    };
+    let manager = insert(
+        tx,
+        "people",
+        person(
+            "manager",
+            "Active",
+            "REPORT-A",
+            json!({"primaryAssignmentId":"report-manager"}),
+        ),
+    );
+    let org = |id: &str| {
+        json!({"primaryAssignmentId":id,"managerEmployeeId":manager,"managerAssignmentId":"report-manager",
+        "functionalManagerEmployeeIds":[manager],"functionalManagerAssignmentIds":["report-manager"]})
+    };
+    let mut multiple = org("report-current");
+    multiple["additionalAssignments"] = json!([{"id":"report-extra","companyCode":"REPORT-A","departmentId":"D","jobTitle":"兼任",
+        "startsOn":"2026-01-01","endsOn":"","managerEmployeeId":manager,"managerAssignmentId":"report-manager"}]);
+    insert(
+        tx,
+        "people",
+        person("current", "Active", "REPORT-A", multiple),
+    );
+    insert(
+        tx,
+        "people",
+        person("departed", "Departed", "REPORT-A", org("report-departed")),
+    );
+    let mut future = org("report-future");
+    future["primaryStartsOn"] = json!("2027-01-01");
+    insert(tx, "people", person("future", "Active", "REPORT-A", future));
+    insert(
+        tx,
+        "people",
+        person(
+            "expired",
+            "Active",
+            "REPORT-B",
+            json!({"primaryAssignmentId":"report-b", "additionalAssignments":[{
+                "id":"report-expired","companyCode":"REPORT-A","departmentId":"D","jobTitle":"兼任","startsOn":"2026-01-01","endsOn":"2026-10-01",
+                "managerEmployeeId":manager,"managerAssignmentId":"report-manager"
+            }]}),
+        ),
+    );
+    assert_eq!(
+        tx.reporting_reference_count("REPORT-A", manager, Some("2026-11-28"))
+            .unwrap(),
+        1
+    );
+    assert_eq!(
+        tx.reporting_reference_count("REPORT-A", manager, None)
+            .unwrap(),
+        4
+    );
+    assert_eq!(
+        tx.reporting_reference_count("REPORT-B", manager, None)
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        tx.reporting_reference_count("' OR 1=1 --", manager, None)
+            .unwrap(),
+        0
+    );
+    tx.rollback().unwrap();
 }
 
 fn reference_ownership(tx: &Connection) {

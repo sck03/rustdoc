@@ -351,6 +351,15 @@ pub(crate) trait Adapter: Send {
         Ok(result)
     }
 
+    fn reporting_reference_count(
+        &self,
+        company: &str,
+        employee: i64,
+        active_on: Option<&str>,
+    ) -> Result<usize> {
+        personnel_links::reporting_reference_count(self, company, employee, active_on)
+    }
+
     fn expired_import_previews(&self, before: &str) -> Result<Vec<Value>> {
         let pg = self.provider() == "PostgreSQL";
         self.query_slice(

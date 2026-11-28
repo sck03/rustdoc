@@ -4,7 +4,8 @@ use crate::engine::store;
 #[test]
 fn committed_task_receipts_survive_late_cancellation() {
     use std::sync::atomic::AtomicBool;
-    for success in [true, false] {
+    for outcome in ["Succeeded", "PartiallyCommitted", "Unknown"] {
+        let success = outcome == "Succeeded";
         let fixture = Fixture::new();
         let store = fixture.store();
         let job =
@@ -27,7 +28,8 @@ fn committed_task_receipts_survive_late_cancellation() {
         } else {
             let mut error = unavailable("已迁移 1 个对象，旧副本清理失败。")
                 .coded(crate::api::ErrorCode::PartialCommit);
-            error.partially_committed = true;
+            error.partially_committed = outcome == "PartiallyCommitted";
+            error.outcome_unknown = outcome == "Unknown";
             Err(error)
         };
         persistence::finish_controlled(
@@ -45,7 +47,7 @@ fn committed_task_receipts_survive_late_cancellation() {
             if success { "Succeeded" } else { "Failed" }
         );
         if !success {
-            assert_eq!(saved["failure"]["outcome"], "PartiallyCommitted");
+            assert_eq!(saved["failure"]["outcome"], outcome);
         }
     }
 }

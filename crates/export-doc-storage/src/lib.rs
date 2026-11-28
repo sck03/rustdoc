@@ -105,9 +105,6 @@ use serde_json::Value;
 use std::{cell::Cell, path::Path};
 
 pub type Result<T> = std::result::Result<T, Error>;
-pub fn validate_schema_version(version: i64) -> Result<()> {
-    schema::validate(version)
-}
 pub fn verify_sqlite_backup(path: &Path) -> Result<()> {
     sqlite::Sqlite::verify_file(path)
 }
@@ -487,6 +484,7 @@ delegate! {
     personnel_exists(query:&PersonnelQuery<'_>)->bool;
     personnel_for_accounts(users:&[i64],fields:&[(&str,&str)])->Vec<Value>;
     appointment_references(people:&[i64])->Vec<Value>;
+    reporting_reference_count(company:&str,employee:i64,active_on:Option<&str>)->usize;
     attachment_category_counts(company:&str)->std::collections::BTreeMap<i64,i64>;
     import_preview_usage(owner:i64)->ImportPreviewUsage;
     insert_import_preview_rows(preview:i64,payload:&str)->();

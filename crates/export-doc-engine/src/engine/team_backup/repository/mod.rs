@@ -152,6 +152,9 @@ impl Repository {
         Ok((bytes, plain))
     }
     fn put(&self, name: &str, plain: &[u8]) -> Result<bool> {
+        self.put_observed(name, plain, || {})
+    }
+    fn put_observed(&self, name: &str, plain: &[u8], before_create: impl FnOnce()) -> Result<bool> {
         crate::operation::check()?;
         self.io.check()?;
         // Existing content is authenticated before deduplication. No unverified
@@ -167,12 +170,13 @@ impl Repository {
             return Ok(false);
         }
         let bytes = self.encrypted(name, plain)?;
+        before_create();
         if !self.io.create(name, &bytes)? {
             return Err(invalid("恢复仓库被并发修改，请核对独占写入配置。"));
         }
         let verified = self.read(name)?;
         if verified.as_slice() != plain {
-            return Err(unavailable("恢复对象回读校验失败，未发布恢复点。"));
+            return Err(unavailable("恢复对象回读校验失败。"));
         }
         Ok(true)
     }

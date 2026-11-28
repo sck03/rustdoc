@@ -279,23 +279,25 @@ pub fn handle(
                 return Err(conflict("已确认评价不能删除。"));
             }
             if resource.key == "crm-contacts" {
-                for mut follow_up in store::matching(
+                store::visit_matching(
                     tx,
                     "crm-follow-ups",
                     &[("crmContactId", id.to_string())],
                     &[],
-                )? {
-                    follow_up["crmContactId"] = Value::Null;
-                    store::save(
-                        tx,
-                        "crm-follow-ups",
-                        follow_up["id"].as_i64().unwrap_or(0),
-                        follow_up,
-                        None,
-                        actor,
-                        "contact-deleted",
-                    )?;
-                }
+                    |mut follow_up| {
+                        follow_up["crmContactId"] = Value::Null;
+                        store::save(
+                            tx,
+                            "crm-follow-ups",
+                            follow_up["id"].as_i64().unwrap_or(0),
+                            follow_up,
+                            None,
+                            actor,
+                            "contact-deleted",
+                        )?;
+                        Ok(())
+                    },
+                )?;
             }
             if !tx.delete(
                 resource.key,

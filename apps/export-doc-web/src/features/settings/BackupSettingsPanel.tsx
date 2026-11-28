@@ -24,9 +24,9 @@ export default function BackupSettingsPanel({ client, databaseProvider, disabled
   client: ExportDocManagerApiClient; databaseProvider: string | null; disabled: boolean; canManageSettings: boolean;
   search: string; onPathError: (message: string) => void; onSettingsSaved?: (status: ApiBackupPlanStatus, previousRevision: number) => void; onDirtyChange?: (dirty: boolean) => void;
 }) {
-  const c = useBackupPlan(client, canManageSettings, onSettingsSaved);
-  const { update } = useRouteQuery();
   const section = operationSection(search, "backup") as BackupSection;
+  const c = useBackupPlan(client, canManageSettings, onSettingsSaved, section === "points" || section === "recovery");
+  const { update } = useRouteQuery();
   const postgres = databaseProvider === "postgresql";
   const selectedId = new URLSearchParams(search).get("archive") ?? "";
   const setSection = (section: BackupSection, archive: string | null = null) => update({ section, archive }, false);

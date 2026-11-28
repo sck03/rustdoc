@@ -239,15 +239,19 @@ impl FileStore {
         let mut objects = self.orphan_intents(store, &config)?;
         objects.extend(store.connection()?.file_objects("", 1000, true)?);
         let mut removed = BTreeSet::new();
-        let mut reclaimed = 0;
-        for object in objects {
-            if !removed.contains(&object.digest) && self.collect(store, &config, &object)? {
-                reclaimed += object.size;
-                removed.insert(object.digest);
+        let mut progress = super::CollectionProgress::default();
+        let result = (|| {
+            for object in objects {
+                if !removed.contains(&object.digest)
+                    && self.collect(store, &config, &object, &mut progress)?
+                {
+                    removed.insert(object.digest);
+                }
             }
-        }
-        self.finish_collection(&config, &removed)?;
-        Ok(reclaimed)
+            self.finish_collection(&config, &removed)?;
+            Ok(progress.bytes)
+        })();
+        result.map_err(|cause| progress.failure(cause))
     }
     fn claim_collection(
         &self,
@@ -279,11 +283,15 @@ impl FileStore {
         store: &super::super::store::Store,
         config: &Configuration,
         object: &FileObject,
+        progress: &mut super::CollectionProgress,
     ) -> Result<bool> {
+        progress.stage = "无引用对象删除";
         let Some(_lease) = self.claim_collection(store, config, object)? else {
             return Ok(false);
         };
         self.remove_object(&self.object_configuration(object)?, object)?;
+        progress.removed(object.size);
+        progress.stage = "对象元数据清理";
         store.transaction(|tx| {
             tx.remove_unused_file(&object.digest)?;
             Ok(())
@@ -302,7 +310,13 @@ impl FileStore {
             }
             Backend::S3 { .. } => {
                 self.health()?;
-                self.target(config)?.delete(&object.digest)
+                self.target(config)?
+                    .delete(&object.digest)
+                    .map_err(|mut cause| {
+                        // A lost delete response does not prove the object still exists.
+                        cause.outcome_unknown = true;
+                        cause
+                    })
             }
         }
     }

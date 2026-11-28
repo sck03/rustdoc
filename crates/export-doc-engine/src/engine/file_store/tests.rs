@@ -3,6 +3,7 @@ use crate::engine::{store::Store, test_support::ScratchDirectory};
 use export_doc_storage::RecordWrite;
 use serde_json::json;
 mod capacity;
+mod collection;
 mod retention;
 #[cfg(feature = "s3-storage")]
 mod s3;

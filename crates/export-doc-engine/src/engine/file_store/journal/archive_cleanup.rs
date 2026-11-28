@@ -8,7 +8,9 @@ impl FileStore {
         &self,
         store: &Store,
         path: &Path,
-    ) -> Result<u64> {
+        progress: &mut super::super::CollectionProgress,
+    ) -> Result<()> {
+        progress.stage = "归档旧副本核验与删除";
         paths::ensure_safe_absolute(path).map_err(unavailable)?;
         let intent: Intent = serde_json::from_reader(fs::File::open(path)?.take(4096))?;
         if !intent.archive_source {
@@ -56,30 +58,29 @@ impl FileStore {
             ));
         }
         let target = self.object_configuration(&current)?;
-        let bytes = if target.identity != source.identity {
+        if target.identity != source.identity {
             // Reverify the authoritative copy before removing the old source.
             self.verify_object(&current)?;
             self.remove_object(&source, &intent.object)?;
-            intent.object.size
-        } else {
-            0
+            progress.removed(intent.object.size);
         }; // SQL did not switch: the source stays authoritative.
+        progress.stage = "归档旧副本记录清理";
         fs::remove_file(path)?;
-        Ok(bytes)
+        Ok(())
     }
 
     pub(in crate::engine::file_store) fn reconcile_archive_sources(
         &self,
         store: &Store,
         tokens: &[String],
-    ) -> Result<u64> {
+        progress: &mut super::super::CollectionProgress,
+    ) -> Result<()> {
         if tokens.len() > 1000 {
             return Err(invalid("归档副本清理清单超过预算。"));
         }
         let _access = self
             .archive_access
             .write(std::time::Duration::from_secs(30))?;
-        let mut bytes = 0;
         for token in tokens {
             crate::operation::check()?;
             if token.len() != 32 || !token.bytes().all(|byte| byte.is_ascii_hexdigit()) {
@@ -88,10 +89,10 @@ impl FileStore {
             let path = self.journal_root().join(format!("{token}.json"));
             paths::ensure_safe_absolute(&path).map_err(unavailable)?;
             if path.try_exists()? {
-                bytes += self.finish_archive_cleanup(store, &path)?;
+                self.finish_archive_cleanup(store, &path, progress)?;
             }
         }
-        Ok(bytes)
+        Ok(())
     }
 
     pub(in crate::engine::file_store) fn archive_cleanup_candidates(

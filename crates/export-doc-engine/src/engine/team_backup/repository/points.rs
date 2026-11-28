@@ -137,13 +137,43 @@ impl<'a> PointWriter<'a> {
         })?;
         self.page()?;
         self.commit.manifest_digest = super::super::hex(&self.hash.finalize());
-        self.repository.io.check()?;
-        self.repository.put(
-            &format!("point-{}.commit", self.commit.id),
-            &serde_json::to_vec(&self.commit)?,
-        )?;
-        // Re-read the authenticated commit: a successful write alone is not a recovery point.
-        self.repository.commit(&self.commit.id)
+        let name = format!("point-{}.commit", self.commit.id);
+        let bytes = serde_json::to_vec(&self.commit)?;
+        self.repository.decode_commit(&self.commit.id, &bytes)?;
+        let mut attempted = false;
+        if let Err(mut cause) = self
+            .repository
+            .put_observed(&name, &bytes, || attempted = true)
+        {
+            if !attempted {
+                return Err(cause);
+            }
+            // Creation can publish before an I/O error or cancellation is observed.
+            // Reconcile once under a bounded scope while retaining repository ownership.
+            let verified = crate::operation::OperationScope::detached(
+                std::time::Duration::from_secs(15),
+            )
+            .run(|| {
+                self.repository
+                    .read(&name)
+                    .map(|actual| actual.as_slice() == bytes)
+            });
+            if !matches!(verified, Ok(true)) {
+                let reason = cause.public_body(&self.commit.id)["message"]
+                    .as_str()
+                    .unwrap_or("请查询任务回执。")
+                    .to_owned();
+                cause.outcome_unknown = true;
+                cause.code = Some(crate::api::ErrorCode::BackupIncomplete);
+                cause.message = format!(
+                    "恢复点 {} 已尝试提交，回读核验未完成：{reason} 请接回原仓库并刷新恢复点列表核对，勿直接重复创建。",
+                    self.commit.id
+                );
+                return Err(cause);
+            }
+        }
+        // put_observed authenticates the exact commit bytes, including deduplicated writes.
+        Ok(self.commit)
     }
 }
 pub(in crate::engine::team_backup) struct ChunkWriter<'b, 'a> {

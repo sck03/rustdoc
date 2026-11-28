@@ -3,6 +3,7 @@ use super::*;
 use crate::engine::{NativeService, auth, store::Actor};
 use serde_json::{Value, json};
 const PLAN: &str = "file-collection-plan";
+
 pub(in crate::engine) fn preview(service: &NativeService, actor: &Actor) -> Result<Value> {
     let _maintenance = super::admin::maintenance_lock(&service.store.files)?;
     let _backup = crate::engine::team_backup::package::lock(&service.paths)?;
@@ -123,45 +124,53 @@ pub(super) fn execute(
         }
     }
     let archive_tokens: Vec<String> = serde_json::from_value(plan["archiveCleanup"].clone())?;
-    let mut bytes = store
-        .files
-        .reconcile_archive_sources(store, &archive_tokens)?;
-    let mut removed = std::collections::BTreeSet::new();
-    for object in objects {
-        crate::operation::check()?;
-        if store.files.collect(store, &config, &object)? {
-            bytes += object.size;
-            removed.insert(object.digest.clone());
-        }
-    }
-    store.files.finish_collection(&config, &removed)?;
-    for digest in &removed {
-        let mark = store
+    let mut progress = CollectionProgress::default();
+    let result = (|| {
+        store
             .files
-            .configuration_path
-            .parent()
-            .unwrap()
-            .join("FileCollection")
-            .join(format!("{}-{digest}.json", config.identity));
-        paths::ensure_safe_absolute(&mark).map_err(unavailable)?;
-        if mark.try_exists()? {
-            fs::remove_file(mark)?;
+            .reconcile_archive_sources(store, &archive_tokens, &mut progress)?;
+        let mut removed = std::collections::BTreeSet::new();
+        for object in objects {
+            crate::operation::check()?;
+            if store
+                .files
+                .collect(store, &config, &object, &mut progress)?
+            {
+                removed.insert(object.digest.clone());
+            }
         }
-    }
-    store.transaction(|tx| {
-        tx.append_audit_details(
-            &export_doc_storage::AuditWrite {
-                kind: "file-collection",
-                record_id: 0,
-                version: config.revision as i64,
-                action: "collect",
-                actor_id: actor.id,
-                occurred_at: &crate::engine::store::timestamp(),
-                note: "",
-            },
-            &json!({"token":token,"bytes":bytes}),
-        )?;
-        Ok(())
-    })?;
-    Ok(bytes)
+        progress.stage = "回收记录清理";
+        store.files.finish_collection(&config, &removed)?;
+        for digest in &removed {
+            let mark = store
+                .files
+                .configuration_path
+                .parent()
+                .unwrap()
+                .join("FileCollection")
+                .join(format!("{}-{digest}.json", config.identity));
+            paths::ensure_safe_absolute(&mark).map_err(unavailable)?;
+            if mark.try_exists()? {
+                fs::remove_file(mark)?;
+            }
+        }
+        progress.stage = "回收审计写入";
+        store.transaction(|tx| {
+            tx.append_audit_details(
+                &export_doc_storage::AuditWrite {
+                    kind: "file-collection",
+                    record_id: 0,
+                    version: config.revision as i64,
+                    action: "collect",
+                    actor_id: actor.id,
+                    occurred_at: &crate::engine::store::timestamp(),
+                    note: "",
+                },
+                &json!({"token":token,"bytes":progress.bytes,"objects":progress.objects}),
+            )?;
+            Ok(())
+        })?;
+        Ok(progress.bytes)
+    })();
+    result.map_err(|cause| progress.failure(cause))
 }

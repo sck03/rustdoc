@@ -89,11 +89,15 @@ fn catalog_orders_instants_and_reuses_bounded_summaries_until_roots_change() {
     assert_eq!(page["totalCount"], 1);
     assert_eq!(page["page"], 1);
     assert_eq!(page["items"][0]["id"], older);
-    assert_eq!(reads.load(Ordering::Relaxed), 3);
+    assert_eq!(
+        reads.load(Ordering::Relaxed),
+        2,
+        "removing a point must reuse remaining immutable summaries"
+    );
     catalog.page(&repo, 2, 1, 1).unwrap();
     assert_eq!(
         reads.load(Ordering::Relaxed),
-        4,
+        3,
         "configuration changes refresh the catalog"
     );
 }

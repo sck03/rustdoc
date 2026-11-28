@@ -9,17 +9,19 @@ import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperat
 import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { backupPlanDraft, validateBackupPlan } from "./backupPlanModel.ts";
-import { isTerminalJob } from "../jobs/jobPresentation.ts";
+import { useTrackedJob } from "../jobs/useTrackedJob.ts";
+
+const affectedJobQueries = [queryKeys.backupPlan(), queryKeys.recoveryArchives(), queryKeys.serverMigrationStatus(), queryKeys.disasterRecoveryStatus()];
 
 export function useBackupPlan(client: ExportDocManagerApiClient, canManage: boolean,
-  onSettingsSaved?: (status: ApiBackupPlanStatus, previousRevision: number) => void) {
+  onSettingsSaved?: (status: ApiBackupPlanStatus, previousRevision: number) => void, loadArchives = true) {
   const queryClient = useQueryClient();
   const run = useAbortableOperation(client);
   const [archivePage, setArchivePage] = useState(1);
   const archiveQuery = useQuery({
     queryKey: [...queryKeys.recoveryArchives(), archivePage],
     queryFn: ({ signal }) => client.listRecoveryArchives({ page: archivePage, pageSize: 20 }, { signal }),
-    enabled: canManage,
+    enabled: canManage && loadArchives,
   });
   useEffect(() => { if (archiveQuery.data && archiveQuery.data.page !== archivePage) setArchivePage(archiveQuery.data.page); }, [archiveQuery.data, archivePage]);
   const [draft, setDraft] = useState<ApiBackupPlanSaveRequest | null>(null);
@@ -27,8 +29,6 @@ export function useBackupPlan(client: ExportDocManagerApiClient, canManage: bool
   const [confirmation, setConfirmation] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [lastJobId, setLastJobId] = useState<string | null>(null);
-  const [dismissedJobId, setDismissedJobId] = useState<string | null>(null);
   const dirty = Boolean(draft && baseline && (confirmation || JSON.stringify(draft) !== JSON.stringify(backupPlanDraft(baseline))));
   const { confirmDiscardChanges } = useUnsavedChangesGuard({ isDirty: dirty, message: "灾备计划或异机存储有未保存的修改。" });
   const query = useQuery({
@@ -42,24 +42,8 @@ export function useBackupPlan(client: ExportDocManagerApiClient, canManage: bool
     setDraft(backupPlanDraft(status)); setBaseline(status); setConfirmation("");
   };
   useEffect(() => { if (query.data && !dirty) apply(query.data); }, [query.data, dirty]);
-  const trackedJobId = query.data?.runningJobId ?? lastJobId ?? null;
-  const jobId = trackedJobId === dismissedJobId ? null : trackedJobId;
-  const job = useQuery({
-    queryKey: ["backup-plan-job", jobId],
-    queryFn: ({ signal }) => client.getJob({ jobId: jobId! }, { signal }),
-    enabled: Boolean(jobId) && canManage,
-    refetchInterval: (query) => isTerminalJob(query.state.data?.status) ? false : queryPollingInterval(query, 2_000),
-    refetchIntervalInBackground: false,
-  });
-  const activeJob = Boolean(jobId && !isTerminalJob(job.data?.status) && !job.isError);
-  useEffect(() => {
-    if (job.data && isTerminalJob(job.data.status)) {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.backupPlan() });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.recoveryArchives() });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.serverMigrationStatus() });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.disasterRecoveryStatus() });
-    }
-  }, [job.data?.status, job.data?.jobId, queryClient]);
+  const { jobId, job, active: activeJob, track: trackJob, retry: retryJob, dismiss: dismissJob } =
+    useTrackedJob(client, canManage, affectedJobQueries, query.data?.runningJobId ?? "");
   const fail = (error: unknown) => { if (!isAbortError(error)) { setMessage(readApiError(error)); setSuccess(null); } };
   const save = useScopedMutation("backup-plan-save", client, {
     mutationFn: (body: ApiBackupPlanSaveRequest, signal) => client.saveBackupPlan({ body }, { signal }),
@@ -74,7 +58,7 @@ export function useBackupPlan(client: ExportDocManagerApiClient, canManage: bool
   const start = useScopedMutation("backup-plan-start", client, {
     mutationFn: (kind: "backup" | "test", signal) => kind === "backup" ? client.runBackupPlan({ signal }) : client.testBackupReplica({ signal }),
     onSuccess: (job) => {
-      setLastJobId(job.jobId); setMessage(null); setSuccess("任务已启动，关闭本页后仍会在后台继续。");
+      trackJob(job.jobId); setMessage(null); setSuccess("任务已启动，关闭本页后仍会在后台继续。");
     },
     refreshKeys: () => [queryKeys.backupPlan()],
     onError: fail,
@@ -82,7 +66,7 @@ export function useBackupPlan(client: ExportDocManagerApiClient, canManage: bool
   const cancel = useScopedMutation(`backup-plan-cancel:${jobId}`, client, {
     mutationFn: (_: void, signal) => client.cancelJob({ jobId: jobId! }, { signal }),
     onSuccess: () => { setSuccess("已请求取消，已完成的本地备份会保留。"); },
-    refreshKeys: () => [["backup-plan-job", jobId]],
+    refreshKeys: () => [queryKeys.job(jobId)],
     onError: fail,
   });
   const download = useScopedMutation("backup-plan-download", client, {
@@ -97,7 +81,7 @@ export function useBackupPlan(client: ExportDocManagerApiClient, canManage: bool
     },
     onSuccess: (job) => {
       if (!job) return;
-      setLastJobId(job.jobId); setMessage(null); setSuccess("便携导出任务已启动，完成后可在任务结果中下载。");
+      trackJob(job.jobId); setMessage(null); setSuccess("便携导出任务已启动，完成后可在任务结果中下载。");
     },
     refreshKeys: () => [queryKeys.jobsRoot()],
     onError: fail,
@@ -108,8 +92,7 @@ export function useBackupPlan(client: ExportDocManagerApiClient, canManage: bool
     query, status: query.data, draft, dirty, confirmation, setConfirmation, message, success, busy, activeJob, job: job.data, jobId,
     jobError: job.isError ? readApiError(job.error) : null,
     jobFetching: job.isFetching,
-    retryJob: () => { void job.refetch(); },
-    dismissJob: () => { setDismissedJobId(jobId); setLastJobId(null); },
+    retryJob, dismissJob,
     updatePlan: <K extends keyof ApiBackupPlan>(key: K, value: ApiBackupPlan[K]) => setDraft((current) => current && ({ ...current, plan: { ...current.plan, [key]: value } })),
     updateS3: <K extends keyof ApiBackupS3Settings>(key: K, value: ApiBackupS3Settings[K]) => setDraft((current) => current && ({ ...current, plan: { ...current.plan, s3: { ...current.plan.s3, [key]: value } } })),
     updateWebDav: (key: "url" | "userName", value: string) => setDraft((current) => current && ({ ...current, webDav: { ...current.webDav, [key]: value, enabled: true } })),
@@ -126,7 +109,7 @@ export function useBackupPlan(client: ExportDocManagerApiClient, canManage: bool
       try { await run(async signal => {
         if (!await confirmDiscardChanges("重新加载灾备设置")) return;
         signal.throwIfAborted();
-        const [result] = await Promise.all([query.refetch(), archiveQuery.refetch()]);
+        const [result] = await Promise.all([query.refetch(), ...(loadArchives ? [archiveQuery.refetch()] : [])]);
         signal.throwIfAborted();
         if (result.data && !result.isError) { apply(result.data); setMessage(null); setSuccess(null); }
       }); } catch (error) { fail(error); }
@@ -134,7 +117,7 @@ export function useBackupPlan(client: ExportDocManagerApiClient, canManage: bool
     start: (kind: "backup" | "test") => { if (!dirty && !busy && !activeJob) start.mutate(kind); },
     cancel: () => cancel.mutate(),
     download: (id: string, name: string) => download.mutate({ id, name }),
-    trackJob: (id: string) => setLastJobId(id),
+    trackJob,
   };
 }
 export type BackupPlanController = ReturnType<typeof useBackupPlan>;

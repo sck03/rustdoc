@@ -420,43 +420,10 @@ pub fn references(
     employee: i64,
     active_only: bool,
 ) -> Result<usize> {
-    let mut count = 0;
-    let today = super::units::today(tx)?;
-    for person in store::matching(
-        tx,
-        "people",
-        &[],
-        &[
-            ("id", "id"),
-            ("status", "status"),
-            ("companyScope", "companyScope"),
-            ("departmentId", "departmentId"),
-            ("jobTitle", "jobTitle"),
-            ("hireDate", "hireDate"),
-            ("organization", "organization"),
-        ],
-    )? {
-        if active_only && !matches!(person["status"].as_str(), Some("Active" | "Probation")) {
-            continue;
-        }
-        for assignment in assignments(&person)?
-            .into_iter()
-            .filter(|a| a.company_code == company)
-        {
-            if active_only && !assignment.active_on(today).map_err(unavailable)? {
-                continue;
-            }
-            if assignment.manager_employee_id == Some(employee)
-                || assignment
-                    .functional_manager_employee_ids
-                    .contains(&employee)
-            {
-                count += 1;
-                break;
-            }
-        }
-    }
-    Ok(count)
+    let date = active_only
+        .then(|| super::units::today(tx).map(|day| day.to_string()))
+        .transpose()?;
+    Ok(tx.reporting_reference_count(company, employee, date.as_deref())?)
 }
 pub fn appointment_managers(
     tx: &Connection,

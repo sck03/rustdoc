@@ -377,6 +377,20 @@ pub fn matching(
     fields: &[(&str, &str)],
 ) -> Result<Vec<Value>> {
     let mut result = vec![];
+    visit_matching(connection, kind, filters, fields, |row| {
+        result.push(row);
+        Ok(())
+    })?;
+    Ok(result)
+}
+/// Consume one bounded page at a time, within the caller's transaction snapshot.
+pub fn visit_matching(
+    connection: &Connection,
+    kind: &str,
+    filters: &[(&str, String)],
+    fields: &[(&str, &str)],
+    mut visit: impl FnMut(Value) -> Result<()>,
+) -> Result<()> {
     let mut before_id = None;
     loop {
         crate::operation::check()?;
@@ -395,13 +409,20 @@ pub fn matching(
             before_id,
         )?;
         let complete = rows.len() < 200;
-        result.extend(rows);
+        for row in rows {
+            crate::operation::check()?;
+            visit(row)?;
+        }
         if complete {
-            return Ok(result);
+            return Ok(());
         }
         before_id = cursor;
     }
 }
+
+#[cfg(test)]
+#[path = "store/tests/visiting.rs"]
+mod visiting_tests;
 pub fn normalize(text: &str) -> String {
     text.nfc().collect::<String>().trim().to_lowercase()
 }

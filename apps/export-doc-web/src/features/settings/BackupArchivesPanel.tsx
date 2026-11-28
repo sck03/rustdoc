@@ -1,3 +1,4 @@
+import { BackupArchivePagination } from "./BackupArchivePagination.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { Download, RotateCcw } from "lucide-react";
@@ -18,11 +19,6 @@ export function BackupArchivesPanel({ controller: c, disabled, onRestore }: { co
         <td><div className="toolbar-actions"><button className="command-button secondary" type="button" disabled={disabled || !archive.available} onClick={() => c.download(archive.id, archive.fileName)}><Download size={16} aria-hidden="true" /><span>下载</span></button><button className="command-button secondary" type="button" disabled={disabled || !archive.available} onClick={() => onRestore(archive.id)}><RotateCcw size={16} aria-hidden="true" /><span>用于恢复</span></button></div></td>
       </tr>) : <tr><td colSpan={4} className="empty-cell">{c.archiveQuery.isPending ? "正在加载备份…" : c.archiveQuery.isError ? "备份列表加载失败。" : "尚无计划备份。"}</td></tr>}</tbody>
     </table></ResponsiveTableFrame>
-    <nav className="toolbar-actions" aria-label="备份分页">
-      <button className="command-button secondary" type="button" disabled={disabled || c.archiveQuery.isFetching || c.archivePage <= 1} onClick={() => c.setArchivePage(c.archivePage - 1)}>上一页</button>
-      <span>第 {c.archivePage} 页 · 共 {c.archiveQuery.data?.totalCount ?? 0} 份</span>
-      <button className="command-button secondary" type="button" disabled={disabled || c.archiveQuery.isFetching || !c.archiveQuery.data || c.archivePage * 20 >= c.archiveQuery.data.totalCount} onClick={() => c.setArchivePage(c.archivePage + 1)}>下一页</button>
-      <button className="command-button secondary" type="button" disabled={c.archiveQuery.isFetching} onClick={() => void c.archiveQuery.refetch()}>刷新</button>
-    </nav>
+    <BackupArchivePagination controller={c} disabled={disabled} />
   </section>;
 }

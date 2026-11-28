@@ -497,22 +497,6 @@ impl Jobs {
             json!({"success":true,"message":format!("已清理 {count} 个已结束任务。"),"affectedCount":count}),
         )
     }
-    pub fn ensure_idle(&self) -> Result<()> {
-        self.health()?;
-        if !self
-            .runtime
-            .lock()
-            .map_err(|_| unavailable("文件任务状态异常。"))?
-            .active
-            .is_empty()
-        {
-            return Err(error(
-                409,
-                "请先等待或取消正在执行的文件任务，再恢复数据库。",
-            ));
-        }
-        Ok(())
-    }
     pub fn recover(&self) -> Result<()> {
         let _admissions = self
             .admissions

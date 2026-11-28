@@ -7,11 +7,13 @@ import { isTerminalJob } from "./jobPresentation.ts";
 
 /** Losing a receipt never retries the write. The user can retry the read or
  * leave tracking and inspect the receipt in the job center. */
-export function useTrackedJob(client: ExportDocManagerApiClient, enabled: boolean, affected: readonly QueryKey[]) {
+export function useTrackedJob(client: ExportDocManagerApiClient, enabled: boolean, affected: readonly QueryKey[], observedJobId = "") {
   const cache = useQueryClient();
   const [tracked, setTracked] = useState<{ client: ExportDocManagerApiClient; id: string } | null>(null);
-  const jobId = enabled && tracked?.client === client ? tracked.id : "";
-  useEffect(() => { setTracked(null); }, [client, enabled]);
+  const [dismissed, setDismissed] = useState("");
+  const candidate = observedJobId || (tracked?.client === client ? tracked.id : "");
+  const jobId = enabled && candidate !== dismissed ? candidate : "";
+  useEffect(() => { setTracked(null); setDismissed(""); }, [client, enabled]);
   const job = useQuery({
     queryKey: queryKeys.job(jobId), enabled: Boolean(jobId),
     queryFn: ({ signal }) => client.getJob({ jobId }, { signal }),
@@ -26,8 +28,8 @@ export function useTrackedJob(client: ExportDocManagerApiClient, enabled: boolea
   return {
     jobId, job, active: Boolean(jobId && !isTerminalJob(job.data?.status)),
     uncertain: Boolean(jobId && job.isError),
-    track: (id: string) => setTracked({ client, id }),
+    track: (id: string) => { setDismissed(""); setTracked({ client, id }); },
     retry: () => { void job.refetch(); },
-    dismiss: () => { setTracked(null); },
+    dismiss: () => { setDismissed(candidate); setTracked(null); },
   };
 }

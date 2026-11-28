@@ -1,6 +1,14 @@
 use super::*;
 use crate::engine::team_backup::tests::{TestService, Workspace};
 #[test]
+fn unknown_commit_keeps_the_attempted_point_id() {
+    let mut cause = unavailable("提交回执丢失。");
+    cause.outcome_unknown = true;
+    let patch = failure_state("point", &cause);
+    assert_eq!(patch["lastResult"], "Unknown");
+    assert_eq!(patch["lastPointId"], "point");
+}
+#[test]
 fn cleanup_failure_keeps_the_committed_point_and_partial_status() {
     let work = Workspace::new();
     let service = TestService::open(work.paths());

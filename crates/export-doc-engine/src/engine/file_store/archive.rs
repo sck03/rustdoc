@@ -219,7 +219,11 @@ pub(super) fn run(store: &Store, actor: &Actor, body: &Value) -> Result<(u64, u6
             bytes += object.size;
             // The journal predates the SQL switch and survives failed/unknown commits.
             if let Some(cleanup) = cleanup {
-                store.files.finish_archive_cleanup(store, &cleanup.path)?;
+                store.files.finish_archive_cleanup(
+                    store,
+                    &cleanup.path,
+                    &mut super::CollectionProgress::default(),
+                )?;
             }
         }
         Ok(())

@@ -71,19 +71,22 @@ pub(super) fn start(
                 complete(&store, &id, &commit, cleanup, retention.map(|_| ()))
             })();
             if let Err(cause) = &result {
-                // A durable COMMIT must never be overwritten with an ordinary failure.
-                let mut patch = json!({
-                    "lastResult": if cause.partially_committed { "Partial" } else { "Failed" },
-                    "lastError": cause.public_body(&id)["message"],
-                });
-                if cause.partially_committed {
-                    patch["lastPointId"] = json!(id);
-                }
-                let _ = finish_state(&store, &id, patch);
+                let _ = finish_state(&store, &id, failure_state(&id, cause));
             }
             result
         },
     )
+}
+
+fn failure_state(id: &str, cause: &crate::api::ApiError) -> Value {
+    let mut patch = json!({
+        "lastResult": if cause.partially_committed { "Partial" } else if cause.outcome_unknown { "Unknown" } else { "Failed" },
+        "lastError": cause.public_body(id)["message"],
+    });
+    if cause.partially_committed || cause.outcome_unknown {
+        patch["lastPointId"] = json!(id);
+    }
+    patch
 }
 
 fn complete(
