@@ -39,7 +39,13 @@ for (const provider of ['seaweedfs', 'rustfs']) {
       const { stdout } = await execute('curl', args, { timeout: 130000 }).catch(() => { throw Error(provider + ' signed S3 request failed'); });
       return { status: Number(stdout), body: fs.readFileSync(prefix + '.body'), headers: fs.readFileSync(prefix + '.headers', 'utf8') };
     };
-    assert.equal((await request('PUT')).status, 200);
+    let created;
+    do {
+      created = await request('PUT');
+      if (created.status !== 503) break;
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } while (Date.now() < deadline);
+    assert.equal(created.status, 200, created.body.toString());
     const race = await Promise.all(Array.from({ length: 12 }, (_, i) => request('PUT', '/conditional', Buffer.from(String(i)), ['--header', 'If-None-Match: *'])));
     assert.equal(race.filter(r => r.status === 200).length, 1); assert.equal(race.filter(r => r.status === 412).length, 11);
     const begin = await request('POST', '/large?uploads'); assert.equal(begin.status, 200);
