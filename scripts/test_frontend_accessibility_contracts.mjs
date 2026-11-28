@@ -252,7 +252,7 @@ inspectTypeScriptSources(files, (file, source) => {
   }
 
   if (sourceRelativePath === "ui/ResponsiveTable.tsx") {
-    for (const responsiveTableContract of ["isScrollableRegion", 'role={isScrollableRegion ? "region" : undefined}', "tabIndex={isScrollableRegion ? 0 : undefined}"]) {
+    for (const responsiveTableContract of ['role="region"', "tabIndex={0}", "aria-label={label}"]) {
       if (!sourceText.includes(responsiveTableContract)) {
         failures.push(`${sourceRelativePath}: 响应式表格缺少滚动区域可访问性契约：${responsiveTableContract}`);
       }

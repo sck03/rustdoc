@@ -455,7 +455,7 @@ mod tests {
         let path = PathBuf::from("/Applications/ExportDocManager/App_Data/Database/data.db");
         let spec = build_open_command(&path, true).unwrap();
 
-        assert_eq!(spec.program, "open");
+        assert_eq!(spec.program, PathBuf::from("open"));
         assert_eq!(spec.args, vec![OsString::from("-R"), path.into_os_string()]);
     }
 
@@ -463,9 +463,9 @@ mod tests {
     #[test]
     fn linux_open_command_reveals_files_by_opening_parent_directory() {
         let path = PathBuf::from("/opt/exportdoc/App_Data/Database/data.db");
-        let spec = build_open_command(&path, true);
+        let spec = build_open_command(&path, true).unwrap();
 
-        assert_eq!(spec.program, "xdg-open");
+        assert_eq!(spec.program, PathBuf::from("xdg-open"));
         assert_eq!(
             spec.args,
             vec![OsString::from("/opt/exportdoc/App_Data/Database")]

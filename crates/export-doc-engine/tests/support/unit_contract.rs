@@ -567,9 +567,29 @@ pub fn exercise(service: &NativeService, root: &str) {
         approved["approvalPlan"]["steps"][0]["actedByUserId"],
         users[2]["id"]
     );
-    // Complete and retire the explicit handling assignment before revoking its operator.
+    // Historical requests retain their service; hand over its operator before revocation.
     let completed = call(service, token(&worker_sub), EXECUTE_GENERAL_REQUEST_FULFILLMENT, id, Some(json!({"expectedVersion":approved["versionNumber"],"nodeKey":super::oa_contract::fulfillment_node(&approved),"note":"办理完成"}))).unwrap();
     assert_eq!(completed["status"], "Completed");
+    let sub_admin = call(
+        service,
+        admin,
+        SWITCH_UNIT_CONTEXT,
+        0,
+        Some(json!({"contextId":format!("company:{sub}")})),
+    )
+    .unwrap();
+    let successor = call(service,token(&sub_admin),CREATE_USER_ACCOUNT,0,Some(json!({"username":format!("handover-{suffix}"),"fullName":"子公司接任办理员","role":"OfficeEmployee","companyScope":sub,"departmentId":sub_department,"isActive":true,"resetPassword":"Unit-Contract-2026","permissionGrants":[grant("office.general","view"),grant("office.general","complete")]}))).unwrap()["user"].clone();
+    let person = call(service,token(&sub_admin),CREATE_PERSONNEL,0,Some(json!({"requestKey":nonce().unwrap(),"employeeNumber":format!("H-{suffix}"),"departmentId":sub_department,"jobTitle":"接任办理","employmentType":"FullTime","hireDate":"2026-01-01","profile":{"fullName":successor["fullName"]}}))).unwrap();
+    call(service,token(&sub_admin),LINK_PERSONNEL_ACCOUNT,person["employee"]["id"].as_i64().unwrap(),Some(json!({"expectedVersion":person["versionNumber"],"userId":successor["id"],"expectedAccountVersion":successor["versionNumber"]}))).unwrap();
+    let hq_admin = call(
+        service,
+        token(&sub_admin),
+        SWITCH_UNIT_CONTEXT,
+        0,
+        Some(json!({"contextId":format!("company:{hq}")})),
+    )
+    .unwrap();
+    let admin = token(&hq_admin);
     let manager_sub = switched(&replacement, &manager_role);
     let services = call(
         service,
@@ -579,16 +599,19 @@ pub fn exercise(service: &NativeService, root: &str) {
         None,
     )
     .unwrap();
-    let handling = services["items"]
+    let mut handling = services["items"]
         .as_array()
         .unwrap()
         .iter()
         .find(|row| row["key"] == "fixture-Other")
-        .unwrap();
+        .unwrap()
+        .clone();
+    handling["handlerUserIds"] = json!([successor["id"]]);
+    handling["isActive"] = json!(false);
     call(
         service,
         token(&manager_sub),
-        REMOVE_HANDLING_SERVICE,
+        SAVE_HANDLING_SERVICE,
         0,
         Some(json!({"service":handling,"commandKey":nonce().unwrap()})),
     )

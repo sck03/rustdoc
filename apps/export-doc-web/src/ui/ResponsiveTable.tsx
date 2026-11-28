@@ -13,15 +13,14 @@ export function ResponsiveTableFrame({
   className?: string;
   busy?: boolean;
 }) {
-  const isScrollableRegion = mobileLayout === "scroll";
-
+  // Card rows still live inside an overflow container and need keyboard access.
   return <div
     className={`table-frame responsive-table-frame ${className}`.trim()}
     data-mobile-layout={mobileLayout}
-    role={isScrollableRegion ? "region" : undefined}
+    role="region"
     aria-label={label}
     aria-busy={busy}
-    tabIndex={isScrollableRegion ? 0 : undefined}
+    tabIndex={0}
   >
     {children}
   </div>;
