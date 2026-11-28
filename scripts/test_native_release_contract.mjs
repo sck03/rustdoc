@@ -78,17 +78,28 @@ async function testPackageWorkflow() {
   await write("workflow.ps1", "$ErrorActionPreference = 'Stop'\n" + block.replace(/^          /gmu, ""));
   const stub = "param($Edition='Document')\n$desktop = \"artifacts/native-desktop/ExportDocManager.Tauri.$Edition\"\nNew-Item -ItemType Directory -Force -Path $desktop, 'artifacts/native-web-server', 'target/test/release/bundle' | Out-Null\n";
   for (const script of ["build-native", "package-native-web-server"]) await write(`scripts/${script}.ps1`, stub);
+  await write("scripts/test_native_ocr.mjs", "import assert from 'node:assert/strict'; import {statSync,writeFileSync} from 'node:fs'; import path from 'node:path'; const target=path.resolve(process.argv[2]); assert.equal(target,path.resolve('artifacts/native-desktop/ExportDocManager.Tauri.'+process.env.RELEASE_EDITION)); assert(statSync(target).isDirectory()); if(process.env.OCR_FIXTURE_EXIT) process.exit(Number(process.env.OCR_FIXTURE_EXIT)); writeFileSync('ocr-verified.txt','verified');\n");
   await write("scripts/lib/archive-native-release.ps1", "param($Source,$Destination)\nif (!(Test-Path -LiteralPath $Source)) { throw 'Missing package' }\nNew-Item -ItemType Directory -Force -Path (Split-Path -Parent $Destination) | Out-Null\nSet-Content -LiteralPath $Destination -Value archive\n");
   const execute = promisify(execFile);
   for (const [product, edition] of [["desktop", "Document"], ["desktop", "Sales"], ["web", "Full"]]) {
     const buildScript = `scripts/${product === "desktop" ? "build-native" : "package-native-web-server"}.ps1`;
     await write(buildScript, stub);
     const env = { ...process.env, RELEASE_PRODUCT: product, RELEASE_EDITION: edition, RELEASE_VERSION: "1.2.3", ARTIFACT_PLATFORM: "test", RUST_TARGET: "test", BUNDLE_TARGETS: "test", CARGO_TARGET_DIR: path.join(temporary, "target") };
+    delete env.OCR_FIXTURE_EXIT;
+    const ocrMarker = path.join(temporary, "ocr-verified.txt");
+    await rm(ocrMarker, { force: true });
     await execute("pwsh", ["-NoProfile", "-File", path.join(temporary, "workflow.ps1")], { cwd: temporary, env, timeout: 30000 });
     const extension = process.platform === "win32" ? "zip" : "tar.gz";
     const suffix = edition === 'Full' ? '' : `-${edition}`;
     assert.equal((await readFile(path.join(temporary, `artifacts/releases/exportdoc-${product}-1.2.3-test${suffix}.${extension}`), "utf8")).trim(), "archive");
-    if (product === "desktop") assert.equal((await readFile(path.join(temporary, `artifacts/releases/exportdoc-desktop-1.2.3-test${suffix}-installers.${extension}`), "utf8")).trim(), "archive");
+    if (product === "desktop") {
+      assert.equal(await readFile(ocrMarker, "utf8"), "verified");
+      const archives = ["", "-installers"].map(part => path.join(temporary, `artifacts/releases/exportdoc-desktop-1.2.3-test${suffix}${part}.${extension}`));
+      assert.equal((await readFile(archives[1], "utf8")).trim(), "archive");
+      for (const archive of archives) await rm(archive);
+      await assert.rejects(execute("pwsh", ["-NoProfile", "-File", path.join(temporary, "workflow.ps1")], { cwd: temporary, env: { ...env, OCR_FIXTURE_EXIT: "31" }, timeout: 30000 }), error => error.code === 31);
+      for (const archive of archives) await assert.rejects(readFile(archive), error => error.code === "ENOENT", "OCR failure must prevent portable and installer archives");
+    } else await assert.rejects(readFile(ocrMarker), error => error.code === "ENOENT", "web packages do not execute the desktop OCR probe");
     await write(buildScript, "exit 23\n");
     await assert.rejects(execute("pwsh", ["-NoProfile", "-File", path.join(temporary, "workflow.ps1")], { cwd: temporary, env, timeout: 30000 }), error => error.code === 23);
   }
