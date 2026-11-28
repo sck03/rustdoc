@@ -85,7 +85,7 @@ fn exercise(postgres: bool) {
         CREATE_GENERAL_REQUEST,
         Some(json!({
             "requestKey":crate::paths::nonce().unwrap(),"employeeId":applicant["employee"]["id"],
-            "title":"查询成本验收","reason":"匿名隔离数据","category":"Other"
+            "title":"查询成本验收","reason":"匿名隔离数据","category":"Other","serviceId":"fixture-Other"
         })),
     );
     let request_id = draft["id"].as_i64().unwrap();

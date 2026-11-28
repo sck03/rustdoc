@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "tests": {
     "test_s3_storage_integration.mjs": {
-      "environment": "已按当前源码 locked build 的 office_review、React dist 与隔离 S3 服务；预建测试桶，私有 JSON 提供配置，设置 EXPORTDOC_S3_TEST_ISOLATED=1 和 EXPORTDOC_S3_TEST_CONFIG。使用随机前缀验证图片、分段、条件写、跨库迁移及完整恢复，禁止使用业务桶。",
-      "commands": ["node scripts/test_s3_storage_integration.mjs"]
+      "environment": "SQLite 使用已构建的 office_review；PostgreSQL 使用 test-native-postgres.ps1 的 ExternalS3 范围。两者使用隔离 S3 服务、预建测试桶和私有 JSON，设置 EXPORTDOC_S3_TEST_ISOLATED=1 及 EXPORTDOC_S3_TEST_CONFIG。PostgreSQL 额外验证在线附件连接断开后的全新库与 DataRoot 冷恢复；禁止使用业务桶。",
+      "commands": ["node scripts/test_s3_storage_integration.mjs", "pwsh -NoProfile -File scripts/test-native-postgres.ps1 -PostgresBin <18.x/bin> -Scope ExternalS3"]
     },
     "test_oa_deployment_ui.mjs": {
       "environment": "当前源码 locked build 的 office_review、React dist 与 Chromium；自动创建隔离 SQLite，验证事项编辑、批量预检发布停用与窄屏布局。",

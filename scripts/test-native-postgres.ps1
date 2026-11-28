@@ -5,9 +5,11 @@ param(
     [ValidateSet('All', 'Storage', 'Engine', 'Workflows', 'Capacity', 'Maintenance', 'QueryPerformance', 'AuditStatistics', 'Organization', 'DeploymentRecovery', 'RecoveryUi', 'StorageRecovery', 'ExternalS3')][string]$Scope = 'All',
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Debug',
     [ValidateRange(200, 100000)][int]$HistoryRows = 10000,
-    [ValidateRange(50, 1000)][int]$Rounds = 200
+    [ValidateRange(50, 1000)][int]$Rounds = 200,
+    [switch]$SkipBuild
 )
 $ErrorActionPreference = 'Stop'
+if ($SkipBuild -and $Scope -ne 'ExternalS3') { throw '-SkipBuild is only supported by ExternalS3 with a previously verified current server binary.' }
 . (Join-Path $PSScriptRoot 'lib/build-script-support.ps1')
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $runtimeRoot = Join-Path $repositoryRoot '.codex-runtime'
@@ -20,6 +22,11 @@ $psql = Join-Path $PostgresBin "psql$extension"
 $initdb = Join-Path $PostgresBin "initdb$extension"
 $version = Invoke-ExportDocExternal -FilePath $pgCtl -Arguments @('--version') -CaptureOutput -TimeoutSeconds 30
 if ($version.Output -notmatch 'PostgreSQL\) 18\.') { throw 'Native integration tests require PostgreSQL 18.' }
+if ($Scope -eq 'ExternalS3') {
+    if ($env:EXPORTDOC_S3_TEST_ISOLATED -ne '1') { throw 'External S3 validation requires dedicated test buckets.' }
+    $s3Config = Get-Content -LiteralPath $env:EXPORTDOC_S3_TEST_CONFIG -Raw | ConvertFrom-Json
+    if ($s3Config.targets -isnot [array] -or $s3Config.targets.Count -lt 1 -or $s3Config.targets.Count -gt 8) { throw 'Provide one to eight isolated S3 targets.' }
+}
 New-Item -ItemType Directory -Force -Path $testRoot, (Join-Path $runtimeRoot 'temp') | Out-Null
 $password = [Convert]::ToHexString([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
 $passwordFile = Join-Path $testRoot 'init-password.txt'
@@ -61,9 +68,6 @@ if ($Scope -eq 'Maintenance') {
     $databaseTargets += ,@('MAINTENANCE_TARGET', 'native_maintenance_target')
 }
 if ($Scope -eq 'ExternalS3') {
-    if ($env:EXPORTDOC_S3_TEST_ISOLATED -ne '1') { throw 'External S3 validation requires dedicated test buckets.' }
-    $s3Config = Get-Content -LiteralPath $env:EXPORTDOC_S3_TEST_CONFIG -Raw | ConvertFrom-Json
-    if ($s3Config.targets.Count -lt 1 -or $s3Config.targets.Count -gt 8) { throw 'Provide one to eight isolated S3 targets.' }
     for ($index = 0; $index -lt $s3Config.targets.Count; $index++) {
         $databaseTargets += ,@("S3_SOURCE_$index", "native_s3_source_$index")
         $databaseTargets += ,@("S3_TARGET_$index", "native_s3_target_$index")
@@ -109,7 +113,9 @@ ALTER DEFAULT PRIVILEGES FOR ROLE native_owner IN SCHEMA public GRANT USAGE, SEL
     if ($Scope -eq 'ExternalS3') {
         $environment['EXPORTDOC_S3_TEST_DATABASE'] = 'PostgreSQL'
         $environment['EXPORTDOC_TEST_CONFIGURATION'] = $Configuration
-        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments (@('build', '--locked', '-p', 'export-doc-server') + $cargoProfile) -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Build external storage recovery host'
+        if (-not $SkipBuild) {
+            Invoke-ExportDocExternal -FilePath 'cargo' -Arguments (@('build', '--locked', '-p', 'export-doc-server') + $cargoProfile) -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Build external storage recovery host'
+        }
         Invoke-ExportDocExternal -FilePath 'node' -Arguments @('scripts/test_s3_storage_integration.mjs') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Real PostgreSQL and S3 migration, isolated old instance and cold recovery'
     }
     if ($Scope -in @('DeploymentRecovery', 'StorageRecovery')) {

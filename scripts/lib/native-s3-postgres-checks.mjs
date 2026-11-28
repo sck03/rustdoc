@@ -1,15 +1,15 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
-import { officeReviewInvoke } from './native-office-ui.mjs';
+import { createHash, randomUUID } from 'node:crypto';
+import { openS3RecoveryUi, verifyBackupIdentityUi, restoreS3ThroughUi } from './native-s3-recovery-ui.mjs';
 import { postgresS3Host } from './native-s3-postgres-host.mjs';
 import { isolateOnlineS3Routes } from './native-s3-network-checks.mjs';
 import { verifyExternalS3 } from './native-s3-storage-checks.mjs';
 import { verifyRecoveredS3 } from './native-s3-recovery-checks.mjs';
 
 export async function verifyPostgresS3(repo, targets, index) {
-  const routes = await isolateOnlineS3Routes(targets); let host;
+  const routes = await isolateOnlineS3Routes(targets); let host, ui;
   try {
     const target = routes.targets[index];
     host = await postgresS3Host(repo, target.name, index);
@@ -18,55 +18,48 @@ export async function verifyPostgresS3(repo, targets, index) {
     fs.mkdirSync(path.dirname(path.join(host.source, relativeTemplate)), { recursive: true });
     fs.writeFileSync(path.join(host.source, relativeTemplate), template);
     const digest = bytes => createHash('sha256').update(bytes).digest('hex');
-    const keyDigest = digest(fs.readFileSync(path.join(host.source, 'Security/native-master-key.bin')));
     const expected = await verifyExternalS3({ ...host, stageRecovery: false }, target, routes.targets.find(other => other !== target));
+    const keyDigest = digest(fs.readFileSync(path.join(host.source, 'Security/native-master-key.bin')));
+    const sourceStorage = JSON.parse(fs.readFileSync(path.join(host.source, 'Configuration/file-storage.json'), 'utf8'));
+    const reconnect = target.restoreMode === 'Reconnect';
+    if (reconnect) expected.reconnectTarget = sourceStorage.backend.settings;
+    else if (index > 0) expected.restoreTarget = { ...targets[0], prefix: 'exportdoc-isolated/restored-' + randomUUID(), addressing: 'path' };
+    ui = await openS3RecoveryUi(repo, host.output);
+    await verifyBackupIdentityUi(ui.page, host, expected);
     await host.stop();
-    await routes.close();
-    for (const remote of routes.targets) await assert.rejects(fetch(remote.endpoint, { signal: AbortSignal.timeout(2000) }));
+    if (!reconnect) {
+      await routes.close();
+      for (const remote of routes.targets) await assert.rejects(fetch(remote.endpoint, { signal: AbortSignal.timeout(2000) }));
+    }
     assert(!fs.existsSync(path.join(host.target, 'Security/native-master-key.bin')));
     assert(!fs.existsSync(path.join(host.target, relativeTemplate)));
     const fixture = await host.start('TARGET', true);
-    const session = await fetch(fixture.url + fixture.operations.get('OpenMaintenanceSession').route, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: host.bootstrap }), signal: AbortSignal.timeout(10000),
-    });
-    assert.equal(session.status, 200);
-    const cookie = session.headers.get('set-cookie')?.split(';')[0]; assert(cookie);
-    const headers = { cookie, 'X-Maintenance-Csrf': (await session.json()).csrfToken };
-    const invoke = officeReviewInvoke(fixture.url, host.spec, fixture.operations, headers);
-    const settle = async () => {
-      const deadline = Date.now() + 180000;
-      while (Date.now() < deadline) {
-        const state = await invoke('GetMaintenanceStatus');
-        if (!state.busy) return state;
-        await new Promise(resolve => setTimeout(resolve, 200));
-      }
-      throw Error('Cold S3 recovery operation timed out');
-    };
-    const unlock = { repositoryId: '', locationId: '', password: expected.recoveryPassword, oldInstanceIsolated: true,
-      sourceKind: 'S3', s3: expected.repository, secretAccessKey: target.secret, sessionToken: '' };
-    const wrong = await fetch(fixture.url + fixture.operations.get('UnlockRecoveryRepository').route, {
-      method: 'POST', headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify({ ...unlock, password: 'Wrong-isolated-password' }), signal: AbortSignal.timeout(60000),
-    });
-    if (wrong.ok) assert.equal((await settle()).state, 'Failed');
-    else assert.equal(wrong.status, 400);
-    assert(!fs.existsSync(path.join(host.target, 'Security/native-master-key.bin')));
-    await invoke('UnlockRecoveryRepository', unlock);
-    const unlocked = await settle(); assert.equal(unlocked.state, 'Unlocked', JSON.stringify(unlocked));
-    assert(unlocked.points.length > 0); assert.equal(unlocked.points[0].provider, 'PostgreSQL');
-    await invoke('PreflightRecoveryPoint', { pointId: unlocked.points[0].id, fileMode: 'Local', targetLocation: '' });
-    const preflight = await settle(); assert.equal(preflight.state, 'Ready', JSON.stringify(preflight));
-    await invoke('ApplyRecoveryPoint', { planId: preflight.planId });
-    const applied = await settle(); assert.equal(applied.state, 'Completed', JSON.stringify(applied));
+    await restoreS3ThroughUi(ui.page, fixture, expected, { secret: target.secret, token: host.bootstrap,
+      afterRejected: () => assert(!fs.existsSync(path.join(host.target, 'Security/native-master-key.bin'))) });
     await host.stop();
     const recovered = await host.start('TARGET');
     await verifyRecoveredS3(recovered, expected);
     assert.equal(digest(fs.readFileSync(path.join(host.target, 'Security/native-master-key.bin'))), keyDigest);
     assert.deepEqual(fs.readFileSync(path.join(host.target, relativeTemplate)), template);
-    expected.checks.push('PostgreSQL cold restore into an empty database and new DataRoot with online attachment routes disconnected',
+    if (reconnect) {
+      const restoredStorage = JSON.parse(fs.readFileSync(path.join(host.target, 'Configuration/file-storage.json'), 'utf8'));
+      assert.equal(restoredStorage.identity, sourceStorage.identity, 'Reconnect retains the original file-library identity');
+      assert.deepEqual(restoredStorage.backend, sourceStorage.backend, 'Reconnect reuses the original S3 configuration and protected credentials');
+    }
+    assert.deepEqual(ui.errors, [], 'No unhandled errors in the real recovery UI');
+    expected.checks.push(reconnect ? 'replace stopped application host with an empty PostgreSQL database and new DataRoot, reconnecting the intact original S3 library' : 'PostgreSQL cold restore into an empty database and new DataRoot with online attachment routes disconnected',
+      reconnect ? 'retain original file-library identity, endpoint, bucket, prefix and protected credentials' : expected.restoreTarget ? 'rebuild attachments in a new S3 namespace on ' + expected.restoreTarget.name : 'rebuild attachments in local storage',
+      'real React backup identity display and S3 unlock, preflight and apply',
       'wrong recovery password leaves target unchanged; master key and template restored from S3');
-    const result = { provider: target.name, database: 'PostgreSQL', checks: expected.checks, passed: true };
+    const result = { provider: target.name, database: 'PostgreSQL', restoreMode: reconnect ? 'Reconnect' : expected.restoreTarget ? 'S3' : 'Local', checks: expected.checks, passed: true };
     fs.writeFileSync(path.join(host.output, 's3-result.json'), JSON.stringify(result, null, 2));
     console.log('PostgreSQL S3 cold recovery passed: ' + host.output);
     return result;
-  } finally { await host?.close(); await routes.close(); }
+  } catch (error) {
+    if (ui) {
+      await ui.page.screenshot({ path: path.join(host.output, 'failure.png'), fullPage: true }).catch(() => {});
+      fs.writeFileSync(path.join(host.output, 'failure-page.txt'), await ui.page.locator('body').ariaSnapshot().catch(() => 'Page unavailable'));
+    }
+    throw error;
+  } finally { await ui?.browser.close(); await host?.close(); await routes.close(); }
 }

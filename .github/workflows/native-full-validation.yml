@@ -10,7 +10,8 @@ jobs:
   desktop:
     name: Desktop ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 90
+    # Cold Windows builds include workspace, feature, UI and OCR package validation.
+    timeout-minutes: 150
     strategy:
       fail-fast: false
       matrix:

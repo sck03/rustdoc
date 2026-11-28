@@ -4,6 +4,10 @@
 
 老 CPU 指令兼容性：手动运行 `browser-compatibility.yml` 并设置 `storage_cpu_only=true`，仅调用独立 `storage-cpu-compatibility.yml`。固定官方 SeaweedFS 4.55/RustFS 1.0.7 Linux 归档并核验 SHA-256，在 QEMU Conroe 指令集下验证启动、12 路条件写和 12 MiB 分段下载摘要。此项不测真实 E5200 性能，也不替代 PostgreSQL 冷恢复验收。默认浏览器验收保持原范围。
 
+ExternalS3 的 PostgreSQL 冷恢复使用测试自建 TCP 代理，要求候选服务位于 `http://127.0.0.1`。真实 React 验证备份仓库编号、错误凭证拒绝、S3 解锁、预检和恢复，恢复后核对文件摘要、主密钥、模板、旧会话和备份后新增记录。默认构建当前服务；`-SkipBuild` 仅限 ExternalS3，可通过 `EXPORTDOC_S3_TEST_SERVER_BINARY` 使用 `.codex-runtime` 内已验证的当前服务器副本，须记录来源和摘要。跳过构建不作为新的编译证据。
+
+每个 target 可增加 `restoreMode: "Reconnect"`，验证只停旧 A、保留原 S3 在线，再由全新数据库与 DataRoot 接回原文件库；省略时验证断开旧附件路由后的本地／新 S3 重建。两种模式均核对恢复后新附件的上传和下载。
+
 2026-11-28 文件发布一致性：`test:storage-governance-lifecycle` 新增 `test_storage_receipts_ui.mjs`，验证保存成功但刷新失败后的版本续用、状态保留和凭据清空；原存储合同增加两库正式位置切换/批量状态、单据待办计数。归档重传、回滚、重启清理和千条日志推进由 Engine 文件存储回归覆盖。macOS 网页包的 CI 先调用内部 `prepare-postgresql-macos-client.ps1`，按原生资源清单下载并校验固定 Homebrew 配方；普通构建不自动安装系统依赖。已安装的配方名称必须与清单一致，客户端复制器继续检查精确版本。
 
 本批按用户追加要求执行全量验证，见[实施记录](../docs/archive/2026-11/2026-11-28文件发布一致性与全量验证.md)。

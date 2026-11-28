@@ -20,7 +20,6 @@ export function BackupSchedulePanel({ controller: c, disabled, onCredentials }: 
         <label><span>恢复凭证</span><input type="password" autoComplete="new-password" value={c.draft.encryptionPassword} placeholder="至少 12 个字符" onChange={(event) => c.setPassword(event.target.value)} /></label>
         <label><span>再次输入新密码</span><input type="password" autoComplete="new-password" value={c.confirmation} onChange={(event) => c.setConfirmation(event.target.value)} /></label>
       </div>}
-      {!c.status.encryptionPasswordSet && <p className="settings-helper-text">请单独保管恢复凭证，恢复时需要使用。</p>}
       <CollapsibleSection className="maintenance-advanced-details" title="保留策略" error={Boolean(c.message)}>
         <div className="field-grid">
           <label><span>保留最新份数</span><input type="number" min={1} max={365} step={1} value={plan.retentionCount} onChange={(event) => c.updatePlan("retentionCount", Number(event.target.value))} /></label>
@@ -29,6 +28,8 @@ export function BackupSchedulePanel({ controller: c, disabled, onCredentials }: 
         <p className="settings-helper-text">新备份及所选副本完成后才清理到期或超额备份，至少保留最新一份。只管理本计划创建的文件。S3 开启版本控制时，旧对象版本的保留由存储端生命周期策略控制。</p>
       </CollapsibleSection>
     </fieldset>
+    {c.status.repositoryId && <label><span>恢复仓库编号</span><input readOnly value={c.status.repositoryId} /></label>}
+    <p className="settings-helper-text">请在本机之外保管恢复仓库编号、恢复凭证和备份位置，独立恢复时需要使用。</p>
     <div className="detail-grid"><div className="detail-item"><span>下次执行（{c.status.timeZone}）</span><strong>{formatRuntimeDate(c.status.nextRunAt ?? undefined, c.status.timeZone) || "未启用"}</strong></div><div className="detail-item"><span>备份内容</span><strong>完整加密快照</strong></div></div>
     <Button disabled={disabled || c.dirty || c.activeJob || !c.status.encryptionPasswordSet} onClick={() => c.start("backup")}>立即备份一次</Button>
     <p className="settings-helper-text">手动执行不要求启用定时计划。请先保存密码及存储设置；计划关闭时不会启动定时线程。</p>

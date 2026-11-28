@@ -89,6 +89,8 @@ export async function verifyExternalS3(fixture, target, alternate) {
     plan: { ...status.plan, enabled: false, replicaMode: 'S3', s3: repository },
     encryptionPassword: password, webDav: status.webDav, webDavPassword: null, s3SecretAccessKey: target.secret, s3SessionToken: '' });
   await wait(await call('RunBackupPlan'));
+  const repositoryId = (await call('GetBackupPlan')).repositoryId;
+  assert.match(repositoryId, /^[a-f0-9]{32}$/u);
   const points = await call('ListRecoveryArchives'); assert(points.items.length > 0);
   const marker = await call('CreatePersonnel', { requestKey: randomUUID(), employeeNumber: 'AFTER-' + randomUUID(),
     departmentId: 'GENERAL', jobTitle: '恢复标记', employmentType: 'FullTime', hireDate: '2026-01-01', profile: { fullName: '恢复点之后' } });
@@ -96,5 +98,5 @@ export async function verifyExternalS3(fixture, target, alternate) {
     await wait(await call('StageRecoveryArchiveRestore', { password, adminPassword: credentials.password, confirmationText: 'RECOVER', fileMode: 'Local' }, { id: points.items[0].id }));
     checks.push('encrypted S3 recovery point discovered and staged into local storage');
   }
-  return { data: fixture.data ?? path.join(output, 'Data'), credentials, repository, recoveryPassword: password, person: person.employee.id, marker: marker.employee.id, files, oldToken: token, checks };
+  return { data: fixture.data ?? path.join(output, 'Data'), credentials, repository, repositoryId, recoveryPassword: password, person: person.employee.id, marker: marker.employee.id, files, oldToken: token, checks };
 }

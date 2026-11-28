@@ -420,11 +420,18 @@ pub fn exercise(service: &NativeService, admin: &str) -> i64 {
     let manager = login(users[1]["username"].as_str().unwrap());
     let manager = manager.as_str();
     let reviewer = call(service, manager, GET_CURRENT_USER, 0, &[], None).unwrap();
-    workflow::configure_handling_services(
+    let service_id = format!("communication-{suffix}");
+    let mut handling = workflow::handling_service("Other", reviewer["id"].as_i64().unwrap());
+    handling["key"] = json!(service_id);
+    handling["name"] = json!(format!("通知独立事项-{suffix}"));
+    handling["revision"] = json!(0);
+    workflow::request(
         service,
         admin,
-        reviewer["id"].as_i64().unwrap(),
-        &["Other"],
+        SAVE_HANDLING_SERVICE,
+        Some(json!({
+            "service":handling,"commandKey":nonce().unwrap()
+        })),
     );
     let mut settings = workflow::request(service, admin, GET_OA_APPROVAL_SETTINGS, None);
     let general = settings["rules"]
@@ -455,7 +462,7 @@ pub fn exercise(service: &NativeService, admin: &str) -> i64 {
         &[],
         Some(json!({
             "requestKey": nonce().unwrap(), "title": "通知事务验收",
-            "reason": "事项通知", "category": "Other", "serviceId": "fixture-Other"
+            "reason": "事项通知", "category": "Other", "serviceId": service_id
         })),
     )
     .unwrap();

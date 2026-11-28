@@ -38,7 +38,12 @@ export async function postgresS3Host(repo, name, index) {
     env.EXPORTDOCMANAGER_BOOTSTRAP_TOKEN_FILE = writeSecret(mode + '-bootstrap.txt', bootstrap);
     environments[mode] = env;
   }
-  const executable = path.join(cargoArtifactDirectory(repo, process.env, process.env.EXPORTDOC_TEST_CONFIGURATION === 'Release' ? 'release' : 'debug'), 'export-doc-server' + (process.platform === 'win32' ? '.exe' : ''));
+  const binaryName = 'export-doc-server' + (process.platform === 'win32' ? '.exe' : '');
+  const executable = process.env.EXPORTDOC_S3_TEST_SERVER_BINARY ?? path.join(cargoArtifactDirectory(repo, process.env, process.env.EXPORTDOC_TEST_CONFIGURATION === 'Release' ? 'release' : 'debug'), binaryName);
+  if (process.env.EXPORTDOC_S3_TEST_SERVER_BINARY) {
+    const relative = path.relative(fs.realpathSync(path.join(repo, '.codex-runtime')), fs.realpathSync(executable));
+    assert(!relative.startsWith('..') && !path.isAbsolute(relative) && path.basename(executable) === binaryName && !fs.lstatSync(executable).isSymbolicLink(), 'Use an isolated repository-owned server copy');
+  }
   const execute = promisify(execFile); let server, log, sequence = 0;
   const stop = async () => { if (server) await stopProcessTree(server, 5000); server = undefined; if (log !== undefined) fs.closeSync(log); log = undefined; };
   const start = async (mode, maintenance = false) => {

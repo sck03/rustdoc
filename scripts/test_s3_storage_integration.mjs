@@ -15,6 +15,8 @@ for (const target of config.targets) {
   assert(['http:', 'https:'].includes(endpoint.protocol) && !endpoint.username && !endpoint.password && !endpoint.search && !endpoint.hash);
   for (const key of ['bucket', 'backupBucket', 'accessKeyId', 'secret']) assert(target[key], 'Missing ' + key);
   assert.notEqual(target.bucket, target.backupBucket, 'Use independent attachment and backup test buckets');
+  assert(target.restoreMode === undefined || target.restoreMode === 'Reconnect', 'Optional restoreMode must be Reconnect');
+  if (target.restoreMode) assert.equal(process.env.EXPORTDOC_S3_TEST_DATABASE, 'PostgreSQL', 'Reconnect validation uses the PostgreSQL cold-recovery runner');
 }
 const results = [];
 for (const target of config.targets) {
