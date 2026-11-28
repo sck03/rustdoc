@@ -10,7 +10,8 @@ const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 export async function verifyExternalS3(fixture, target, alternate) {
   const { repo, url, invoke, operations, output } = fixture;
   const checks = [];
-  const token = (await invoke('Login', { username: 'oa-review', password: 'Review-2026-Test' })).accessToken;
+  const credentials = fixture.credentials ?? { username: 'oa-review', password: 'Review-2026-Test' };
+  const token = (await invoke('Login', credentials)).accessToken;
   const call = (name, body, parameters = {}) => invoke(name, body, parameters, token);
   const route = (name, parameters) => operations.get(name).route.replace(/\{([^}]+)\}/gu, (_, key) => parameters[key]);
   const request = (name, parameters, init = {}) => fetch(url + route(name, parameters), {
@@ -82,14 +83,18 @@ export async function verifyExternalS3(fixture, target, alternate) {
   if (alternate) { await migrate(alternate); await verify(); await migrate(target); await verify(); checks.push('cross-provider migration and return'); }
   const status = await call('GetBackupPlan');
   const password = 'Isolated-Recovery-' + randomUUID();
+  const repository = s3(target, target.backupBucket);
+  repository.endpoint = target.backupEndpoint ?? target.endpoint;
   await call('SaveBackupPlan', { expectedRevision: status.revision, expectedSettingsRevision: status.settingsRevision,
-    plan: { ...status.plan, enabled: false, replicaMode: 'S3', s3: s3(target, target.backupBucket) },
+    plan: { ...status.plan, enabled: false, replicaMode: 'S3', s3: repository },
     encryptionPassword: password, webDav: status.webDav, webDavPassword: null, s3SecretAccessKey: target.secret, s3SessionToken: '' });
   await wait(await call('RunBackupPlan'));
   const points = await call('ListRecoveryArchives'); assert(points.items.length > 0);
   const marker = await call('CreatePersonnel', { requestKey: randomUUID(), employeeNumber: 'AFTER-' + randomUUID(),
     departmentId: 'GENERAL', jobTitle: '恢复标记', employmentType: 'FullTime', hireDate: '2026-01-01', profile: { fullName: '恢复点之后' } });
-  await wait(await call('StageRecoveryArchiveRestore', { password, adminPassword: 'Review-2026-Test', confirmationText: 'RECOVER', fileMode: 'Local' }, { id: points.items[0].id }));
-  checks.push('encrypted S3 recovery point discovered and staged into local storage');
-  return { data: path.join(output, 'Data'), person: person.employee.id, marker: marker.employee.id, files, oldToken: token, checks };
+  if (fixture.stageRecovery !== false) {
+    await wait(await call('StageRecoveryArchiveRestore', { password, adminPassword: credentials.password, confirmationText: 'RECOVER', fileMode: 'Local' }, { id: points.items[0].id }));
+    checks.push('encrypted S3 recovery point discovered and staged into local storage');
+  }
+  return { data: fixture.data ?? path.join(output, 'Data'), credentials, repository, recoveryPassword: password, person: person.employee.id, marker: marker.employee.id, files, oldToken: token, checks };
 }

@@ -2,7 +2,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$PostgresBin,
     [ValidateRange(60, 7200)][int]$TimeoutSeconds = 3600,
-    [ValidateSet('All', 'Storage', 'Engine', 'Workflows', 'Capacity', 'Maintenance', 'QueryPerformance', 'AuditStatistics', 'Organization', 'DeploymentRecovery', 'RecoveryUi', 'StorageRecovery')][string]$Scope = 'All',
+    [ValidateSet('All', 'Storage', 'Engine', 'Workflows', 'Capacity', 'Maintenance', 'QueryPerformance', 'AuditStatistics', 'Organization', 'DeploymentRecovery', 'RecoveryUi', 'StorageRecovery', 'ExternalS3')][string]$Scope = 'All',
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Debug',
     [ValidateRange(200, 100000)][int]$HistoryRows = 10000,
     [ValidateRange(50, 1000)][int]$Rounds = 200
@@ -60,6 +60,15 @@ if ($Scope -eq 'Maintenance') {
     $databaseTargets += ,@('MAINTENANCE_UI', 'native_maintenance_ui')
     $databaseTargets += ,@('MAINTENANCE_TARGET', 'native_maintenance_target')
 }
+if ($Scope -eq 'ExternalS3') {
+    if ($env:EXPORTDOC_S3_TEST_ISOLATED -ne '1') { throw 'External S3 validation requires dedicated test buckets.' }
+    $s3Config = Get-Content -LiteralPath $env:EXPORTDOC_S3_TEST_CONFIG -Raw | ConvertFrom-Json
+    if ($s3Config.targets.Count -lt 1 -or $s3Config.targets.Count -gt 8) { throw 'Provide one to eight isolated S3 targets.' }
+    for ($index = 0; $index -lt $s3Config.targets.Count; $index++) {
+        $databaseTargets += ,@("S3_SOURCE_$index", "native_s3_source_$index")
+        $databaseTargets += ,@("S3_TARGET_$index", "native_s3_target_$index")
+    }
+}
 $databaseStatements = ($databaseTargets | ForEach-Object { "CREATE DATABASE $($_[1]) OWNER native_owner;" }) -join [Environment]::NewLine
 try {
     Invoke-ExportDocExternal -FilePath $initdb -Arguments @('-D', $dataRoot, '-U', 'native_bootstrap', '--auth=scram-sha-256', "--pwfile=$passwordFile", '--encoding=UTF8', '--locale=C') -Environment $environment -TimeoutSeconds 120 -DisplayName 'Initialize isolated native test cluster'
@@ -96,6 +105,12 @@ ALTER DEFAULT PRIVILEGES FOR ROLE native_owner IN SCHEMA public GRANT USAGE, SEL
     }
     if ($Scope -eq 'Organization') {
         Invoke-ExportDocExternal -FilePath 'cargo' -Arguments (@('test', '--locked', '-p', 'export-doc-storage', '--features', 'postgres', '--test', 'organization_references') + $cargoProfile + @('--', '--ignored', '--test-threads=1')) -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Organization ownership references on isolated PostgreSQL 18'
+    }
+    if ($Scope -eq 'ExternalS3') {
+        $environment['EXPORTDOC_S3_TEST_DATABASE'] = 'PostgreSQL'
+        $environment['EXPORTDOC_TEST_CONFIGURATION'] = $Configuration
+        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments (@('build', '--locked', '-p', 'export-doc-server') + $cargoProfile) -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Build external storage recovery host'
+        Invoke-ExportDocExternal -FilePath 'node' -Arguments @('scripts/test_s3_storage_integration.mjs') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Real PostgreSQL and S3 migration, isolated old instance and cold recovery'
     }
     if ($Scope -in @('DeploymentRecovery', 'StorageRecovery')) {
         Invoke-ExportDocExternal -FilePath 'cargo' -Arguments (@('test', '--locked', '-p', 'export-doc-storage', '--features', 'postgres', '--test', 'retention') + $cargoProfile + @('--', 'postgres_retention', '--ignored', '--test-threads=1', '--nocapture')) -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Formal archive retention and cascade accounting on PostgreSQL 18'

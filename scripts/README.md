@@ -1,6 +1,8 @@
 # 脚本使用说明
 
-外部 S3 兼容验收：`test_s3_storage_integration.mjs` 使用显式隔离桶与现有 office_review 程序，覆盖并发条件创建、图片／分段文件、迁移、加密恢复及重启。配置、实际 SeaweedFS/RustFS 结果和设备验收边界见[局域网附件存储选型与接入](../docs/局域网附件存储选型与接入.md)；它是内部验收脚本，不是新增普通用户入口。
+外部 S3 兼容验收：`test_s3_storage_integration.mjs` 使用显式隔离桶，覆盖并发条件创建、图片／分段文件、迁移、加密恢复及重启。SQLite 使用已构建的 office_review；`test-native-postgres.ps1 -PostgresBin <18.x/bin> -Scope ExternalS3` 验证断开原在线附件连接后，从独立 S3 备份恢复至全新 PostgreSQL 库与 DataRoot。两种入口均需 `EXPORTDOC_S3_TEST_ISOLATED=1` 和私有 `EXPORTDOC_S3_TEST_CONFIG`。配置、实际结果和设备验收边界见[局域网附件存储选型与接入](../docs/局域网附件存储选型与接入.md)；它们是内部验收入口。
+
+老 CPU 指令兼容性：手动运行 `browser-compatibility.yml` 并设置 `storage_cpu_only=true`，仅调用独立 `storage-cpu-compatibility.yml`。固定官方 SeaweedFS 4.55/RustFS 1.0.7 Linux 归档并核验 SHA-256，在 QEMU Conroe 指令集下验证启动、12 路条件写和 12 MiB 分段下载摘要。此项不测真实 E5200 性能，也不替代 PostgreSQL 冷恢复验收。默认浏览器验收保持原范围。
 
 2026-11-28 文件发布一致性：`test:storage-governance-lifecycle` 新增 `test_storage_receipts_ui.mjs`，验证保存成功但刷新失败后的版本续用、状态保留和凭据清空；原存储合同增加两库正式位置切换/批量状态、单据待办计数。归档重传、回滚、重启清理和千条日志推进由 Engine 文件存储回归覆盖。macOS 网页包的 CI 先调用内部 `prepare-postgresql-macos-client.ps1`，按原生资源清单下载并校验固定 Homebrew 配方；普通构建不自动安装系统依赖。已安装的配方名称必须与清单一致，客户端复制器继续检查精确版本。
 

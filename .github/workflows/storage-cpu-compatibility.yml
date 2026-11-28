@@ -1,0 +1,42 @@
+name: Storage legacy CPU acceptance
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  conroe-s3:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 26
+      - name: Install instruction emulator
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user unzip
+          qemu-x86_64 --version
+      - name: Verify fixed official storage archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .codex-runtime/storage-cpu/{seaweedfs,rustfs}
+          cd .codex-runtime/storage-cpu
+          curl --fail --location --retry 3 --output seaweedfs.tar.gz https://github.com/seaweedfs/seaweedfs/releases/download/4.55/linux_amd64.tar.gz
+          curl --fail --location --retry 3 --output rustfs.zip https://github.com/rustfs/rustfs/releases/download/1.0.7/rustfs-linux-x86_64-musl-v1.0.7.zip
+          printf '%s\n' 'f156c609eeaf9e5fcfeea33fd70411222005f83760aa95893c9d58eff006b45c  seaweedfs.tar.gz' 'c90a40ba8cdc1468c71029a4d65fdd13449720183d3a8e00bc61ab09fcd448a5  rustfs.zip' | sha256sum --check
+          tar -xzf seaweedfs.tar.gz -C seaweedfs
+          unzip -q rustfs.zip -d rustfs
+          chmod +x seaweedfs/weed rustfs/rustfs
+      - name: Run real storage on the conservative CPU model
+        run: node scripts/test_s3_cpu_compatibility.mjs
+      - name: Preserve instruction compatibility evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: storage-conroe-acceptance
+          path: |
+            artifacts/s3-cpu-compatibility/result.json
+            artifacts/s3-cpu-compatibility/*/server.log
+          retention-days: 14

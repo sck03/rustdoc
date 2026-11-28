@@ -2,6 +2,11 @@ name: Browser compatibility acceptance
 
 on:
   workflow_dispatch:
+    inputs:
+      storage_cpu_only:
+        description: Test SeaweedFS and RustFS on a conservative legacy x86-64 instruction set
+        type: boolean
+        default: false
 
 concurrency:
   group: browser-compatibility-${{ github.ref }}
@@ -12,6 +17,7 @@ permissions:
 
 jobs:
   firefox-webkit:
+    if: ${{ !inputs.storage_cpu_only }}
     name: Firefox + WebKit desktop/mobile
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -66,3 +72,7 @@ jobs:
       - name: Run real browser accessibility and responsive acceptance
         timeout-minutes: 25
         run: npm --prefix apps/export-doc-web run test:cross-browser-ui
+
+  storage-cpu:
+    if: ${{ inputs.storage_cpu_only }}
+    uses: ./.github/workflows/storage-cpu-compatibility.yml

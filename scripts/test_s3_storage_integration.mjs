@@ -4,6 +4,7 @@ import path from 'node:path';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
 import { verifyExternalS3 } from './lib/native-s3-storage-checks.mjs';
 import { verifyS3RecoveryRestart } from './lib/native-s3-recovery-checks.mjs';
+import { verifyPostgresS3 } from './lib/native-s3-postgres-checks.mjs';
 
 assert.equal(process.env.EXPORTDOC_S3_TEST_ISOLATED, '1', 'Use dedicated empty test buckets and set EXPORTDOC_S3_TEST_ISOLATED=1');
 const config = JSON.parse(fs.readFileSync(process.env.EXPORTDOC_S3_TEST_CONFIG, 'utf8'));
@@ -17,6 +18,10 @@ for (const target of config.targets) {
 }
 const results = [];
 for (const target of config.targets) {
+  if (process.env.EXPORTDOC_S3_TEST_DATABASE === 'PostgreSQL') {
+    results.push(await verifyPostgresS3(path.resolve(import.meta.dirname, '..'), config.targets, config.targets.indexOf(target)));
+    continue;
+  }
   let restored;
   await withOfficeUi('external-s3-' + target.name, async fixture => {
     restored = await verifyExternalS3(fixture, target, config.targets.find(other => other !== target));

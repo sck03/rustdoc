@@ -19,17 +19,21 @@ export async function verifyS3RecoveryRestart(repo, expected) {
     });
     const spec = await (await fetch(url + '/openapi/v1.json', { signal: AbortSignal.timeout(10000) })).json();
     const operations = officeReviewOperations(spec), invoke = officeReviewInvoke(url, spec, operations);
-    const token = (await invoke('Login', { username: 'oa-review', password: 'Review-2026-Test' })).accessToken;
-    assert.equal((await invoke('GetFileStorage', undefined, {}, token)).kind, 'local');
-    const get = (route, credentials = token) => fetch(url + route, { signal: AbortSignal.timeout(60000), headers: { authorization: 'Bearer ' + credentials } });
-    assert.equal((await get('/api/file-storage', expected.oldToken)).status, 401);
-    const route = (name, parameters) => operations.get(name).route.replace(/\{([^}]+)\}/gu, (_, key) => parameters[key]);
-    for (const file of expected.files) {
-      const response = await get(route('DownloadPersonnelAttachment', { id: expected.person, attachmentId: file.id }));
-      assert.equal(response.status, 200);
-      assert.equal(createHash('sha256').update(Buffer.from(await response.arrayBuffer())).digest('hex'), file.hash);
-    }
-    assert.equal((await get(route('GetPersonnel', { id: expected.marker }))).status, 404);
-    expected.checks.push('restart restores database and attachment hashes and revokes old sessions');
+    await verifyRecoveredS3({ url, invoke, operations }, expected);
   } finally { await stopProcessTree(server); }
+}
+
+export async function verifyRecoveredS3({ url, invoke, operations }, expected) {
+  const token = (await invoke('Login', expected.credentials)).accessToken;
+  assert.equal((await invoke('GetFileStorage', undefined, {}, token)).kind, 'local');
+  const get = (route, credentials = token) => fetch(url + route, { signal: AbortSignal.timeout(60000), headers: { authorization: 'Bearer ' + credentials } });
+  const route = (name, parameters = {}) => operations.get(name).route.replace(/\{([^}]+)\}/gu, (_, key) => parameters[key]);
+  assert.equal((await get(route('GetFileStorage'), expected.oldToken)).status, 401);
+  for (const file of expected.files) {
+    const response = await get(route('DownloadPersonnelAttachment', { id: expected.person, attachmentId: file.id }));
+    assert.equal(response.status, 200);
+    assert.equal(createHash('sha256').update(Buffer.from(await response.arrayBuffer())).digest('hex'), file.hash);
+  }
+  assert.equal((await get(route('GetPersonnel', { id: expected.marker }))).status, 404);
+  expected.checks.push('restart restores database and attachment hashes and revokes old sessions');
 }
